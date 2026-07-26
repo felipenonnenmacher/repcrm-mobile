@@ -1,0 +1,1950 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>RepCRM Mobile</title>
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%20%22RepCRM%20%5Cu2014%20Amora%22%2C%20%22short_name%22%3A%20%22RepCRM%22%2C%20%22start_url%22%3A%20%22./%22%2C%20%22scope%22%3A%20%22./%22%2C%20%22display%22%3A%20%22standalone%22%2C%20%22orientation%22%3A%20%22portrait%22%2C%20%22background_color%22%3A%20%22%23f5f3ff%22%2C%20%22theme_color%22%3A%20%22%237c3aed%22%2C%20%22icons%22%3A%20%5B%7B%22src%22%3A%20%22data%3Aimage/png%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAAMAAAADACAYAAABS3GwHAAAEGUlEQVR4nO3dzVXbQBSGYZmTCkw3uITUkS7wynSROijBdINbIIsccYwBI1k/M9L3POscexb31R15QTZNYY8Pr2%2Blz0A5Ty/3m5LfP/uXG3iumTuIWb7M0HOLOWKY9AsMfl0Ox23pI7zb706d/%2B2UIUzywQa/LjUN/qXSIfwa88MMPlNq52vMEEb5IINfr5qf/q0%2BW%2BDcGCHcDf0Aw08pY8zeoAAMP6UNncGb3gEMPjUZ8m7QewMYfmp1y2z2CsDwU7u%2BM9o5AMPPUvSZ1U4BGH6WpuvMDv4ZFJbsxwA8/VmqLrN7NQDDz9L9NMPfBmD4WYtrs%2BwdgGhfBuDpz9p8N9M2ANE%2BBeDpz1p9Nds2ANE%2BBODpz9pdzrgNQLT3ADz9SXE%2B6zYA0QRAtLumcf0hTzvzNgDRBEA0ARDtzv2fVI8Pr282ANEEQDQBEG3UP4%2Be5nDcPpc%2BQ2u/O/0ufYYlEsANahr8VnsmIfTjCkQ0AfRU49P/XO3nq40AiCYAogmAaAIgmgCIJgCiCYBoAiCaAIgmAKIJgGgCIJoAiCYAogmAaAIgmgCIJgCiCYBoAiCaAIgmAKIJgGgCIJoAiCYAogmAaAIgmgCIJgCiCYBoAiCaAIgmAKJV9Z/kHY7bP6XP0NrvTn9Ln4HpVRFATYPfas8khHVzBSJa8QBqfPqfq/18DFM8AChJAEQTANEEQDQBEE0ARBMA0QRANAEQTQBEEwDRBEA0ARBNAEQTANEEQDQBEE0ARBMA0QRANAEQTQBEEwDRBEA0ARBNAEQTANEEQDQBEE0ARBMA0QRANAEQTQBEEwDRBEA0ARBNAEQTANEEQDQBEE0ARBMA0QRANAEQTQBEEwDRBEA0ARBNAEQTANEEQDQBEE0ARBMA0QRANAEQTQBEEwDRBEA0ARBNAEQTANEEQDQBEE0ARBMA0QRANAEQTQBEEwDRBEA0ARBNAEQTANEEQDQBEE0ARBMA0QRAtOIB7Henv6XPcM3l%2Bfa70%2B9SZ%2Bni8nz73anUUTopfb7iAUBJm6ZpmseH17fSB2mapjkct39Kn6HVZTMdjtvnOc7SRZfNdDhu5zhKJ6Wf/E3TNE8v95uqAoA5Pb3cb1yBiCYAot01zf9VUPogMKd25m0AogmAaO8BuAaR4nzWbQCifQjAFmDtLmfcBiDapwBsAdbqq9m2AYj2ZQC2AGvz3UzbAET7NgBbgLW4NstXN4AIWLqfZvjHK5AIWKous%2BsdgGidArAFWJquM9t5A4iApegzq72uQCKgdn1ntPc7gAio1S2zOWiY/TUJajDkoTzoVyDbgNKGzuDgn0FFQCljzN6ow%2BtKxBzGfOhO8vQWAlOY4rYx6fVFCIxhymv2LPd3IXCLOd4vZ3%2BBFQPXzP2jSvFfcASRrfSviP8AXU77IOB9nKwAAAAASUVORK5CYII%3D%22%2C%20%22sizes%22%3A%20%22192x192%22%2C%20%22type%22%3A%20%22image/png%22%7D%2C%20%7B%22src%22%3A%20%22data%3Aimage/png%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAYAAAD0eNT6AAAMiklEQVR4nO3d3ZUTxwJGUcEiApwNhOA4nAU84Swch0OAbCAF7oOXuGIYZqRR/1T12TsBt1oP3%2BlqDX51YlMf3n39vvc1AIzo7y9/vNr7Gkrc7BUYeYBliYPluaF3MvYA%2BxAF93HzbmTwAcYkCG7jZl3B6APMRQw8zw16hMEHOBZB8Cs35ILhBzg2IfB/%2BRth9AGa6jGQ/fCGH7o%2BfX679yVwhY/vv23y36mGQO5DG37oMvxzEgLreLP3BWzB6APwnMutKMTAoT%2Bg4QfOPP3PbatTgIeOHAKv976AtRh/AO515C053CuAI39ZAGzvvCtHOw04TAAYfgDWdLQQmD4ADD8AWzpKCEz9GwDjD8BeZt%2BgKU8AZr/pABzDzKcB050AGH8ARjPjNk0VADPeYAAaZtuoKV4BzHZTAWia6ZXA8CcAxh%2BA2cywXUMHwAw3EAAeM/qGDfkKYPSbBgDXGPmVwHAnAMYfgKMZcduGCoARbxAALGG0jRsmAEa7MQCwtJG2bogAGOmGAMCaRtm83QNglBsBAFsZYft2DYARbgAA7GHvDdwtAPb%2B4ACwtz23cJcAMP4A8J%2B9NnHzADD%2BAPCzPbZx0wAw/gDwuK03crMAMP4A8LQtt3KTADD%2BAHCdrTZz9QAw/gBwmy22c9UAMP4A8DJrb%2Bju/xIgALC91QLA0z8A3GfNLV0lAIw/ACxjrU1dPACMPwAsa41t9RsAAAhaNAA8/QPAOpbe2MUCwPgDwLqW3NpFAsD4A8A2ltpcvwEAgKC7A8DTPwBsa4ntvSsAjD8A7OPeDfYKAACCXhwAnv4BYF/3bLETAAAIelEAePoHgDG8dJOdAABA0M0B4OkfAMbykm2%2BKQCMPwCM6daN9goAAIKuDgBP/wAwtlu22gkAAAQJAAAIuioAHP8DwByu3WwnAAAQ9GwAePoHgLlcs91OAAAg6MkA8PQPAHN6bsOdAABAkAAAgKDfBoDjfwCY21Nb7gQAAIIeDQBP/wBwDL/bdCcAABAkAAAgSAAAQNAvAeD9PwAcy2Pb7gQAAIIEAAAE/RQAjv8B4JgebrwTAAAIEgAAECQAACDoRwB4/w8Ax3a59U4AACBIAABAkAAAgCABAABBr08nPwAEgIrz5jsBAIAgAQAAQQIAAIIEAAAECQAACBIAABD02p8AAkDLh3dfvzsBAIAgAQAAQW/2vgCYxafPb//d%2Bxp43sf33/7c%2BxpgBgIAnmH453L%2BvoQAPM0rAAAIEgDwBE//8/LdwdMEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACHqz9wUc3afPb//a%2Bxp43sf33/7Z%2BxoAtiQAVmL453L%2BvoQAUOEVAAAECYAVePqfl%2B8OqBAAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQJAAAIAgAQAAQQIAAIIEAAAECQAACBIAABAkAAAgSAAAQNDrv7/88WrviwAAtvP3lz9eOQEAgCABAABBAgAAggQAAAQJgBV8fP/tn72vgZd5%2BN19fP/tz72uhfs8/O4%2Bvv%2B216VwJ9/dOgQAAAT9%2BBPAD%2B%2B%2Bft/zQo7q0%2Be3f%2B19DTzvmlObT5/f/rvFtXCfa05tPn1%2Bu8WlcCdP/us4//m/AACAkHMAeAUAAEECAACCBAAABP0IAP9PAAA4tsutdwIAAEECAACCBAAABP0UAH4HAADH9HDjnQAAQJAAAICgXwLAawAAOJbHtt0JAAAECQAACBIAABD0aAD4HQAAHMPvNt0JAAAE/TYAnAIAwNye2nInAAAQJAAAIOjJAPAaAADm9NyGOwEAgKBnA8ApAADM5ZrtdgIAAEFXBYBTAACYw7Wb7QQAAIIEAAAEXR0AXgMAwNhu2WonAAAQdFMAOAUAgDHdutE3nwCIAAAYy0u22SsAAAh6UQA4BQCAMbx0k50AAEDQiwPAKQAA7OueLXYCAABBdwWAUwAA2Me9G3z3CYAIAIBtLbG9XgEAQNAiAeAUAAC2sdTmLnYCIAIAYF1Lbu2irwBEAACsY%2BmN9RsAAAhaPACcAgDAstbY1lVOAEQAACxjrU1d7RWACACA%2B6y5pX4DAABBqwaAUwAAeJm1N3T1EwARAAC32WI7N3kFIAIA4DpbbeZmvwEQAQDwtC23ctMfAYoAAHjc1hu5%2BV8BiAAA%2BNke27jLnwGKAAD4z16buNu/AyACAKjbcwt3/YeARAAAVXtv4O7/EuDeNwAAtjbC9u0eAKfTGDcCALYwyuYNEQCn0zg3BADWMtLWDRMAp9NYNwYAljTaxg0VAKfTeDcIAO414rYNd0GXPrz7%2Bn3vawCAlxpx%2BM%2BGOwG4NPKNA4CnjL5hQwfA6TT%2BDQSAh2bYruEv8JJXAgCMbIbhPxv%2BBODSTDcWgJbZNmqqADid5rvBABzfjNs03QVf8koAgD3NOPxn050AXJr5xgMwt9k3aOqLv%2BQ0AIAtzD78Z4f4EJeEAABrOMrwnx3qw1wSAgAs4WjDfzb1bwCectQvDIDtHHlLDvvBLjkNAOAWRx7%2Bs8N/wIfEAACPKYz%2BpdSHvSQEADidesN/lvzQl4QAQFN1%2BM/SH/4hMQBwbPXRv%2BRGPEIIAByL4f%2BVG3IFQQAwF4P/PDfoRmIAYExG/zZu1p0EAcA%2BDP593LwViAKAZRn75bmhGxMHAI8z8tv6H/HROuOMYeTZAAAAAElFTkSuQmCC%22%2C%20%22sizes%22%3A%20%22512x512%22%2C%20%22type%22%3A%20%22image/png%22%7D%5D%7D">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:17.5px}
+:root{--bg:#e9edf2;--s1:#f7f9fb;--s2:#eef1f5;--s3:#e3e8ee;--bdr:#d3dae3;--acc:#2563eb;--acc2:#7c3aed;--grn:#059669;--org:#d97706;--red:#dc2626;--cyn:#0891b2;--t1:#1e293b;--t2:#475569;--t3:#94a3b8}
+
+/* ── Layout base ── */
+.app{display:flex;flex-direction:column;height:100%;background:var(--bg)}
+.topbar{height:54px;background:var(--s1);border-bottom:1px solid var(--bdr);display:flex;align-items:center;padding:0 16px;gap:10px;flex-shrink:0;position:sticky;top:0;z-index:100}
+.brand{font-weight:800;font-size:24px;color:var(--t1);display:flex;align-items:center;gap:8px;flex:1}
+.brand-icon{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--acc),var(--acc2));display:flex;align-items:center;justify-content:center}
+.topbar-btn{background:transparent;border:none;padding:8px;border-radius:10px;color:var(--t2);cursor:pointer;font-size:24px;display:flex;align-items:center}
+.topbar-btn:active{background:var(--s3)}
+
+/* ── Conteúdo principal ── */
+.main{flex:1;overflow-y:auto;overflow-x:hidden;padding-bottom:70px}
+
+/* ── Navegação inferior ── */
+.bottom-nav{height:68px;background:var(--s1);border-top:1px solid var(--bdr);display:flex;align-items:stretch;flex-shrink:0;position:sticky;bottom:0;z-index:100}
+.bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;color:var(--t3);font-size:15px;font-weight:600;border:none;background:transparent;padding:6px 0;position:relative}
+.bnav-item i{font-size:22px}
+.bnav-item.act{color:var(--acc)}
+.bnav-badge{position:absolute;top:4px;right:calc(50% - 18px);width:16px;height:16px;border-radius:50%;background:var(--red);font-size:13.5px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700}
+
+/* ── Cards e métricas ── */
+.section{padding:14px}
+.section-title{font-size:19.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.card{background:var(--s1);border:1px solid var(--bdr);border-radius:14px;padding:14px;margin-bottom:12px}
+.card-title{font-size:18px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.metric{background:var(--s1);border:1px solid var(--bdr);border-radius:12px;padding:14px;text-align:center}
+.metric-lbl{font-size:15px;color:var(--t3);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+.metric-val{font-size:24px;font-weight:800;color:var(--t1);line-height:1.1}
+.metric-sub{font-size:15px;color:var(--t3);margin-top:3px}
+
+/* ── Lista de clientes/pedidos ── */
+.list-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--bdr)}
+.list-item:last-child{border:none}
+
+.list-body{flex:1;min-width:0}
+.list-name{font-weight:600;font-size:19.5px;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list-sub{font-size:16.5px;color:var(--t3);margin-top:2px}
+.list-right{text-align:right;flex-shrink:0}
+.list-val{font-size:19.5px;font-weight:700;color:var(--t1)}
+.list-badge{display:inline-block;padding:2px 7px;border-radius:10px;font-size:15px;font-weight:600}
+.b-g{background:rgba(5,150,105,.12);color:#047857}
+.b-o{background:rgba(217,119,6,.12);color:#b45309}
+.b-r{background:rgba(220,38,38,.12);color:#b91c1c}
+.b-b{background:rgba(37,99,235,.12);color:#1d4ed8}
+.b-p{background:rgba(124,58,237,.12);color:#6d28d9}
+
+/* ── Busca ── */
+.search-bar{display:flex;align-items:center;gap:8px;background:var(--s1);border:1.5px solid var(--bdr);border-radius:12px;padding:0 12px;height:44px;margin-bottom:12px}
+.search-bar i{color:var(--t3);font-size:27px;flex-shrink:0}
+.search-bar input{flex:1;border:none;background:transparent;font-size:21px;color:var(--t1);outline:none}
+
+/* ── Filtros chip ── */
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex-shrink:0;padding:6px 14px;border-radius:20px;border:1.5px solid var(--bdr);background:transparent;font-size:18px;font-weight:600;color:var(--t2);cursor:pointer;white-space:nowrap}
+.chip.act{background:var(--acc);border-color:var(--acc);color:#fff}
+
+/* ── Modais mobile ── */
+.mbg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:flex-end}
+.mbg.open{display:flex}
+.msheet{background:var(--s1);border-radius:20px 20px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:20px 16px 40px;animation:slideUp .25s ease}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.mhandle{width:40px;height:4px;border-radius:2px;background:var(--bdr);margin:0 auto 16px}
+.mtt{font-size:24px;font-weight:700;color:var(--t1);margin-bottom:16px}
+.fi{width:100%;padding:12px 14px;border:1.5px solid var(--bdr);border-radius:12px;background:var(--s2);color:var(--t1);font-size:21px;outline:none;-webkit-appearance:none}
+.fi:focus{border-color:var(--acc)}
+.fl{font-size:18px;font-weight:600;color:var(--t3);display:block;margin-bottom:5px}
+.fg{margin-bottom:14px}
+.fg2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* ── Botões ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:12px 18px;border-radius:12px;border:1.5px solid var(--bdr);background:transparent;color:var(--t2);cursor:pointer;font-size:21px;font-weight:600;width:100%;transition:all .15s}
+.btn:active{opacity:.7}
+.bp{background:var(--acc);border-color:var(--acc);color:#fff}
+.bs{background:var(--s2);color:var(--t1)}
+.btn-row{display:flex;gap:10px;margin-top:8px}
+.btn-row .btn{flex:1}
+
+/* ── Agenda / bloco de notas ── */
+.nota-linha{display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid var(--bdr)}
+.nota-hora{min-width:44px;font-size:18px;font-weight:700;color:var(--t3);padding-top:1px;text-align:right}
+.nota-sep{width:1px;align-self:stretch;background:var(--bdr);flex-shrink:0}
+.nota-corpo{flex:1;min-width:0}
+.nota-desc{font-size:19.5px;color:var(--t1);line-height:1.4}
+.nota-meta{font-size:16.5px;color:var(--t3);margin-top:2px}
+.nota-acoes{display:flex;gap:6px;flex-shrink:0;padding-top:2px}
+.nota-btn{background:transparent;border:1px solid var(--bdr);border-radius:8px;padding:5px 7px;color:var(--t2);cursor:pointer;font-size:19.5px;display:flex;align-items:center}
+
+/* ── Detalhes cliente ── */
+.detalhe-header{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.detalhe-av{width:50px;height:50px;border-radius:50%;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;flex-shrink:0}
+.acao-chips{display:flex;gap:8px;margin-bottom:14px}
+.acao-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border-radius:12px;background:var(--s2);border:1px solid var(--bdr);cursor:pointer;font-size:15px;font-weight:600;color:var(--t2)}
+.acao-btn i{font-size:24px;color:var(--acc)}
+.acao-btn:active{background:var(--s3)}
+
+/* ── Toast ── */
+.toast-m{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--t1);color:var(--s1);padding:10px 18px;border-radius:20px;font-size:19.5px;font-weight:600;opacity:0;transition:all .3s;z-index:999;white-space:nowrap}
+.toast-m.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── Barra progresso ── */
+.prog-bar{height:8px;background:var(--s3);border-radius:4px;overflow:hidden;margin-top:6px}
+.prog-fill{height:100%;border-radius:4px;transition:width .4s}
+
+/* ── Empresa selector ── */
+.emp-tabs{display:flex;gap:6px;overflow-x:auto;padding:12px 14px 0;scrollbar-width:none}
+.emp-tabs::-webkit-scrollbar{display:none}
+.emp-tab{flex-shrink:0;display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:20px;background:var(--s2);border:1.5px solid var(--bdr);font-size:18px;font-weight:600;color:var(--t2);cursor:pointer}
+.emp-tab.act{background:var(--acc);border-color:var(--acc);color:#fff}
+.emp-dot{width:8px;height:8px;border-radius:50%}
+
+/* ── Seção vazia ── */
+.empty{text-align:center;padding:40px 20px;color:var(--t3)}
+.empty i{font-size:40px;margin-bottom:10px;display:block}
+.empty p{font-size:19.5px}
+
+/* ── Scroll suave ── */
+::-webkit-scrollbar{width:0;height:0}
+</style>
+<script>
+if('serviceWorker' in navigator){var b=new Blob(["const CACHE='repcrm-mob-v26';self.addEventListener('install',e=>{self.skipWaiting();});self.addEventListener('activate',e=>{self.clients.claim();});self.addEventListener('fetch',e=>{e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)));});"],{type:'application/javascript'});navigator.serviceWorker.register(URL.createObjectURL(b),{scope:'./'}).catch(function(){});}
+</script>
+</head>
+<body style="background:var(--bg)">
+<div class="app">
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-icon"><i class="ti ti-building-store" style="font-size:15px;color:#fff"></i></div>
+    RepCRM
+  </div>
+  <button class="topbar-btn" onclick="abrirModalBackupM()" title="Backup"><i class="ti ti-cloud-upload" style="color:var(--grn)"></i></button>
+  <button class="topbar-btn" id="btn-nuvem-m" onclick="navM('mais')" title="Sincronização em nuvem"><i class="ti ti-cloud" style="color:var(--t3)"></i></button>
+  <button class="topbar-btn" onclick="abrirModalCfgM()" title="Configurações"><i class="ti ti-settings"></i></button>
+</div>
+
+<!-- CONTEÚDO PRINCIPAL -->
+<div class="main" id="main-content">
+  <!-- Gerado dinamicamente -->
+</div>
+
+<!-- NAVEGAÇÃO INFERIOR -->
+<div class="bottom-nav">
+  <button class="bnav-item act" id="bnav-dash" onclick="navM('dash')">
+    <i class="ti ti-layout-dashboard"></i>Dashboard
+  </button>
+  <button class="bnav-item" id="bnav-clientes" onclick="navM('clientes')">
+    <i class="ti ti-users"></i>Clientes
+  </button>
+  <button class="bnav-item" id="bnav-proximos" onclick="navM('proximos')">
+    <i class="ti ti-map-pin"></i>Próximos
+  </button>
+  <button class="bnav-item" id="bnav-agenda" onclick="navM('agenda')">
+    <i class="ti ti-calendar-event"></i>Agenda
+    <span class="bnav-badge" id="badge-agenda-m" style="display:none">0</span>
+  </button>
+  <button class="bnav-item" id="bnav-mais" onclick="navM('mais')">
+    <i class="ti ti-dots"></i>Mais
+  </button>
+</div>
+</div>
+
+<!-- ═══════════════ MODAIS (bottom sheets) ═══════════════ -->
+
+<!-- Modal novo pedido -->
+<div class="mbg" id="mPedM">
+  <div class="msheet">
+    <div class="mhandle"></div>
+    <div class="mtt">Novo Pedido</div>
+    <div class="fg"><label class="fl">Empresa</label>
+      <select class="fi" id="mped-emp" onchange="carregarClisMPed()"></select>
+    </div>
+    <div class="fg"><label class="fl">Cliente *</label>
+      <select class="fi" id="mped-cli"></select>
+    </div>
+    <div class="fg2">
+      <div class="fg"><label class="fl">Data</label><input class="fi" id="mped-dt" type="date"></div>
+      <div class="fg"><label class="fl">Nº Pedido</label><input class="fi" id="mped-num" placeholder="Ex: 1234"></div>
+    </div>
+    <div class="fg2">
+      <div class="fg"><label class="fl">Valor (R$)</label><input class="fi" id="mped-val" type="number" placeholder="0"></div>
+      <div class="fg"><label class="fl">Parcelas</label>
+        <select class="fi" id="mped-parc">
+          <option value="1">À vista</option>
+          <option value="2">2x</option><option value="3">3x</option><option value="4">4x</option>
+          <option value="5">5x</option><option value="6">6x</option><option value="7">7x</option>
+          <option value="8">8x</option><option value="9">9x</option><option value="10">10x</option>
+          <option value="11">11x</option><option value="12">12x</option><option value="13">13x</option>
+          <option value="14">14x</option><option value="15">15x</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg2">
+      <div class="fg"><label class="fl">Comissão %</label><input class="fi" id="mped-com" type="number" step="0.1" placeholder="3"></div>
+      <div class="fg"><label class="fl">Origem</label><input class="fi" id="mped-tipo" placeholder="Ex: Feira, Visita"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn bs" onclick="fecharModal('mPedM')">Cancelar</button>
+      <button class="btn bp" onclick="salvarPedidoM()"><i class="ti ti-check"></i> Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal novo cliente -->
+<div class="mbg" id="mCliM">
+  <div class="msheet">
+    <div class="mhandle"></div>
+    <div class="mtt">Novo Cliente</div>
+    <div class="fg"><label class="fl">Empresa *</label>
+      <select class="fi" id="mcli-emp"></select>
+    </div>
+    <div class="fg"><label class="fl">Razão Social *</label><input class="fi" id="mcli-rs" placeholder="Nome da empresa"></div>
+    <div class="fg2">
+      <div class="fg"><label class="fl">Cidade</label><input class="fi" id="mcli-cid"></div>
+      <div class="fg"><label class="fl">Segmento</label><input class="fi" id="mcli-seg"></div>
+    </div>
+    <div class="fg2">
+      <div class="fg"><label class="fl">Celular</label><input class="fi" id="mcli-cel" type="tel"></div>
+      <div class="fg"><label class="fl">CNPJ</label><input class="fi" id="mcli-cnpj"></div>
+    </div>
+    <div class="fg"><label class="fl">Comprador</label><input class="fi" id="mcli-comp"></div>
+    <div class="btn-row">
+      <button class="btn bs" onclick="fecharModal('mCliM')">Cancelar</button>
+      <button class="btn bp" onclick="salvarClienteM()"><i class="ti ti-check"></i> Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal tarefa/agenda -->
+<div class="mbg" id="mTarM">
+  <div class="msheet">
+    <div class="mhandle"></div>
+    <div class="mtt">Novo Registro</div>
+    <div class="fg">
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="chip act" onclick="selTipoM(this,'geral')">📋 Geral</button>
+        <button class="chip" onclick="selTipoM(this,'telefonema')">📞 Ligação</button>
+        <button class="chip" onclick="selTipoM(this,'reuniao')">👥 Reunião</button>
+      </div>
+      <input type="hidden" id="mtar-tipo" value="geral">
+    </div>
+    <div class="fg"><label class="fl">Descrição *</label><input class="fi" id="mtar-desc" placeholder="O que precisa ser feito?"></div>
+    <div class="fg2">
+      <div class="fg"><label class="fl">Data</label><input class="fi" id="mtar-dt" type="date"></div>
+      <div class="fg"><label class="fl">Horário</label><input class="fi" id="mtar-hora" type="time"></div>
+    </div>
+    <div class="fg"><label class="fl">Empresa</label><select class="fi" id="mtar-emp"></select></div>
+    <div class="btn-row">
+      <button class="btn bs" onclick="fecharModal('mTarM')">Cancelar</button>
+      <button class="btn bp" onclick="salvarTarefaM()"><i class="ti ti-check"></i> Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Nuvem -->
+<div class="mbg" id="mNuvemM">
+  <div class="msheet">
+    <div class="mhandle"></div>
+    <div class="msheettitle"><i class="ti ti-cloud"></i> Sincronização em Nuvem</div>
+    <div style="font-size:12px;color:var(--t2);margin-bottom:12px">Cole as credenciais do Firebase (mesmo JSON do desktop) e use a mesma chave de sincronização.</div>
+    <label class="fl">Credenciais Firebase (JSON)</label>
+    <textarea id="nuvem-cfg-m" rows="5" style="width:100%;font-family:monospace;font-size:10px;border:1px solid var(--bdr);border-radius:8px;padding:8px;margin-bottom:12px;background:var(--s2);resize:none" placeholder='{"apiKey":"...","databaseURL":"https://...","projectId":"..."}'></textarea>
+    <label class="fl">Chave de sincronização</label>
+    <input id="nuvem-chave-m" class="fi" placeholder="ex: minha-empresa-2024" style="margin-bottom:8px">
+    <div id="nuvem-status-m" style="font-size:12px;margin-bottom:14px;color:var(--t3)"></div>
+    <button class="btn bp" style="width:100%;margin-bottom:8px" onclick="salvarCfgNuvemM()"><i class="ti ti-cloud-check"></i> Salvar e Conectar</button>
+    <button class="btn bs" style="width:100%;color:var(--red);border-color:var(--red)" onclick="desconectarNuvemM()"><i class="ti ti-cloud-off"></i> Desconectar</button>
+  </div>
+</div>
+
+<!-- Modal Backup -->
+<div class="mbg" id="mBkpM">
+  <div class="msheet">
+    <div class="mhandle"></div>
+    <div class="mtt">Backup & Restauração</div>
+    <p style="font-size:13px;color:var(--t2);margin-bottom:16px">Os dados são compartilhados com a versão Desktop (mesmo navegador). Para transferir entre dispositivos, use o backup.</p>
+    <button class="btn bp" onclick="exportarBackupM()" style="margin-bottom:10px"><i class="ti ti-cloud-upload"></i> Baixar backup (JSON)</button>
+    <div style="border:1.5px dashed var(--bdr);border-radius:12px;padding:16px;text-align:center;cursor:pointer;color:var(--t3);font-size:13px;margin-bottom:10px" onclick="document.getElementById('fi-bkp-m').click()">
+      <i class="ti ti-file-import" style="font-size:24px;display:block;margin-bottom:6px"></i>
+      Clique para restaurar backup (.json)
+    </div>
+    <input type="file" id="fi-bkp-m" style="display:none" accept=".json" onchange="restaurarBackupM(this)">
+    <button class="btn bs" onclick="fecharModal('mBkpM')">Fechar</button>
+  </div>
+</div>
+
+<!-- Modal configurações -->
+<div class="mbg" id="mCfgM">
+  <div class="msheet">
+    <div class="mhandle"></div>
+    <div class="mtt">Configurações</div>
+    <div class="fg"><label class="fl">Seu nome</label><input class="fi" id="mcfg-nome" placeholder="Nome do representante"></div>
+    <div class="fg"><label class="fl">Chave API Gemini (IA)</label><input class="fi" id="mcfg-key" type="password" placeholder="AQ... ou AIza..."></div>
+    <div class="fg"><label class="fl">Google Places API Key</label><input class="fi" id="mcfg-places-key" type="password" placeholder="AIza... (busca de lojas)"></div>
+    <div style="font-size:11px;color:var(--t3);margin-top:-8px;margin-bottom:8px">console.cloud.google.com → Places API (nova)</div>
+    <div class="fg"><label class="fl">Nome da assistente virtual</label><input class="fi" id="mcfg-amora" placeholder="Amora" maxlength="20"></div>
+    <div style="font-size:11px;color:var(--t3);margin-top:-8px">Diga este nome para ativar a assistente por voz</div>
+    <div class="fg">
+      <label class="fl">Foto da assistente</label>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div id="preview-amora-foto" style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#db2777);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;border:2px solid #7c3aed33">
+          <span style="color:#fff;font-size:20px;font-weight:700" id="preview-amora-letra">A</span>
+        </div>
+        <div style="flex:1">
+          <label style="display:inline-block;background:var(--s2);border:1px solid var(--bdr);border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;color:var(--t1)">
+            <i class="ti ti-upload"></i> Escolher foto
+            <input type="file" id="mcfg-amora-foto" accept="image/*" style="display:none" onchange="previewFotoAmora(this)">
+          </label>
+          <button onclick="removerFotoAmora()" style="background:none;border:none;color:var(--red);font-size:11px;cursor:pointer;margin-left:8px"><i class="ti ti-trash"></i> Remover</button>
+        </div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn bs" onclick="fecharModal('mCfgM')">Cancelar</button>
+      <button class="btn bp" onclick="salvarCfgM()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast-m" id="toast-m"></div>
+
+<!-- AMORA - Assistente Virtual -->
+<button id="btn-voz" onclick="toggleVoz()"
+  style="position:fixed;bottom:80px;right:16px;width:58px;height:58px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#db2777);color:#fff;border:3px solid rgba(255,255,255,0.3);cursor:pointer;z-index:500;box-shadow:0 4px 20px rgba(124,58,237,.5);display:flex;align-items:center;justify-content:center;flex-direction:column;transition:all .2s;padding:0">
+  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- Rosto -->
+    <circle cx="16" cy="13" r="8" fill="#fde68a"/>
+    <!-- Cabelo -->
+    <path d="M8 13 Q8 5 16 5 Q24 5 24 13 Q22 8 16 8 Q10 8 8 13Z" fill="#92400e"/>
+    <path d="M8 13 Q6 18 8 22 Q8 16 8 13Z" fill="#92400e"/>
+    <path d="M24 13 Q26 18 24 22 Q24 16 24 13Z" fill="#92400e"/>
+    <!-- Olhos -->
+    <circle cx="13" cy="13" r="1.2" fill="#1e293b"/>
+    <circle cx="19" cy="13" r="1.2" fill="#1e293b"/>
+    <!-- Boca sorrindo -->
+    <path d="M13 17 Q16 20 19 17" stroke="#e11d48" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+    <!-- Corpo -->
+    <path d="M10 24 Q10 20 16 20 Q22 20 22 24 L22 32 L10 32Z" fill="#7c3aed"/>
+    <!-- Fone/headset -->
+    <path d="M8 12 Q8 6 16 6 Q24 6 24 12" stroke="#92400e" stroke-width="1.5" fill="none"/>
+    <rect x="6.5" y="11" width="2.5" height="4" rx="1" fill="#92400e"/>
+    <rect x="23" y="11" width="2.5" height="4" rx="1" fill="#92400e"/>
+  </svg>
+  <span id="btn-voz-label" style="font-size:7px;font-weight:700;letter-spacing:0.5px;margin-top:1px">AMORA</span>
+</button>
+
+<!-- PAINEL DA AMORA -->
+<div id="painel-voz" style="display:none;position:fixed;bottom:150px;right:16px;left:16px;background:var(--s1);border:2px solid #7c3aed33;border-radius:20px;padding:14px;z-index:499;box-shadow:0 8px 32px rgba(124,58,237,.2)">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div id="voz-status-dot" style="width:9px;height:9px;border-radius:50%;background:var(--t3)"></div>
+      <span style="font-size:12px;font-weight:600;background:linear-gradient(135deg,#7c3aed,#db2777);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Amora</span>
+      <span id="voz-status-txt" style="font-size:11px;color:var(--t2)">Diga "Amora" para ativar</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button id="btn-falar" onclick="falarUltima()" style="display:none;background:none;border:1px solid #7c3aed;border-radius:8px;padding:3px 8px;font-size:10px;color:#7c3aed;cursor:pointer"><i class="ti ti-volume"></i></button>
+      <button onclick="document.getElementById('painel-voz').style.display='none'" style="background:none;border:none;color:var(--t3);font-size:16px;cursor:pointer"><i class="ti ti-x"></i></button>
+    </div>
+  </div>
+  <div id="voz-transcricao" style="font-size:11px;color:#7c3aed;min-height:16px;font-style:italic;margin-bottom:8px"></div>
+  <div id="voz-resposta" style="font-size:12px;color:var(--t1);max-height:160px;overflow-y:auto;line-height:1.6"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// RepCRM Mobile — compartilha localStorage com o Desktop
+// ═══════════════════════════════════════════════════════
+
+// ── Storage (mesmas chaves do desktop) ──────────────────
+const save = (k,v) => localStorage.setItem('repcm_'+k, JSON.stringify(v));
+const load = (k,d=[]) => { try{ return JSON.parse(localStorage.getItem('repcm_'+k))||d; }catch(e){ return d; } };
+const loadCfg = () => { try{ return JSON.parse(localStorage.getItem('repcm_cfg'))||{}; }catch(e){ return {}; } };
+const saveCfg = v => localStorage.setItem('repcm_cfg', JSON.stringify(v));
+const uid = () => Math.random().toString(36).substr(2,9);
+const fmt = v => 'R$\u00a0' + Math.round(v||0).toLocaleString('pt-BR');
+const fmtD = d => { if(!d) return '—'; var dt=new Date(d+'T12:00'); return isNaN(dt.getTime())? '—' : dt.toLocaleDateString('pt-BR'); };
+const inic = s => (s||'').split(' ').slice(0,2).map(w=>w[0]?.toUpperCase()).join('');
+const dias = c => c.ultFat ? Math.floor((Date.now()-new Date(c.ultFat+'T12:00'))/86400000) : 999;
+const getSit = (c,r=60) => { if(c.encerrado) return 'Encerrado'; const d=dias(c); return d>r?'Inativo':d>r*.6?'Atenção':'Ativo'; };
+
+// ── DB ──────────────────────────────────────────────────
+var DB = { empresas:[], clientes:[], pedidos:[], tarefas:[], eventos:[] };
+function carregarDB(){
+  DB.empresas = load('empresas');
+  DB.clientes = load('clientes');
+  DB.pedidos  = load('pedidos');
+  DB.tarefas  = load('tarefas',[]);
+  DB.eventos  = load('eventos',[]);
+}
+function salvarDB(){
+  save('empresas', DB.empresas);
+  save('clientes', DB.clientes);
+  save('pedidos',  DB.pedidos);
+  save('tarefas',  DB.tarefas);
+  save('eventos',  DB.eventos);
+  salvarNuvemM();
+}
+
+// ── Estado ──────────────────────────────────────────────
+var paginaAtual = 'dash';
+var empAtualM = null;
+var blocoDataM = new Date().toISOString().split('T')[0];
+
+// ── Toast ────────────────────────────────────────────────
+function toastM(msg, dur=2200){
+  var t = document.getElementById('toast-m');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+
+// ── Modais ───────────────────────────────────────────────
+function abrirModal(id){ document.getElementById(id).classList.add('open'); }
+function fecharModal(id){ document.getElementById(id).classList.remove('open'); }
+document.addEventListener('click', function(e){
+  if(e.target.classList.contains('mbg')) fecharModal(e.target.id);
+});
+
+// ── Navegação ────────────────────────────────────────────
+function navM(p){
+  paginaAtual = p;
+  document.querySelectorAll('.bnav-item').forEach(b => b.classList.remove('act'));
+  var btn = document.getElementById('bnav-'+p);
+  if(btn) btn.classList.add('act');
+  renderM();
+}
+
+// ── Renderização principal ───────────────────────────────
+function renderM(){
+  switch(paginaAtual){
+    case 'dash':     renderDashM(); break;
+    case 'clientes': renderClientesM(); break;
+    case 'pedidos':  renderPedidosM(); break;
+    case 'agenda':   renderAgendaM(); break;
+    case 'mais':     renderMaisM(); break;
+    case 'proximos': renderProximosM(); break;
+  }
+}
+
+// ══════════════════════════════
+// DASHBOARD
+// ══════════════════════════════
+function renderDashM(){
+  var cont = document.getElementById('main-content');
+  var hoje = new Date();
+  var mes = hoje.getMonth();
+  var ano = hoje.getFullYear();
+  var hjStr = hoje.toISOString().split('T')[0];
+
+  if(!empAtualM && DB.empresas.length) empAtualM = DB.empresas[0].id;
+  var e = DB.empresas.find(x => x.id===empAtualM);
+  var ps = e ? DB.pedidos.filter(p => p.empId===empAtualM && !p.cancelado) : [];
+
+  var vendaMes = ps.filter(p=>{if(!p.dt)return false;var d=new Date(p.dt+'T12:00');return d.getMonth()===mes&&d.getFullYear()===ano;}).reduce((a,p)=>a+(p.val||0),0);
+  var fatMes   = ps.filter(p=>{if(!p.dtFat)return false;var d=new Date(p.dtFat+'T12:00');return d.getMonth()===mes&&d.getFullYear()===ano;}).reduce((a,p)=>a+(p.valfat||p.val||0),0);
+  var emAberto = ps.filter(p=>!p.dtFat).length;
+  var metaV=getMetaMensalM(empAtualM, ano, mes, 'meta');
+  var metaF=getMetaMensalM(empAtualM, ano, mes, 'metaFat');
+  var pctV=metaV?Math.round(vendaMes/metaV*100):0;
+  var pctF=metaF?Math.round(fatMes/metaF*100):0;
+  var corV=pctV>=100?'var(--grn)':pctV>=70?'var(--org)':'var(--red)';
+  var corF=pctF>=100?'var(--grn)':pctF>=70?'var(--org)':'var(--red)';
+
+  var cliEmp=DB.clientes.filter(c=>!c.encerrado&&DB.pedidos.some(p=>p.cliId===c.id&&p.empId===empAtualM));
+  var ativos=cliEmp.filter(c=>dias(c)<=60).length;
+  var inativos=cliEmp.filter(c=>dias(c)>90).length;
+  var emRisco=cliEmp.filter(c=>{var d=dias(c);return d>=80&&d<=90;});
+  var pedMes=ps.filter(p=>{if(!p.dt)return false;var d=new Date(p.dt+'T12:00');return d.getMonth()===mes&&d.getFullYear()===ano;});
+  var ultPedidos=ps.filter(p=>p.dt).sort((a,b)=>b.dt>a.dt?1:-1).slice(0,30);
+  var tarAtraso=DB.tarefas.filter(t=>t.dt&&t.dt<hjStr&&!t.done);
+
+  var totalVendaMes=DB.empresas.reduce((sum,emp)=>sum+DB.pedidos.filter(p=>p.empId===emp.id&&!p.cancelado).filter(p=>{if(!p.dt)return false;var d=new Date(p.dt+'T12:00');return d.getMonth()===mes&&d.getFullYear()===ano;}).reduce((a,p)=>a+(p.val||0),0),0);
+  var totalFatMes=DB.empresas.reduce((sum,emp)=>sum+DB.pedidos.filter(p=>p.empId===emp.id&&!p.cancelado).filter(p=>{if(!p.dtFat)return false;var d=new Date(p.dtFat+'T12:00');return d.getMonth()===mes&&d.getFullYear()===ano;}).reduce((a,p)=>a+(p.valfat||p.val||0),0),0);
+  var totalAberto=DB.pedidos.filter(p=>!p.cancelado&&!p.dtFat).length;
+
+  // Metas somadas de todas as empresas
+  var totalMetaV=DB.empresas.reduce((sum,emp)=>sum+getMetaMensalM(emp.id,ano,mes,'meta'),0);
+  var totalMetaF=DB.empresas.reduce((sum,emp)=>sum+getMetaMensalM(emp.id,ano,mes,'metaFat'),0);
+  var pctVTotal=totalMetaV?Math.round(totalVendaMes/totalMetaV*100):0;
+  var pctFTotal=totalMetaF?Math.round(totalFatMes/totalMetaF*100):0;
+  var corVT=pctVTotal>=100?'var(--grn)':pctVTotal>=70?'var(--org)':'var(--red)';
+  var corFT=pctFTotal>=100?'var(--grn)':pctFTotal>=70?'var(--org)':'var(--red)';
+  var todosClientes=DB.clientes.filter(c=>!c.encerrado);
+  var ativosTotal=todosClientes.filter(c=>dias(c)<=60).length;
+  var inativosTotal=todosClientes.filter(c=>dias(c)>90).length;
+
+  var empTabs=DB.empresas.map(emp=>`<button class="emp-tab ${emp.id===empAtualM?'act':''}" onclick="selecionarEmpM('${emp.id}')"><div class="emp-dot" style="background:${emp.cor}"></div>${emp.nome.split(' ')[0]}</button>`).join('');
+
+  cont.innerHTML=`
+  <div class="card" style="margin:12px 12px 0;padding:12px">
+    <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Geral — ${hoje.toLocaleString('pt-BR',{month:'long',year:'numeric'})}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+      <div style="text-align:center"><div style="font-size:10px;color:var(--t3)">Vendas</div><div style="font-size:14px;font-weight:700;color:var(--t1)">${fmt(totalVendaMes)}</div></div>
+      <div style="text-align:center"><div style="font-size:10px;color:var(--t3)">Faturamento</div><div style="font-size:14px;font-weight:700;color:var(--grn)">${fmt(totalFatMes)}</div></div>
+      <div style="text-align:center"><div style="font-size:10px;color:var(--t3)">Em aberto</div><div style="font-size:14px;font-weight:700;color:var(--org)">${totalAberto}</div></div>
+    </div>
+  </div>
+  ${tarAtraso.length?`<div class="card" style="margin:8px 12px 0;border-left:3px solid var(--red);padding:10px 12px">
+    <div style="font-size:12px;font-weight:700;color:var(--red)"><i class="ti ti-alert-triangle"></i> ${tarAtraso.length} tarefa(s) atrasada(s)</div>
+    ${tarAtraso.slice(0,2).map(t=>`<div style="font-size:11px;color:var(--t2);margin-top:4px">• ${t.desc} — ${fmtD(t.dt)}</div>`).join('')}
+  </div>`:''}
+  <div class="emp-tabs">${empTabs}</div>
+  <div class="section">
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-lbl">Vendas ${hoje.toLocaleString('pt-BR',{month:'short'})}</div>
+        <div class="metric-val" style="font-size:16px">${fmt(vendaMes)}</div>
+        <div class="metric-sub" style="color:${corV}">${pctV}% da meta</div>
+        <div class="prog-bar"><div class="prog-fill" style="width:${Math.min(100,pctV)}%;background:${corV}"></div></div>
+      </div>
+      <div class="metric">
+        <div class="metric-lbl">Faturamento</div>
+        <div class="metric-val" style="font-size:16px">${fmt(fatMes)}</div>
+        <div class="metric-sub" style="color:${corF}">${pctF}% da meta</div>
+        <div class="prog-bar"><div class="prog-fill" style="width:${Math.min(100,pctF)}%;background:${corF}"></div></div>
+      </div>
+      <div class="metric">
+        <div class="metric-lbl">Em aberto</div>
+        <div class="metric-val">${emAberto}</div>
+        <div class="metric-sub">pedidos</div>
+      </div>
+      <div class="metric">
+        <div class="metric-lbl">Atividade</div>
+        <div style="display:flex;justify-content:center;gap:8px;margin-top:4px">
+          <div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--grn)">${ativos}</div><div style="font-size:9px;color:var(--grn)">ativos</div></div>
+          <div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--red)">${inativos}</div><div style="font-size:9px;color:var(--red)">inativos</div></div>
+        </div>
+      </div>
+    </div>
+    ${emRisco.length?`<div class="card">
+      <div class="card-title"><i class="ti ti-flame" style="color:var(--org)"></i>Em risco (80–90 dias)</div>
+      ${emRisco.slice(0,5).map(c=>`<div class="list-item">
+        <div class="list-body" onclick="abrirClienteM('${c.id}')" style="cursor:pointer">
+          <div class="list-name">${c.rs}</div><div class="list-sub">${dias(c)} dias sem comprar</div>
+        </div>
+        <button class="nota-btn" onclick="wppM('${c.cel||c.fone||''}')"><i class="ti ti-brand-whatsapp" style="color:var(--grn)"></i></button>
+      </div>`).join('')}
+    </div>`:''}
+    ${ultPedidos.length?`<div class="card">
+      <div class="card-title"><i class="ti ti-shopping-cart" style="color:var(--acc)"></i>Pedidos — ${e?.nome||''} <span style="font-size:10px;background:var(--acc);color:#fff;padding:1px 7px;border-radius:10px;margin-left:4px">${pedMes.length} no mês</span></div>
+      ${ultPedidos.map(p=>{var cli=DB.clientes.find(x=>x.id===p.cliId);return `<div class="list-item">
+        <div class="list-body">
+          <div class="list-name">${cli?.rs||'—'}</div>
+          <div class="list-sub">${fmtD(p.dt)} · ${fmt(p.val||0)}${p.dtFat?` · <span style="color:var(--grn)">Fat.</span>`:`<span style="color:var(--org)"> · Em aberto</span>`}</div>
+        </div>
+      </div>`;}).join('')}
+    </div>`:''}
+    <div style="display:flex;gap:10px;margin-top:4px">
+      <button class="btn bp" style="flex:1" onclick="prepNovoPedidoM()"><i class="ti ti-plus"></i> Novo pedido</button>
+      <button class="btn bs" style="flex:1" onclick="prepNovoTarM()"><i class="ti ti-bell"></i> Lembrete</button>
+    </div>
+  </div>`;
+}
+
+// ══════════════════════════════
+// CLIENTES
+// ══════════════════════════════
+var buscaCliM = '';
+var _buscaTimer = null;
+function onBuscaCli(val){
+  clearTimeout(_buscaTimer);
+  _buscaTimer = setTimeout(()=>{ buscaCliM=val.toLowerCase(); renderListaClientesM(); }, 350);
+}
+function renderClientesM(){
+  var cont = document.getElementById('main-content');
+  cont.innerHTML = `
+  <div class="section">
+    <div class="search-bar">
+      <i class="ti ti-search"></i>
+      <input id="input-busca-cli" placeholder="Buscar cliente, cidade, CNPJ..." oninput="onBuscaCli(this.value)" value="${buscaCliM}">
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--t2)"><input type="checkbox" id="sel-all-cli" onchange="selTodosCli(this)"> Todos</label>
+      <button class="btn bs" style="font-size:11px;padding:6px 10px;margin-left:auto" onclick="rotaLoteCli()"><i class="ti ti-map-pin"></i> Rota em lote</button>
+    </div>
+    <div class="card" id="lista-cli-m"></div>
+  </div>
+  <div style="position:fixed;right:16px;bottom:76px">
+    <button class="btn bp" style="width:52px;height:52px;border-radius:50%;padding:0;font-size:22px;box-shadow:0 4px 14px rgba(37,99,235,.4)" onclick="prepNovoClienteM()"><i class="ti ti-plus"></i></button>
+  </div>`;
+  renderListaClientesM();
+}
+function renderListaClientesM(){
+  var el = document.getElementById('lista-cli-m');
+  if(!el) return;
+  var lista = DB.clientes.filter(c => !c.encerrado);
+  if(buscaCliM) lista = lista.filter(c =>
+    c.rs?.toLowerCase().includes(buscaCliM) ||
+    c.cid?.toLowerCase().includes(buscaCliM) ||
+    c.cnpj?.includes(buscaCliM)
+  );
+  lista.sort((a,b) => (a.rs||'').localeCompare(b.rs||'','pt-BR'));
+  el.innerHTML = lista.length ? lista.slice(0,50).map(c => {
+    var e = DB.empresas.find(x=>x.id===c.empId);
+    var sit = getSit(c, e?.risco||60);
+    var corSit = sit==='Ativo'?'b-g':sit==='Atenção'?'b-o':'b-r';
+    return `<div class="list-item">
+      <input type="checkbox" class="cli-cb-m" data-cliid="${c.id}" style="margin-right:8px;flex-shrink:0">
+      <div class="list-body" onclick="abrirClienteM('${c.id}')" style="cursor:pointer">
+        <div class="list-name">${c.rs}</div>
+        <div class="list-sub">${c.cid||''}${c.cid&&e?' · ':''}${e?.nome||''}</div>
+      </div>
+      <div class="list-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+        <span class="list-badge ${corSit}">${sit}</span>
+        <div style="font-size:10px;color:var(--t3)">${dias(c)<999?dias(c)+'d':'—'}</div>
+        <button style="background:none;border:none;padding:0;cursor:pointer;color:var(--acc)" onclick="mapsCliM('${c.id}')"><i class="ti ti-map-pin" style="font-size:16px"></i></button>
+      </div>
+    </div>`;
+  }).join('') : '<div class="empty"><i class="ti ti-users"></i><p>Nenhum cliente encontrado</p></div>';
+}
+
+function abrirClienteM(id){
+  var c = DB.clientes.find(x=>x.id===id);
+  if(!c) return;
+  var e = DB.empresas.find(x=>x.id===c.empId);
+  var pedsCli = DB.pedidos.filter(p=>p.cliId===id&&!p.cancelado).sort((a,b)=>b.dt>a.dt?1:-1);
+  var cont = document.getElementById('main-content');
+  cont.innerHTML = `
+  <div class="section">
+    <button class="btn bs" style="width:auto;padding:8px 14px;margin-bottom:14px" onclick="navM('clientes')"><i class="ti ti-arrow-left"></i> Voltar</button>
+    <div class="detalhe-header">
+      <div class="detalhe-av" style="background:${e?.cor||'var(--acc)'}">${inic(c.rs)}</div>
+      <div>
+        <div style="font-size:16px;font-weight:700;color:var(--t1)">${c.rs}</div>
+        <div style="font-size:12px;color:var(--t3)">${c.cid||''} ${c.uf||''} · ${e?.nome||''}</div>
+      </div>
+    </div>
+
+    <div class="acao-chips">
+      ${c.cel?`<button class="acao-btn" onclick="wppM('${c.cel}')"><i class="ti ti-brand-whatsapp"></i>WhatsApp</button>`:''}
+      ${c.cel||c.fone?`<button class="acao-btn" onclick="location.href='tel:${c.cel||c.fone}'"><i class="ti ti-phone"></i>Ligar</button>`:''}
+      ${c.email?`<button class="acao-btn" onclick="location.href='mailto:${c.email}'"><i class="ti ti-mail"></i>Email</button>`:''}
+      <button class="acao-btn" onclick="mapsCliM('${c.id}')"><i class="ti ti-map-pin"></i>Mapa</button>
+      <button class="acao-btn" onclick="prepNovoPedidoM('${c.id}')"><i class="ti ti-shopping-cart"></i>Pedido</button>
+    </div>
+
+    <div class="card">
+      ${[['Comprador',c.comp],['CNPJ',c.cnpj],['Celular',c.cel],['Segmento',c.seg],['Último fat.',fmtD(c.ultFat)],['Dias s/ comprar',dias(c)<999?dias(c)+' dias':'—']].map(r=>
+        r[1]?`<div class="list-item" style="padding:8px 0">
+          <div class="list-body"><div class="list-sub">${r[0]}</div><div class="list-name" style="font-size:13px">${r[1]}</div></div>
+        </div>`:''
+      ).join('')}
+    </div>
+
+    ${pedsCli.length?`<div class="card">
+      <div class="card-title"><i class="ti ti-shopping-cart"></i>Pedidos</div>
+      ${pedsCli.slice(0,6).map(p=>{
+        var pe = DB.empresas.find(x=>x.id===p.empId);
+        return `<div class="list-item">
+        <div class="list-body">
+          <div class="list-name">NF ${p.nf||p.num||'—'} · ${fmtD(p.dt)}</div>
+          <div class="list-sub">${pe?`<span style="color:${pe.cor};font-weight:600">${pe.nome}</span> · `:''}${p.dtFat?'Fat. '+fmtD(p.dtFat):'Em aberto'}</div>
+        </div>
+        <div class="list-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <div class="list-val">${fmt(p.val)}</div>
+          <button style="background:none;border:1px solid var(--acc);border-radius:5px;padding:2px 7px;font-size:10px;color:var(--acc);cursor:pointer" onclick="sacCliM('${p.id}')"><i class="ti ti-headset"></i> SAC</button>
+        </div>
+      </div>`;}).join('')}
+    </div>`:''}
+  </div>`;
+}
+
+// ══════════════════════════════
+function getMetaMensalM(empId, ano, mes, campo){
+  var e=DB.empresas.find(function(x){return x.id===empId;});
+  if(!e) return 0;
+  if(e.metasMensais&&e.metasMensais[ano]&&e.metasMensais[ano][mes]&&e.metasMensais[ano][mes][campo]!=null)
+    return e.metasMensais[ano][mes][campo];
+  return campo==='meta'?(e.meta||0):(e.metaFat||0);
+}
+
+function selecionarEmpM(id){ empAtualM=id; renderM(); }
+function clientesDaEmpresaM(empId){
+  return DB.clientes.filter(c=>!c.encerrado&&DB.pedidos.some(p=>p.cliId===c.id&&p.empId===empId));
+}
+
+// ══════════════════════════════
+// PEDIDOS
+// ══════════════════════════════
+var buscaPedM = '';
+var filEmpPedM = '';
+function renderPedidosM(){
+  var cont = document.getElementById('main-content');
+  var ps = DB.pedidos.filter(p=>!p.cancelado);
+  if(filEmpPedM) ps = ps.filter(p=>p.empId===filEmpPedM);
+  if(buscaPedM) ps = ps.filter(p=>{
+    var c = DB.clientes.find(x=>x.id===p.cliId);
+    return (p.num||'').includes(buscaPedM)||(c?.rs||'').toLowerCase().includes(buscaPedM);
+  });
+  ps.sort((a,b)=>(a.dt||'')<(b.dt||'')?1:-1);
+
+  var empTabs = `<button class="chip ${!filEmpPedM?'act':''}" onclick="filEmpPedM='';renderPedidosM()">Todos</button>` +
+    DB.empresas.map(e=>`<button class="chip ${filEmpPedM===e.id?'act':''}" onclick="filEmpPedM='${e.id}';renderPedidosM()">${e.nome.split(' ')[0]}</button>`).join('');
+
+  cont.innerHTML = `
+  <div class="section">
+    <div class="search-bar">
+      <i class="ti ti-search"></i>
+      <input placeholder="Buscar pedido ou cliente..." oninput="buscaPedM=this.value.toLowerCase();renderPedidosM()" value="${buscaPedM}">
+    </div>
+    <div class="chips">${empTabs}</div>
+    <div class="card">
+      ${ps.length ? ps.slice(0,40).map(p=>{
+        var c = DB.clientes.find(x=>x.id===p.cliId);
+        var e = DB.empresas.find(x=>x.id===p.empId);
+        return `<div class="list-item" style="flex-wrap:wrap;gap:6px">
+          <div class="list-body">
+            <div class="list-name" style="font-size:13px">${c?.rs||'—'}</div>
+            <div class="list-sub">${fmtD(p.dtFat)||'Sem data fat.'} · NF ${p.nf||'—'}</div>
+          </div>
+          <div class="list-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+            <div class="list-val">${fmt(p.valfat||p.val||0)}</div>
+            ${e?.sac?`<button style="background:none;border:1px solid var(--acc);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--acc);cursor:pointer" onclick="sacPedM('${p.id}')"><i class="ti ti-headset"></i> SAC</button>`:''}
+          </div>
+        </div>`;
+      }).join('') : '<div class="empty"><i class="ti ti-shopping-cart"></i><p>Nenhum pedido encontrado</p></div>'}
+    </div>
+  </div>
+  <div style="position:fixed;right:16px;bottom:76px">
+    <button class="btn bp" style="width:52px;height:52px;border-radius:50%;padding:0;font-size:22px;box-shadow:0 4px 14px rgba(37,99,235,.4)" onclick="prepNovoPedidoM()"><i class="ti ti-plus"></i></button>
+  </div>`;
+}
+
+// ══════════════════════════════
+// AGENDA
+// ══════════════════════════════
+function renderAgendaM(){
+  var cont = document.getElementById('main-content');
+  var hoje = new Date().toISOString().split('T')[0];
+  var tarefas = DB.tarefas.filter(t=>t.dt===blocoDataM).sort((a,b)=>(a.hora||'23:59')<(b.hora||'23:59')?-1:1);
+  var diasSemana = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+  var dRef = new Date(blocoDataM+'T12:00');
+  var lbl = diasSemana[dRef.getDay()]+', '+fmtD(blocoDataM)+(blocoDataM===hoje?' · Hoje':'');
+  var atrasadas = DB.tarefas.filter(t=>t.dt&&t.dt<hoje&&!t.done);
+
+  // Mini calendário
+  var calAno = dRef.getFullYear();
+  var calMes = dRef.getMonth();
+  var primeiroDia = new Date(calAno, calMes, 1).getDay();
+  var diasNoMes = new Date(calAno, calMes+1, 0).getDate();
+  var nomeMes = new Date(calAno, calMes, 1).toLocaleString('pt-BR',{month:'long'});
+  var diasComTar = new Set(DB.tarefas.filter(t=>t.dt&&!t.done).map(t=>t.dt));
+  var celulas = [];
+  for(var i=0;i<primeiroDia;i++) celulas.push('<div></div>');
+  for(var d=1;d<=diasNoMes;d++){
+    var dStr = calAno+'-'+String(calMes+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    var isHoje = dStr===hoje;
+    var isSel = dStr===blocoDataM;
+    var temTar = diasComTar.has(dStr);
+    celulas.push(`<div onclick="blocoDataM='${dStr}';renderAgendaM()" style="text-align:center;padding:4px 2px;border-radius:6px;cursor:pointer;font-size:12px;position:relative;${isSel?'background:var(--acc);color:#fff;font-weight:700':isHoje?'border:1px solid var(--acc);color:var(--acc);font-weight:600':'color:var(--t1)'}">
+      ${d}${temTar&&!isSel?'<div style="width:4px;height:4px;background:var(--org);border-radius:50%;margin:0 auto;margin-top:1px"></div>':''}
+    </div>`);
+  }
+  var calGrid = `
+  <div style="margin-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <button class="btn bs" style="width:32px;height:32px;padding:0" onclick="var d=new Date('${calAno}-${String(calMes+1).padStart(2,'0')}-01T12:00');d.setMonth(d.getMonth()-1);blocoDataM=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01';renderAgendaM()"><i class="ti ti-chevron-left"></i></button>
+      <div style="font-size:13px;font-weight:600;text-transform:capitalize">${nomeMes} ${calAno}</div>
+      <button class="btn bs" style="width:32px;height:32px;padding:0" onclick="var d=new Date('${calAno}-${String(calMes+1).padStart(2,'0')}-01T12:00');d.setMonth(d.getMonth()+1);blocoDataM=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01';renderAgendaM()"><i class="ti ti-chevron-right"></i></button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">
+      ${['D','S','T','Q','Q','S','S'].map(d=>`<div style="text-align:center;font-size:10px;color:var(--t3);font-weight:600;padding:2px">${d}</div>`).join('')}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">${celulas.join('')}</div>
+  </div>`;
+
+  cont.innerHTML = `
+  <div class="section">
+    <div class="card">
+      ${calGrid}
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+        <button class="btn bs" style="width:38px;height:38px;padding:0;flex-shrink:0" onclick="mudarDiaBlocoM(-1)"><i class="ti ti-chevron-left"></i></button>
+        <div style="flex:1;text-align:center;font-size:13px;font-weight:600;color:var(--t1)">${lbl}</div>
+        <button class="btn bs" style="width:38px;height:38px;padding:0;flex-shrink:0" onclick="mudarDiaBlocoM(1)"><i class="ti ti-chevron-right"></i></button>
+      </div>
+      <button class="btn bs" style="margin-bottom:14px;font-size:12px;padding:8px" onclick="blocoDataM=new Date().toISOString().split('T')[0];renderAgendaM()"><i class="ti ti-calendar-today"></i> Hoje</button>
+
+      ${tarefas.length ? tarefas.map(t=>`
+        <div class="nota-linha">
+          <div class="nota-hora">${t.hora||'—'}</div>
+          <div class="nota-sep"></div>
+          <div class="nota-corpo">
+            <div class="nota-desc" style="${t.done?'text-decoration:line-through;color:var(--t3)':''}">${{telefonema:'📞',reuniao:'👥',verificacao:'🔍',geral:'📋'}[t.tipo||'geral']||'📋'} ${t.desc}</div>
+            ${t.importante?'<div class="nota-meta">⭐ Importante</div>':''}
+          </div>
+          <div class="nota-acoes">
+            <button class="nota-btn" onclick="concluirTarM('${t.id}')" title="${t.done?'Reabrir':'Concluir'}">
+              <i class="ti ti-${t.done?'rotate':'check'}" style="color:${t.done?'var(--t3)':'var(--grn)'}"></i>
+            </button>
+            <button class="nota-btn" onclick="excluirTarM('${t.id}')" style="color:var(--red)">
+              <i class="ti ti-trash"></i>
+            </button>
+          </div>
+        </div>
+      `).join('') : '<div class="empty" style="padding:20px"><p>Nenhum registro neste dia</p></div>'}
+
+      <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+        <input type="time" class="fi" id="nova-hora-m" style="width:90px;padding:8px">
+        <input class="fi" id="nova-desc-m" placeholder="Anotar rápido..." style="flex:1" onkeydown="if(event.key==='Enter')addNotaRapidaM()">
+        <button class="btn bp" style="width:44px;height:44px;padding:0;flex-shrink:0" onclick="addNotaRapidaM()"><i class="ti ti-plus"></i></button>
+      </div>
+    </div>
+
+    ${atrasadas.length?`<div class="card" style="border-left:3px solid var(--red)">
+      <div class="card-title"><i class="ti ti-alert-triangle" style="color:var(--red)"></i>${atrasadas.length} tarefa(s) atrasada(s)</div>
+      ${atrasadas.slice(0,5).map(t=>`<div class="list-item">
+        <div class="list-body">
+          <div class="list-name">${t.desc}</div>
+          <div class="list-sub" style="color:var(--red)">${fmtD(t.dt)}</div>
+        </div>
+        <button class="nota-btn" onclick="concluirTarM('${t.id}')"><i class="ti ti-check"></i></button>
+      </div>`).join('')}
+    </div>`:''}
+  </div>
+  <div style="position:fixed;right:16px;bottom:76px">
+    <button class="btn bp" style="width:52px;height:52px;border-radius:50%;padding:0;font-size:22px;box-shadow:0 4px 14px rgba(37,37,235,.4)" onclick="prepNovoTarM()"><i class="ti ti-bell"></i></button>
+  </div>`;
+}
+
+function mudarDiaBlocoM(d){ var dt=new Date(blocoDataM+'T12:00'); dt.setDate(dt.getDate()+d); blocoDataM=dt.toISOString().split('T')[0]; renderAgendaM(); }
+
+function addNotaRapidaM(){
+  var desc = document.getElementById('nova-desc-m')?.value?.trim();
+  if(!desc){ toastM('Escreva algo antes de adicionar!'); return; }
+  var hora = document.getElementById('nova-hora-m')?.value||null;
+  DB.tarefas.push({id:uid(),desc,dt:blocoDataM,hora,tipo:'geral',importante:false,done:false});
+  salvarDB();
+  document.getElementById('nova-desc-m').value='';
+  document.getElementById('nova-hora-m').value='';
+  renderAgendaM();
+  atualizarBadgeAgendaM();
+}
+
+function concluirTarM(id){
+  var t = DB.tarefas.find(x=>x.id===id);
+  if(!t) return;
+  t.done = !t.done;
+  salvarDB();
+  renderM();
+  atualizarBadgeAgendaM();
+}
+function excluirTarM(id){
+  if(!confirm('Excluir este registro?')) return;
+  DB.tarefas = DB.tarefas.filter(x=>x.id!==id);
+  salvarDB();
+  renderM();
+  atualizarBadgeAgendaM();
+}
+
+function atualizarBadgeAgendaM(){
+  var hoje = new Date().toISOString().split('T')[0];
+  var n = DB.tarefas.filter(t=>!t.done&&t.dt&&t.dt<=hoje).length;
+  var b = document.getElementById('badge-agenda-m');
+  if(b){ b.textContent=n; b.style.display=n?'flex':'none'; }
+}
+
+// ══════════════════════════════
+// MAIS (opções extras)
+// ══════════════════════════════
+function renderMaisM(){
+  var cont = document.getElementById('main-content');
+  var cfg = loadCfg();
+  cont.innerHTML = `
+  <div class="section">
+    <div class="section-title">Conta</div>
+    <div class="card">
+      <div class="list-item" style="padding:12px 0">
+        <i class="ti ti-user" style="font-size:22px;color:var(--acc)"></i>
+        <div class="list-body">
+          <div class="list-name">${cfg.nome||'Representante'}</div>
+          <div class="list-sub">Usuário atual</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">Ferramentas</div>
+    <div class="card">
+      <div class="list-item" style="padding:12px 0" onclick="navM('proximos')">
+        <i class="ti ti-map-pin" style="font-size:22px;color:var(--acc2)"></i>
+        <div class="list-body"><div class="list-name">📍 Clientes próximos</div><div class="list-sub">Encontrar clientes na sua cidade atual</div></div>
+        <i class="ti ti-chevron-right" style="color:var(--t3)"></i>
+      </div>
+    </div>
+
+    <div class="section-title">Dados</div>
+    <div class="card">
+      <div class="list-item" style="padding:12px 0" onclick="abrirModalNuvemM()">
+        <i class="ti ti-cloud" style="font-size:22px;color:var(--acc)" id="ic-nuvem-mais"></i>
+        <div class="list-body"><div class="list-name">☁️ Sincronização em nuvem</div><div class="list-sub" id="sub-nuvem-mais">Configurar Firebase</div></div>
+        <i class="ti ti-chevron-right" style="color:var(--t3)"></i>
+      </div>
+      <div class="list-item" style="padding:12px 0" onclick="abrirModalBackupM()">
+        <i class="ti ti-cloud-upload" style="font-size:22px;color:var(--grn)"></i>
+        <div class="list-body"><div class="list-name">Backup & Restauração</div><div class="list-sub">Baixar ou importar backup JSON</div></div>
+        <i class="ti ti-chevron-right" style="color:var(--t3)"></i>
+      </div>
+      <div class="list-item" style="padding:12px 0">
+        <i class="ti ti-database" style="font-size:22px;color:var(--acc)"></i>
+        <div class="list-body">
+          <div class="list-name">${DB.clientes.length} clientes · ${DB.pedidos.length} pedidos</div>
+          <div class="list-sub">${DB.empresas.length} empresa(s) cadastrada(s)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">Configurações</div>
+    <div class="card">
+      <div class="list-item" style="padding:12px 0" onclick="abrirModalCfgM()">
+        <i class="ti ti-settings" style="font-size:22px;color:var(--t2)"></i>
+        <div class="list-body"><div class="list-name">Configurações gerais</div><div class="list-sub">Nome, chave API</div></div>
+        <i class="ti ti-chevron-right" style="color:var(--t3)"></i>
+      </div>
+    </div>
+
+    <div class="card" style="background:rgba(37,99,235,.05);border-color:rgba(37,99,235,.2)">
+      <div style="text-align:center;font-size:12px;color:var(--t3)">
+        <div style="font-weight:700;color:var(--acc);margin-bottom:4px">RepCRM Mobile</div>
+        Dados compartilhados com a versão Desktop<br>via localStorage do mesmo navegador
+      </div>
+    </div>
+  </div>`;
+}
+
+// ══════════════════════════════
+// AÇÕES: Novo Pedido / Cliente / Tarefa
+// ══════════════════════════════
+function prepNovoPedidoM(cliId){
+  var sel = document.getElementById('mped-emp');
+  sel.innerHTML = DB.empresas.map(e=>`<option value="${e.id}">${e.nome}</option>`).join('');
+  if(empAtualM) sel.value = empAtualM;
+  carregarClisMPed();
+  if(cliId) setTimeout(()=>{ document.getElementById('mped-cli').value=cliId; },100);
+  document.getElementById('mped-dt').value = new Date().toISOString().split('T')[0];
+  document.getElementById('mped-num').value = '';
+  document.getElementById('mped-val').value = '';
+  document.getElementById('mped-tipo').value = '';
+  document.getElementById('mped-parc').value = '1';
+  var e = DB.empresas.find(x=>x.id===empAtualM);
+  document.getElementById('mped-com').value = e?.com||3;
+  abrirModal('mPedM');
+}
+
+function carregarClisMPed(){
+  var eid = document.getElementById('mped-emp').value;
+  var clis = DB.clientes.filter(c=>c.empId===eid&&!c.encerrado).sort((a,b)=>(a.rs||'').localeCompare(b.rs||''));
+  document.getElementById('mped-cli').innerHTML = clis.map(c=>`<option value="${c.id}">${c.rs}</option>`).join('');
+}
+
+function salvarPedidoM(){
+  var eid = document.getElementById('mped-emp').value;
+  var cid = document.getElementById('mped-cli').value;
+  var val = parseFloat(document.getElementById('mped-val').value)||0;
+  if(!eid||!cid||!val){ toastM('Preencha empresa, cliente e valor!'); return; }
+  var e = DB.empresas.find(x=>x.id===eid);
+  var parc = parseInt(document.getElementById('mped-parc').value)||1;
+  var fatcom = e?.fatcom||'nao';
+  var pays = fatcom==='sim' ? ['',...Array(parc).fill('')] : Array(parc).fill('');
+  DB.pedidos.push({
+    id:uid(), empId:eid, cliId:cid,
+    dt: document.getElementById('mped-dt').value,
+    num: document.getElementById('mped-num').value||('PED'+Date.now()),
+    val, desc:0, parc,
+    com: parseFloat(document.getElementById('mped-com').value)||3,
+    fatcom, valfat:0, pays,
+    tipo: document.getElementById('mped-tipo').value||null,
+    naTransp: false
+  });
+  salvarDB();
+  toastM('✅ Pedido salvo!');
+  fecharModal('mPedM');
+  renderM();
+}
+
+function prepNovoClienteM(){
+  document.getElementById('mcli-emp').innerHTML = DB.empresas.map(e=>`<option value="${e.id}">${e.nome}</option>`).join('');
+  if(empAtualM) document.getElementById('mcli-emp').value = empAtualM;
+  ['mcli-rs','mcli-cid','mcli-seg','mcli-cel','mcli-cnpj','mcli-comp'].forEach(id=>document.getElementById(id).value='');
+  abrirModal('mCliM');
+}
+
+function salvarClienteM(){
+  var rs = document.getElementById('mcli-rs').value.trim();
+  var eid = document.getElementById('mcli-emp').value;
+  if(!rs||!eid){ toastM('Preencha o nome e a empresa!'); return; }
+  DB.clientes.push({
+    id:uid(), rs, empId:eid,
+    cid: document.getElementById('mcli-cid').value,
+    seg: document.getElementById('mcli-seg').value,
+    cel: document.getElementById('mcli-cel').value,
+    cnpj: document.getElementById('mcli-cnpj').value,
+    comp: document.getElementById('mcli-comp').value,
+    hist:[], encerrado:false
+  });
+  salvarDB();
+  toastM('✅ Cliente salvo!');
+  fecharModal('mCliM');
+  renderM();
+}
+
+function selTipoM(btn, tipo){
+  document.getElementById('mtar-tipo').value = tipo;
+  document.querySelectorAll('#mTarM .chip').forEach(c=>c.classList.remove('act'));
+  btn.classList.add('act');
+}
+
+function prepNovoTarM(){
+  document.getElementById('mtar-emp').innerHTML = `<option value="">Geral</option>` + DB.empresas.map(e=>`<option value="${e.id}">${e.nome}</option>`).join('');
+  document.getElementById('mtar-desc').value='';
+  document.getElementById('mtar-dt').value=blocoDataM;
+  document.getElementById('mtar-hora').value='';
+  document.getElementById('mtar-tipo').value='geral';
+  document.querySelectorAll('#mTarM .chip').forEach((c,i)=>c.classList.toggle('act',i===0));
+  abrirModal('mTarM');
+}
+
+function salvarTarefaM(){
+  var desc = document.getElementById('mtar-desc').value.trim();
+  if(!desc){ toastM('Informe a descrição!'); return; }
+  DB.tarefas.push({
+    id:uid(), desc,
+    dt: document.getElementById('mtar-dt').value||null,
+    hora: document.getElementById('mtar-hora').value||null,
+    empId: document.getElementById('mtar-emp').value||null,
+    tipo: document.getElementById('mtar-tipo').value||'geral',
+    importante: false, done: false
+  });
+  salvarDB();
+  toastM('✅ Registro salvo!');
+  fecharModal('mTarM');
+  renderM();
+  atualizarBadgeAgendaM();
+}
+
+// ── Backup ──────────────────────────────────────────────
+function abrirModalBackupM(){ abrirModal('mBkpM'); }
+function exportarBackupM(){
+  var dados = {empresas:DB.empresas,clientes:DB.clientes,pedidos:DB.pedidos,tarefas:DB.tarefas,eventos:DB.eventos,exportado:new Date().toISOString(),versao:'mobile'};
+  var blob = new Blob([JSON.stringify(dados)], {type:'application/json'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'RepCRM_backup_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+  toastM('Backup baixado!');
+}
+function restaurarBackupM(input){
+  var file = input.files[0]; if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var dados = JSON.parse(e.target.result);
+      if(!dados.empresas||!dados.clientes){ toastM('Arquivo inválido!'); return; }
+      if(!confirm('Restaurar backup? Os dados atuais serão substituídos.')) return;
+      DB.empresas = dados.empresas||[];
+      DB.clientes = dados.clientes||[];
+      DB.pedidos  = dados.pedidos||[];
+      DB.tarefas  = dados.tarefas||[];
+      DB.eventos  = dados.eventos||[];
+      salvarDB();
+      fecharModal('mBkpM');
+      toastM('✅ Dados restaurados!');
+      renderM();
+    }catch(err){ toastM('Erro ao ler o arquivo!'); }
+  };
+  reader.readAsText(file);
+}
+
+// ── Configurações ────────────────────────────────────────
+function abrirModalCfgM(){
+  var cfg = loadCfg();
+  document.getElementById('mcfg-nome').value = cfg.nome||'';
+  document.getElementById('mcfg-key').value = cfg.iakey||'';
+  var epk=document.getElementById('mcfg-places-key'); if(epk) epk.value=cfg.placesKey||'';
+  var ea=document.getElementById('mcfg-amora'); if(ea) ea.value=cfg.nomeAmora||'Amora';
+  carregarFotoAmoraSettings();
+  abrirModal('mCfgM');
+}
+function salvarCfgM(){
+  var cfg = loadCfg();
+  cfg.nome = document.getElementById('mcfg-nome').value.trim();
+  cfg.iakey = document.getElementById('mcfg-key').value.trim();
+  var epk=document.getElementById('mcfg-places-key'); if(epk) cfg.placesKey=epk.value.trim();
+  var ea=document.getElementById('mcfg-amora'); if(ea) cfg.nomeAmora=ea.value.trim()||'Amora';
+  saveCfg(cfg);
+  atualizarBotaoAmora();
+  salvarNuvemM(); // sincroniza chaves e foto na nuvem
+  toastM('✅ Configurações salvas!');
+  fecharModal('mCfgM');
+}
+
+
+// ── Busca lojas por segmento (Google Places API v1) ──────
+var MAPA_SEGMENTO_PLACES = {
+  'Papelaria':'papelaria stationery',
+  'Presente':'loja de presentes gift shop',
+  'Gamer':'games loja eletrônicos',
+  'Varejo':'loja varejo retail',
+  'Atacado':'atacado distribuidor',
+  'Tabacaria':'tabacaria tobacco shop',
+  'Farmácia':'farmácia pharmacy',
+  'Móveis':'moveis furniture store',
+  'Vestuário':'loja roupas clothing store',
+  'Calçados':'calcados shoe store',
+  'Brinquedos':'brinquedos toy store',
+  'Esporte':'artigos esportivos sporting goods',
+  'Pet':'petshop pet store',
+  'Cosméticos':'cosmeticos beauty store',
+  'Alimentício':'supermercado mercado'
+};
+
+async function buscarLojasPorSeg(escopo){
+  var status=document.getElementById('seg-busca-status');
+  var lista=document.getElementById('seg-busca-lista');
+  if(!status||!lista) return;
+
+  var cfg=loadCfg();
+  var placesKey=cfg.placesKey||'';
+  if(!placesKey){
+    status.innerHTML='⚠️ Configure a Google Places API Key em <b>Configurações</b> para usar esta função.';
+    return;
+  }
+
+  status.innerHTML='⏳ Obtendo localização...';
+  lista.innerHTML='';
+
+  if(!navigator.geolocation){ status.innerHTML='❌ Geolocalização não disponível.'; return; }
+
+  navigator.geolocation.getCurrentPosition(async function(pos){
+    var lat=pos.coords.latitude; var lng=pos.coords.longitude;
+    var raio=escopo==='bairro'?1500:5000; // 1.5km bairro / 5km cidade
+    status.innerHTML='🔍 Buscando lojas ('+(escopo==='bairro'?'bairro':'cidade')+')...';
+
+    var segSel=document.getElementById('seg-busca-prox')?.value||'';
+    var segs=segSel?[segSel]:[...new Set(DB.clientes.filter(c=>c.seg&&!c.encerrado).map(c=>c.seg))];
+    var keywords=[...new Set(segs.map(s=>MAPA_SEGMENTO_PLACES[s]||s).filter(Boolean))].slice(0,3);
+
+    function norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
+    var nomesExist=new Set(DB.clientes.map(c=>norm(c.rs).slice(0,8)));
+
+    var resultados=[];
+    for(var ki=0;ki<keywords.length;ki++){
+      try{
+        // Google Places API v1 - Nearby Search
+        var body={
+          includedTypes:['store','shopping_mall','supermarket','clothing_store','shoe_store','pet_store','pharmacy','furniture_store','sporting_goods_store','book_store','electronics_store'],
+          maxResultCount:10,
+          locationRestriction:{circle:{center:{latitude:lat,longitude:lng},radius:raio}},
+          textQuery:keywords[ki]
+        };
+        var r=await fetch('https://places.googleapis.com/v1/places:searchText',{
+          method:'POST',
+          headers:{
+            'Content-Type':'application/json',
+            'X-Goog-Api-Key':placesKey,
+            'X-Goog-FieldMask':'places.displayName,places.formattedAddress,places.location,places.nationalPhoneNumber,places.websiteUri'
+          },
+          body:JSON.stringify({textQuery:keywords[ki]+' '+( escopo==='bairro'?'perto de mim':'' ),locationBias:{circle:{center:{latitude:lat,longitude:lng},radius:raio}},maxResultCount:10,languageCode:'pt-BR'})
+        });
+        var d=await r.json();
+        if(d.places) resultados.push(...d.places.map(p=>({...p,_kw:keywords[ki]})));
+      }catch(e){ console.error(e); }
+    }
+
+    // Deduplica por nome
+    var uniq={}; resultados.forEach(p=>{uniq[p.displayName?.text||p.formattedAddress]=p;});
+    resultados=Object.values(uniq);
+
+    if(!resultados.length){
+      status.innerHTML='Nenhuma loja encontrada. Tente ampliar o raio ou outro segmento.';
+      return;
+    }
+
+    status.innerHTML='<b>'+resultados.length+'</b> loja(s) encontrada(s) num raio de '+(raio/1000)+'km';
+
+    lista.innerHTML=resultados.map(function(p){
+      var nome=p.displayName?.text||'—';
+      var end=p.formattedAddress||'';
+      var nomeNorm=norm(nome).slice(0,8);
+      var jaCli=nomesExist.has(nomeNorm);
+      var plat=p.location?.latitude; var plng=p.location?.longitude;
+      var mapsUrl=plat?'https://www.google.com/maps/search/?api=1&query='+plat+','+plng:'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(nome+' '+end);
+      return '<div class="list-item">'+
+        '<div class="list-body" style="cursor:pointer" onclick="window.open(\''+mapsUrl+'\',\'_blank\')">'+
+          '<div class="list-name">'+nome+(jaCli?' <span style="font-size:9px;background:var(--grn)22;color:var(--grn);padding:1px 5px;border-radius:8px">já cliente</span>':'')+'</div>'+
+          '<div class="list-sub">'+end+'</div>'+
+        '</div>'+
+        '<button style="background:none;border:1px solid var(--acc);border-radius:6px;padding:4px 10px;font-size:11px;color:var(--acc);cursor:pointer;flex-shrink:0" onclick="window.open(\''+mapsUrl+'\',\'_blank\')"><i class="ti ti-map-pin"></i></button>'+
+      '</div>';
+    }).join('');
+
+  }, function(err){
+    var msgs={1:'Permissão negada.',2:'Localização indisponível.',3:'Tempo esgotado.'};
+    status.innerHTML='❌ '+(msgs[err.code]||'Erro.');
+  },{timeout:15000});
+}
+
+function buscarLojasPorSegBairro(){ buscarLojasPorSeg('bairro'); }
+function buscarLojasPorSegCidade(){ buscarLojasPorSeg('cidade'); }
+var _geocacheM = {};
+var _minhaLocM = null;
+
+function normalizar(str){
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
+}
+
+function renderProximosM(){
+  var cont = document.getElementById('main-content');
+  var segs = [...new Set(DB.clientes.filter(c=>c.seg&&!c.encerrado).map(c=>c.seg))].sort();
+  cont.innerHTML = `
+  <div class="section">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:15px;font-weight:700;color:var(--t1)"><i class="ti ti-map-pin" style="color:var(--acc)"></i> Próximos</div>
+      <button class="btn bp" style="font-size:11px;padding:5px 12px" onclick="buscarProximosM()"><i class="ti ti-current-location"></i> Meus clientes</button>
+    </div>
+
+    <!-- Buscar lojas por segmento -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title"><i class="ti ti-search" style="color:var(--acc2)"></i>Buscar lojas por segmento</div>
+      <select class="fi" id="seg-busca-prox" style="margin-bottom:8px">
+        <option value="">Todos os segmentos cadastrados</option>
+        ${segs.map(s=>`<option value="${s}">${s}</option>`).join('')}
+      </select>
+      <div style="display:flex;gap:8px">
+        <button class="btn bs" style="flex:1;font-size:11px" onclick="buscarLojasPorSegBairro()"><i class="ti ti-building-store"></i> No bairro</button>
+        <button class="btn bp" style="flex:1;font-size:11px" onclick="buscarLojasPorSegCidade()"><i class="ti ti-building-community"></i> Na cidade</button>
+      </div>
+      <div id="seg-busca-status" style="font-size:11px;color:var(--t3);margin-top:8px;text-align:center"></div>
+      <div id="seg-busca-lista"></div>
+    </div>
+
+    <div id="proximos-status" style="text-align:center;color:var(--t3);font-size:13px;padding:12px">
+      Toque em <b>Meus clientes</b> para ver clientes da sua cidade.
+    </div>
+    <div id="proximos-lista"></div>
+  </div>`;
+}
+
+async function buscarProximosM(){
+  var status = document.getElementById('proximos-status');
+  var lista = document.getElementById('proximos-lista');
+  if(!status||!lista) return;
+
+  status.innerHTML='<i class="ti ti-loader"></i> Obtendo sua localização...';
+  lista.innerHTML='';
+
+  if(!navigator.geolocation){
+    status.innerHTML='❌ Geolocalização não disponível neste dispositivo.'; return;
+  }
+
+  navigator.geolocation.getCurrentPosition(async function(pos){
+    _minhaLocM = {lat: pos.coords.latitude, lng: pos.coords.longitude};
+    status.innerHTML='📍 Localização obtida! Identificando sua cidade...';
+
+    try{
+      // Reverse geocode para descobrir cidade atual
+      var r = await fetch(
+        'https://nominatim.openstreetmap.org/reverse?format=json&lat='+_minhaLocM.lat+'&lon='+_minhaLocM.lng+'&zoom=10',
+        {headers:{'User-Agent':'RepCRM-Mobile/1.0'}}
+      );
+      var d = await r.json();
+      var cidadeOriginal = d.address?.city || d.address?.town || d.address?.municipality || d.address?.county || '';
+      var cidadeAtual = normalizar(cidadeOriginal);
+
+      if(!cidadeAtual){
+        status.innerHTML='❌ Não foi possível identificar sua cidade atual.'; return;
+      }
+
+      // Filtra clientes da mesma cidade
+      var clisCidade = DB.clientes.filter(function(c){
+        if(c.encerrado) return false;
+        var cidCli = normalizar(c.cid||'');
+        return cidCli===cidadeAtual ||
+               cidCli.includes(cidadeAtual) ||
+               cidadeAtual.includes(cidCli);
+      });
+
+      status.innerHTML = '📍 Você está em <b>'+cidadeOriginal+'</b> · '+
+        '<b>'+clisCidade.length+'</b> cliente(s) nesta cidade'+
+        (clisCidade.length?
+          ' <button onclick="abrirTodosMapaM()" class="btn bs" style="font-size:10px;padding:2px 8px;margin-left:6px"><i class="ti ti-map"></i> Ver todos</button>':'');
+
+      if(!clisCidade.length){
+        lista.innerHTML='<div style="color:var(--t3);font-size:13px;padding:20px;text-align:center">Nenhum cliente cadastrado em '+cidadeOriginal+'.</div>';
+        return;
+      }
+
+      // Guarda para abrir todos no mapa
+      window._proximosResultados = clisCidade;
+
+      lista.innerHTML = clisCidade.map(function(c){
+        var e = DB.empresas.find(function(emp){return emp.id===c.empId;});
+        var endCompleto = [c.end, c.cid, c.uf].filter(Boolean).join(', ');
+        var endMapa = encodeURIComponent(endCompleto||c.cid||c.rs);
+        return '<div class="list-item">'+
+          
+          '<div class="list-body" onclick="abrirClienteM(\''+c.id+'\')" style="cursor:pointer">'+
+            '<div class="list-name">'+c.rs+'</div>'+
+            '<div class="list-sub" style="color:var(--t2)">'+(c.end||'Sem endereço cadastrado')+'</div>'+
+            (c.comp?'<div class="list-sub">'+c.comp+'</div>':'')+
+          '</div>'+
+          '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">'+
+            '<button onclick="window.open(\'https://www.google.com/maps/search/?api=1&query='+endMapa+'\',\'_blank\')" '+
+              'style="background:none;border:1px solid var(--acc);border-radius:6px;padding:4px 10px;font-size:10px;color:var(--acc);cursor:pointer">'+
+              '<i class="ti ti-map-pin"></i> Mapa</button>'+
+            (c.cel||c.fone?
+              '<button onclick="wppM(\''+((c.cel||c.fone)||'')+'\''+')" '+
+              'style="background:none;border:1px solid #25d366;border-radius:6px;padding:4px 10px;font-size:10px;color:#25d366;cursor:pointer">'+
+              '<i class="ti ti-brand-whatsapp"></i></button>':'')+ 
+          '</div>'+
+        '</div>';
+      }).join('');
+
+    }catch(err){
+      status.innerHTML='❌ Erro ao identificar cidade: '+err.message;
+    }
+
+  }, function(err){
+    var msgs={1:'Permissão negada. Toque em Permitir.',2:'Localização indisponível.',3:'Tempo esgotado.'};
+    status.innerHTML='❌ '+(msgs[err.code]||'Erro ao obter localização.');
+  },{timeout:15000, maximumAge:60000});
+}
+
+function abrirTodosMapaM(){
+  if(!window._proximosResultados||!window._proximosResultados.length) return;
+  window._proximosResultados.slice(0,9).forEach(function(c,i){
+    setTimeout(function(){
+      var end = encodeURIComponent([c.end,c.cid,c.uf].filter(Boolean).join(', ')||c.rs);
+      window.open('https://www.google.com/maps/search/?api=1&query='+end,'_blank');
+    },i*700);
+  });
+}
+// ── Fim Clientes Próximos ────────────────────────────────
+// ══ FIREBASE SYNC ══
+// ╔══════════════════════════════════════════════════════╗
+// ║         CONFIGURAÇÃO FIREBASE — PREENCHA AQUI        ║
+// ║  Ao atualizar o sistema, copie este bloco para       ║
+// ║  o arquivo novo e o sync funcionará automaticamente. ║
+// ╚══════════════════════════════════════════════════════╝
+var FB_CONFIG_PADRAO_M = {
+  "apiKey": "AIzaSyCn0sVoLm5aWG6gfcdUxXI6Sh1qrSjggbc",
+  "authDomain": "fnreprescrm.firebaseapp.com",
+  "databaseURL": "https://fnreprescrm-default-rtdb.firebaseio.com",
+  "projectId": "fnreprescrm",
+  "storageBucket": "fnreprescrm.firebasestorage.app",
+  "messagingSenderId": "1090178885977",
+  "appId": "1:1090178885977:web:3dd6febd872a1a522d4448"
+};
+var FB_CHAVE_PADRAO_M = ""; // ex: minha-empresa-2024
+// ══════════════════════════════════════════════════════
+var fbAppM = null;
+
+function parseFbConfig(raw){
+  var s = raw.trim()
+    .replace(/^\s*(const|var|let)\s+\w+\s*=\s*/,'')
+    .replace(/;\s*$/,'')
+    .trim();
+  return Function('return (' + s + ')')();
+}
+var fbDBM  = null;
+var fbRefM = null;
+var fbEscutandoM = false;
+
+function fbChaveM(){ return localStorage.getItem('fb_chave')||'repcrm'; }
+
+function setSyncStatusM(status){
+  var btn = document.getElementById('btn-nuvem-m');
+  var sub = document.getElementById('sub-nuvem-mais');
+  var mapa = {
+    conectado:    {ic:'color:var(--grn)', sub:'🟢 Conectado'},
+    sincronizando:{ic:'color:var(--org)', sub:'🔄 Sincronizando...'},
+    erro:         {ic:'color:var(--red)', sub:'⚠️ Erro de conexão'},
+    offline:      {ic:'color:var(--t3)', sub:'Configurar Firebase'},
+  };
+  var m = mapa[status]||mapa['offline'];
+  if(btn) btn.querySelector('i').style.color = m.ic.split(':')[1];
+  if(sub) sub.textContent = m.sub;
+}
+
+function initFirebaseM(){
+  var raw = localStorage.getItem('fb_config');
+  if(!raw && FB_CONFIG_PADRAO_M.apiKey){
+    raw = JSON.stringify(FB_CONFIG_PADRAO_M);
+    if(FB_CHAVE_PADRAO_M) localStorage.setItem('fb_chave', FB_CHAVE_PADRAO_M);
+  }
+  if(!raw) return;
+  try {
+    var cfg = parseFbConfig(raw);
+    if(!firebase.apps.length) fbAppM = firebase.initializeApp(cfg);
+    else fbAppM = firebase.app();
+    fbDBM = firebase.database();
+    fbRefM = fbDBM.ref(fbChaveM()+'/db');
+    firebase.database().ref('.info/connected').on('value', function(snap){
+      setSyncStatusM(snap.val() ? 'conectado' : 'offline');
+    });
+    if(!fbEscutandoM){
+      fbEscutandoM = true;
+      fbRefM.on('value', function(snap){
+        var remoto = snap.val();
+        if(!remoto) return;
+        if(remoto._ts && DB._ts && remoto._ts <= DB._ts) return;
+        DB.empresas = remoto.empresas||[];
+        DB.clientes = remoto.clientes||[];
+        DB.pedidos  = remoto.pedidos||[];
+        DB.tarefas  = remoto.tarefas||[];
+        DB.eventos  = remoto.eventos||[];
+        DB._ts      = remoto._ts;
+        // Restaura config e foto da nuvem
+        if(remoto._cfg){
+          var cfgLocal = loadCfg();
+          if(remoto._cfg.iakey&&!cfgLocal.iakey)    cfgLocal.iakey=remoto._cfg.iakey;
+          if(remoto._cfg.placesKey&&!cfgLocal.placesKey) cfgLocal.placesKey=remoto._cfg.placesKey;
+          if(remoto._cfg.nomeAmora) cfgLocal.nomeAmora=remoto._cfg.nomeAmora;
+          saveCfg(cfgLocal);
+          if(remoto._cfg.fotoAmora&&!localStorage.getItem('repcrm_amora_foto'))
+            localStorage.setItem('repcrm_amora_foto', remoto._cfg.fotoAmora);
+          setTimeout(atualizarBotaoAmora, 500);
+        }
+        salvarLocal_M();
+        renderM();
+      }, function(){ setSyncStatusM('erro'); });
+    }
+  } catch(e){ setSyncStatusM('erro'); }
+}
+
+function salvarLocal_M(){
+  save('empresas', DB.empresas);
+  save('clientes', DB.clientes);
+  save('pedidos',  DB.pedidos);
+  save('tarefas',  DB.tarefas);
+  save('eventos',  DB.eventos);
+}
+
+function salvarNuvemM(){
+  if(!fbRefM) return;
+  setSyncStatusM('sincronizando');
+  DB._ts = Date.now();
+  var cfg = loadCfg();
+  fbRefM.set({
+    empresas: DB.empresas,
+    clientes: DB.clientes,
+    pedidos:  DB.pedidos,
+    tarefas:  DB.tarefas,
+    eventos:  DB.eventos,
+    _ts:      DB._ts,
+    _cfg:{
+      iakey:     cfg.iakey||'',
+      placesKey: cfg.placesKey||'',
+      nomeAmora: cfg.nomeAmora||'Amora',
+      fotoAmora: localStorage.getItem('repcrm_amora_foto')||''
+    }
+  }).then(function(){ setSyncStatusM('conectado'); })
+    .catch(function(){ setSyncStatusM('erro'); });
+}
+
+function abrirModalNuvemM(){
+  document.getElementById('nuvem-cfg-m').value = localStorage.getItem('fb_config')||'';
+  document.getElementById('nuvem-chave-m').value = fbChaveM();
+  var s = document.getElementById('nuvem-status-m');
+  s.textContent = fbDBM ? '🟢 Conectado ao Firebase' : '⚪ Não conectado';
+  s.style.color = fbDBM ? 'var(--grn)' : 'var(--t3)';
+  abrirModal('mNuvemM');
+}
+
+function salvarCfgNuvemM(){
+  var raw = document.getElementById('nuvem-cfg-m').value.trim();
+  var chave = document.getElementById('nuvem-chave-m').value.trim()||'repcrm';
+  var s = document.getElementById('nuvem-status-m');
+  try { var cfg = parseFbConfig(raw); raw = JSON.stringify(cfg); } catch(e){ s.textContent='❌ JSON inválido'; s.style.color='var(--red)'; return; }
+  localStorage.setItem('fb_config', raw);
+  localStorage.setItem('fb_chave', chave);
+  fbEscutandoM = false;
+  if(fbAppM){ try{ fbAppM.delete(); }catch(e){} fbAppM=null; fbDBM=null; fbRefM=null; }
+  s.textContent='🔄 Conectando...'; s.style.color='var(--org)';
+  setTimeout(function(){
+    initFirebaseM();
+    if(fbDBM){ s.textContent='🟢 Conectado!'; s.style.color='var(--grn)'; salvarNuvemM(); }
+    else { s.textContent='❌ Falha — verifique as credenciais'; s.style.color='var(--red)'; }
+  }, 800);
+}
+
+function desconectarNuvemM(){
+  if(fbAppM){ try{ fbAppM.delete(); }catch(e){} }
+  fbAppM=null; fbDBM=null; fbRefM=null; fbEscutandoM=false;
+  localStorage.removeItem('fb_config');
+  setSyncStatusM('offline');
+  var s = document.getElementById('nuvem-status-m');
+  if(s){ s.textContent='⚪ Desconectado'; s.style.color='var(--t3)'; }
+}
+// ══ FIM FIREBASE SYNC ══
+
+// ── Amora — Assistente Virtual ───────────────────────────
+var vozAtiva = false;
+var reconhecimento = null;
+var _ultimaResposta = '';
+var _vozSintetizador = window.speechSynthesis;
+var _vozAmora = null;
+
+function carregarVozAmora(){
+  var vozes = _vozSintetizador.getVoices();
+  _vozAmora = vozes.find(function(v){return v.lang==='pt-BR'&&v.name.toLowerCase().includes('female');})
+    ||vozes.find(function(v){return v.lang==='pt-BR'&&(v.name.includes('Google')||v.name.includes('Microsoft'));})
+    ||vozes.find(function(v){return v.lang==='pt-BR';})
+    ||vozes.find(function(v){return v.lang.startsWith('pt');})
+    ||null;
+}
+if(_vozSintetizador){ _vozSintetizador.onvoiceschanged=carregarVozAmora; carregarVozAmora(); }
+
+function falarAmora(texto){
+  // Síntese de voz desativada — resposta apenas em texto
+  _ultimaResposta=texto;
+  var el=document.getElementById('btn-falar');
+  if(el) el.style.display='none';
+}
+
+function falarUltima(){ if(_ultimaResposta) falarAmora(_ultimaResposta); }
+
+function previewFotoAmora(input){
+  if(!input.files||!input.files[0]) return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var base64=e.target.result;
+    // Preview no settings
+    var prev=document.getElementById('preview-amora-foto');
+    if(prev){ prev.innerHTML='<img src="'+base64+'" style="width:100%;height:100%;object-fit:cover">'; }
+    // Salva no localStorage
+    localStorage.setItem('repcrm_amora_foto', base64);
+    // Atualiza botão flutuante
+    atualizarBotaoAmora();
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+function removerFotoAmora(){
+  localStorage.removeItem('repcrm_amora_foto');
+  var prev=document.getElementById('preview-amora-foto');
+  var cfg=loadCfg();
+  var nome=(cfg.nomeAmora||'Amora')[0].toUpperCase();
+  if(prev) prev.innerHTML='<span style="color:#fff;font-size:20px;font-weight:700">'+nome+'</span>';
+  atualizarBotaoAmora();
+}
+
+function atualizarBotaoAmora(){
+  var btn=document.getElementById('btn-voz');
+  if(!btn) return;
+  var foto=localStorage.getItem('repcrm_amora_foto');
+  var cfg=loadCfg();
+  var nome=(cfg.nomeAmora||'Amora');
+  if(foto){
+    btn.innerHTML='<img src="'+foto+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%"><span style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);font-size:7px;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.5);letter-spacing:0.5px">'+nome.toUpperCase()+'</span>';
+    btn.style.padding='0';
+    btn.style.overflow='hidden';
+    btn.style.position='fixed'; // manter position
+  } else {
+    var letra=nome[0].toUpperCase();
+    btn.innerHTML='<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="13" r="8" fill="#fde68a"/><path d="M8 13 Q8 5 16 5 Q24 5 24 13 Q22 8 16 8 Q10 8 8 13Z" fill="#92400e"/><path d="M8 13 Q6 18 8 22 Q8 16 8 13Z" fill="#92400e"/><path d="M24 13 Q26 18 24 22 Q24 16 24 13Z" fill="#92400e"/><circle cx="13" cy="13" r="1.2" fill="#1e293b"/><circle cx="19" cy="13" r="1.2" fill="#1e293b"/><path d="M13 17 Q16 20 19 17" stroke="#e11d48" stroke-width="1.2" fill="none" stroke-linecap="round"/><path d="M10 24 Q10 20 16 20 Q22 20 22 24 L22 32 L10 32Z" fill="#7c3aed"/><path d="M8 12 Q8 6 16 6 Q24 6 24 12" stroke="#92400e" stroke-width="1.5" fill="none"/><rect x="6.5" y="11" width="2.5" height="4" rx="1" fill="#92400e"/><rect x="23" y="11" width="2.5" height="4" rx="1" fill="#92400e"/></svg><span id="btn-voz-label" style="font-size:7px;font-weight:700;letter-spacing:0.5px;margin-top:1px">'+nome.toUpperCase()+'</span>';
+  }
+}
+
+function carregarFotoAmoraSettings(){
+  var foto=localStorage.getItem('repcrm_amora_foto');
+  var prev=document.getElementById('preview-amora-foto');
+  var cfg=loadCfg();
+  if(foto && prev){
+    prev.innerHTML='<img src="'+foto+'" style="width:100%;height:100%;object-fit:cover">';
+  } else if(prev){
+    var letra=(cfg.nomeAmora||'Amora')[0].toUpperCase();
+    document.getElementById('preview-amora-letra').textContent=letra;
+  }
+}
+
+
+function getNomeAmora(){ var cfg=loadCfg(); return (cfg.nomeAmora||'Amora').toLowerCase(); }
+
+function toggleVoz(){
+  if(vozAtiva) pararVoz();
+  else iniciarVoz();
+}
+
+function iniciarVoz(){
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ toastM('Reconhecimento de voz não suportado. Use o Chrome.'); return; }
+  document.getElementById('painel-voz').style.display='block';
+  var _fraseAcumulada = '';
+  var _pausaTimer = null;
+  var _aguardandoComando = false;
+
+  reconhecimento=new SR();
+  reconhecimento.lang='pt-BR';
+  reconhecimento.continuous=false;
+  reconhecimento.interimResults=true;
+  reconhecimento.maxAlternatives=1;
+
+  reconhecimento.onstart=function(){
+    vozAtiva=true;
+    document.getElementById('btn-voz').style.boxShadow='0 0 0 4px rgba(219,39,119,.4),0 4px 20px rgba(124,58,237,.5)';
+    document.getElementById('voz-status-dot').style.background='#db2777';
+    document.getElementById('voz-status-txt').textContent='Ouvindo... diga "'+getNomeAmora()+'"';
+    if(!_aguardandoComando) document.getElementById('voz-transcricao').textContent='';
+  };
+
+  reconhecimento.onresult=function(event){
+    var txt='';
+    for(var i=0;i<event.results.length;i++) txt+=event.results[i][0].transcript;
+    txt=txt.trim();
+    document.getElementById('voz-transcricao').textContent='🎤 "'+txt+'"';
+
+    if(event.results[event.results.length-1].isFinal){
+      _fraseAcumulada=(_fraseAcumulada+' '+txt).trim();
+      var txLower=_fraseAcumulada.toLowerCase();
+      var nome=getNomeAmora();
+
+      // Detectou o nome — aguarda o resto do comando
+      if(txLower.includes(nome)){
+        _aguardandoComando=true;
+        clearTimeout(_pausaTimer);
+        var comando=txLower.replace(new RegExp(nome,'gi'),'').trim();
+        if(comando.length>2){
+          // Tem comando junto com o nome — processa com delay para capturar mais
+          _pausaTimer=setTimeout(function(){
+            document.getElementById('voz-status-txt').textContent='Amora processando...';
+            document.getElementById('voz-resposta').innerHTML='<span style="color:#7c3aed">⏳ Analisando...</span>';
+            processarComandoVoz(_fraseAcumulada.replace(new RegExp(nome,'gi'),'').trim());
+            _fraseAcumulada=''; _aguardandoComando=false;
+          },1200);
+        } else {
+          // Só o nome — responde e fica ouvindo o comando
+          var saud='Olá! Como posso ajudar?';
+          document.getElementById('voz-resposta').innerHTML='<span style="color:#7c3aed">👋 '+saud+'</span>';
+          falarAmora(saud);
+          document.getElementById('voz-status-txt').textContent='Ouvindo seu comando...';
+        }
+      } else if(_aguardandoComando && _fraseAcumulada.length>2){
+        // Já ouviu o nome antes, agora recebeu o comando
+        clearTimeout(_pausaTimer);
+        _pausaTimer=setTimeout(function(){
+          var fraseCompleta=_fraseAcumulada.toLowerCase();
+          var nome2=getNomeAmora();
+          var cmd=fraseCompleta.replace(new RegExp(nome2,'gi'),'').trim();
+          if(cmd.length>2){
+            document.getElementById('voz-status-txt').textContent='Amora processando...';
+            document.getElementById('voz-resposta').innerHTML='<span style="color:#7c3aed">⏳ Analisando...</span>';
+            processarComandoVoz(cmd);
+          }
+          _fraseAcumulada=''; _aguardandoComando=false;
+        },800);
+      }
+    }
+  };
+
+  reconhecimento.onerror=function(e){
+    var msgs={'not-allowed':'Permissão de microfone negada.','network':'Erro de rede.'};
+    if(msgs[e.error]) document.getElementById('voz-resposta').innerHTML='❌ '+msgs[e.error];
+    if(e.error==='not-allowed'||e.error==='network') pararVoz();
+  };
+
+  reconhecimento.onend=function(){
+    // Reinicia automaticamente enquanto ativo
+    if(vozAtiva){
+      setTimeout(function(){
+        try{ reconhecimento.start(); }catch(e){}
+      },200);
+    }
+  };
+
+  reconhecimento.start();
+}
+
+function pararVoz(){
+  vozAtiva=false;
+  if(reconhecimento){ try{ reconhecimento.stop(); }catch(e){} }
+  if(_vozSintetizador) _vozSintetizador.cancel();
+  document.getElementById('btn-voz').style.boxShadow='0 4px 20px rgba(124,58,237,.5)';
+  document.getElementById('voz-status-dot').style.background='var(--t3)';
+  document.getElementById('voz-status-txt').textContent='Diga "'+getNomeAmora()+'" para ativar';
+}
+
+async function processarComandoVoz(texto){
+  document.getElementById('voz-status-txt').textContent='Processando...';
+  document.getElementById('voz-resposta').innerHTML='⏳ Analisando...';
+
+  function norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
+  var txNorm = norm(texto);
+
+  // Resposta com voz para qualquer resultado
+  function responderAmora(texto){
+    document.getElementById('voz-resposta').innerHTML=texto.replace(/\n/g,'<br>');
+    document.getElementById('voz-status-txt').textContent='Ouvindo... diga "'+getNomeAmora()+'"';
+    falarAmora(texto.replace(/<[^>]+>/g,''));
+  }
+
+  // ── Detecção LOCAL de intenção (sem IA) ──────────────
+  var ehBuscaCli = /buscar|abrir|ver|mostrar|cliente|procurar/.test(txNorm);
+  var ehLembrete = /visita|reuniao|reunião|lembrete|marcar|agenda|agendar|ligar|ligação/.test(txNorm);
+  var ehMapa = /mapa|rota|localizar|onde fica|endereço/.test(txNorm);
+  var ehWpp = /whatsapp|zap|mensagem/.test(txNorm);
+  var ehProx = /proximos|próximos|perto|nearby|aqui/.test(txNorm);
+  var ehAnalise = /analise|análise|últimos pedidos|ultimo pedido|histórico|resumo|antes da visita|preparar visita/.test(txNorm);
+
+  // Busca cliente no texto
+  var cliMatch = null;
+  var palavras = txNorm.split(' ').filter(function(w){ return w.length>3; });
+  DB.clientes.forEach(function(c){
+    if(!c.rs) return;
+    var nNorm = norm(c.rs);
+    if(palavras.some(function(w){ return nNorm.includes(w); })){
+      if(!cliMatch || norm(c.rs).length < norm(cliMatch.rs).length) cliMatch = c;
+    }
+  });
+
+  if(ehProx){
+    navM('proximos'); buscarProximosM();
+    responderAmora('Buscando clientes próximos à sua localização!');
+    return;
+  }
+  if(ehMapa && cliMatch){
+    var end=[cliMatch.end,cliMatch.cid,cliMatch.uf].filter(Boolean).join(', ')||cliMatch.rs;
+    window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(end),'_blank');
+    responderAmora('Abrindo o mapa para '+cliMatch.rs+'!');
+    return;
+  }
+  if(ehWpp && cliMatch && (cliMatch.cel||cliMatch.fone)){
+    wppM(cliMatch.cel||cliMatch.fone);
+    responderAmora('Abrindo WhatsApp de '+cliMatch.rs+'!');
+    return;
+  }
+  if(ehBuscaCli && !ehAnalise && cliMatch){
+    responderAmora('Abrindo o cadastro de '+cliMatch.rs+'!');
+    setTimeout(function(){ navM('clientes'); setTimeout(function(){ abrirClienteM(cliMatch.id); },300); },800);
+    return;
+  }
+  if(ehLembrete){
+    var dataMatch=texto.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
+    var dtTar=new Date().toISOString().split('T')[0];
+    if(dataMatch){
+      var dia=dataMatch[1].padStart(2,'0'); var mes=dataMatch[2].padStart(2,'0');
+      var ano=dataMatch[3]?(dataMatch[3].length===2?'20'+dataMatch[3]:dataMatch[3]):new Date().getFullYear();
+      dtTar=ano+'-'+mes+'-'+dia;
+    }
+    var horaMatch=texto.match(/(\d{1,2})h(\d{0,2})/);
+    var hora=horaMatch?horaMatch[1].padStart(2,'0')+':'+(horaMatch[2]||'00').padStart(2,'0'):'';
+    var desc=texto.replace(/buscar|abrir|ver|mostrar|cliente|procurar|marcar|agendar|lembrete|visita|reunião|reuniao/gi,'').replace(/\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/g,'').replace(/\d{1,2}h\d{0,2}/g,'').trim();
+    if(hora) desc=hora+' - '+desc;
+    if(cliMatch) desc=desc+' - '+cliMatch.rs;
+    desc=desc.trim()||texto;
+    DB.tarefas=DB.tarefas||[];
+    DB.tarefas.push({id:'t'+Date.now(),desc:desc,dt:dtTar,done:false,cliId:cliMatch?cliMatch.id:'',empId:cliMatch?cliMatch.empId:''});
+    salvarDB();
+    var dtFmt=dtTar.split('-').reverse().join('/');
+    responderAmora('Lembrete criado! '+desc+' para o dia '+dtFmt+(cliMatch?', cliente '+cliMatch.rs:'')+'.');
+    return;
+  }
+
+  // ── Chama Gemini para análise avançada ──────────────
+  var cfg=loadCfg(); var key=(cfg.iakey||'').trim();
+  if(!key){
+    responderAmora('Preciso de uma chave do Gemini para análises avançadas. Configure em Configurações.');
+    return;
+  }
+
+  // Contexto rico do cliente para análise
+  var contextoCliente = '';
+  if(cliMatch){
+    var pedsCli=DB.pedidos.filter(function(p){return p.cliId===cliMatch.id&&!p.cancelado;}).sort(function(a,b){return b.dt>a.dt?1:-1;}).slice(0,5);
+    var empsCli=[...new Set(pedsCli.map(function(p){return p.empId;}))].map(function(eid){var e=DB.empresas.find(function(x){return x.id===eid;}); return e?e.nome:'';}).filter(Boolean);
+    contextoCliente='Cliente: '+cliMatch.rs+'\nCidade: '+(cliMatch.cid||'')+'\nSegmento: '+(cliMatch.seg||'')+'\nÚltimos pedidos:\n'+
+      pedsCli.map(function(p){
+        var e=DB.empresas.find(function(x){return x.id===p.empId;});
+        return '- '+(p.dt||'')+(e?' ('+e.nome+')':'')+' R$ '+(p.val||0).toLocaleString('pt-BR');
+      }).join('\n');
+  }
+
+  var nomesClientes=DB.clientes.slice(0,20).map(function(c){return c.rs;}).join(', ');
+  var prompt='Você é a Amora, assistente virtual de CRM. Responda de forma natural e fluida para ser lida em voz alta. Máximo 3 frases curtas.\n\n'+(contextoCliente||'Clientes: '+nomesClientes)+'\n\nPergunta: '+texto;
+
+  try{
+    var url='https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent';
+    var r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},
+      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:120}})});
+    var d=await r.json();
+    if(d.error) throw new Error(d.error.message);
+    var resp=d.candidates?.[0]?.content?.parts?.[0]?.text||'Não consegui processar a solicitação.';
+    responderAmora(resp);
+  }catch(e){
+    responderAmora('Desculpe, ocorreu um erro: '+e.message);
+  }
+}
+
+function executarRespostaVoz(resp){
+  // Normaliza e procura padrão ACAO em qualquer formato
+  var texto = resp.trim();
+  
+  // Tenta encontrar linha com ACAO (aceita com ou sem acento)
+  var linhaAcao = '';
+  texto.split('\n').forEach(function(l){
+    var lt = l.trim().toUpperCase();
+    if(lt.startsWith('ACAO:') || lt.startsWith('AÇÃO:') || lt.startsWith('ACA')) linhaAcao = l.trim();
+  });
+
+  // Se não achou linha específica mas resposta começa com ACAO
+  if(!linhaAcao && texto.toUpperCase().startsWith('ACA')) linhaAcao = texto.split('\n')[0].trim();
+
+  if(linhaAcao){
+    // Normaliza separador
+    linhaAcao = linhaAcao.replace(/^AÇ[AÃ]O:/i,'ACAO:').replace(/^ACAO\s*:/i,'ACAO:');
+    var partes = linhaAcao.split(':');
+    var tipo = (partes[1]||'').trim().toUpperCase();
+    var dados = partes.slice(2).join(':').trim().replace(/['"`,]/g,'').trim();
+    var exp = texto.split('\n').filter(function(l){ return !l.trim().toUpperCase().startsWith('ACA'); }).join(' ').trim();
+
+    document.getElementById('voz-resposta').innerHTML='⏳ Executando: '+tipo+(dados?' - '+dados:'')+'...';
+
+    function norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
+    var dadosNorm = norm(dados);
+
+    if(tipo==='MAPA'){
+      setTimeout(function(){ window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(dados),'_blank'); },500);
+      document.getElementById('voz-resposta').innerHTML='✅ Abrindo mapa: '+dados;
+    }
+    else if(tipo==='WHATSAPP'){
+      var cw=DB.clientes.find(function(c){ return norm(c.rs).includes(dadosNorm.slice(0,8)); });
+      if(cw&&(cw.cel||cw.fone)){ setTimeout(function(){ wppM(cw.cel||cw.fone); },500); document.getElementById('voz-resposta').innerHTML='✅ Abrindo WhatsApp: '+cw.rs; }
+      else document.getElementById('voz-resposta').innerHTML='⚠️ Cliente "'+dados+'" não encontrado ou sem telefone.';
+    }
+    else if(tipo==='CLIENTE'){
+      var cli=DB.clientes.find(function(c){ return norm(c.rs)===dadosNorm; })
+        ||DB.clientes.find(function(c){ return norm(c.rs).includes(dadosNorm); })
+        ||DB.clientes.find(function(c){ return dadosNorm.split(' ').some(function(w){ return w.length>3&&norm(c.rs).includes(w); }); });
+      if(cli){
+        document.getElementById('voz-resposta').innerHTML='✅ Abrindo: '+cli.rs;
+        setTimeout(function(){ navM('clientes'); setTimeout(function(){ abrirClienteM(cli.id); },300); },500);
+      } else {
+        document.getElementById('voz-resposta').innerHTML='⚠️ Cliente "'+dados+'" não encontrado.';
+      }
+    }
+    else if(tipo==='AGENDA'){ setTimeout(function(){ navM('agenda'); },500); document.getElementById('voz-resposta').innerHTML='✅ Abrindo agenda'; }
+    else if(tipo==='PROXIMOS'){ setTimeout(function(){ navM('proximos'); buscarProximosM(); },500); document.getElementById('voz-resposta').innerHTML='✅ Buscando clientes próximos...'; }
+    else if(tipo==='LEMBRETE'||tipo==='AGENDA_ITEM'){
+      try{
+        var dataMatch=dados.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
+        var dtTar=new Date().toISOString().split('T')[0];
+        if(dataMatch){
+          var dia=dataMatch[1].padStart(2,'0');
+          var mes=dataMatch[2].padStart(2,'0');
+          var ano=dataMatch[3]?(dataMatch[3].length===2?'20'+dataMatch[3]:dataMatch[3]):new Date().getFullYear();
+          dtTar=ano+'-'+mes+'-'+dia;
+        }
+        var horaMatch=dados.match(/(\d{1,2})h(\d{0,2})|(\d{1,2}):(\d{2})/);
+        var hora=horaMatch?(horaMatch[1]||horaMatch[3]).padStart(2,'0')+':'+(horaMatch[2]||horaMatch[4]||'00'):'';
+        var cliEncontrado=null;
+        try{
+          cliEncontrado=DB.clientes.find(function(c){
+            if(!c.rs) return false;
+            return dadosNorm.split(' ').filter(function(w){return w.length>3;}).some(function(w){return norm(c.rs).includes(w);});
+          });
+        }catch(e2){}
+        var desc=dados.replace(/\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/g,'').replace(/\d{1,2}h\d{0,2}/g,'').trim()||dados;
+        if(hora) desc=hora+' - '+desc;
+        if(cliEncontrado) desc=desc+' - '+cliEncontrado.rs;
+        desc=desc.trim();
+        DB.tarefas=DB.tarefas||[];
+        DB.tarefas.push({id:'t'+Date.now(),desc:desc,dt:dtTar,done:false,
+          cliId:cliEncontrado?cliEncontrado.id:'',empId:cliEncontrado?cliEncontrado.empId:''});
+        salvarDB();
+        document.getElementById('voz-resposta').innerHTML='✅ Agendado: <b>'+desc+'</b><br>📅 '+fmtDM(dtTar)+(cliEncontrado?'<br>👤 '+cliEncontrado.rs:'');
+        toastM('Lembrete criado!');
+      }catch(e3){
+        document.getElementById('voz-resposta').innerHTML='❌ Erro ao criar lembrete: '+e3.message;
+      }
+    }
+  } else {
+    document.getElementById('voz-resposta').innerHTML=texto.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<b>$1</b>');
+  }
+  document.getElementById('voz-status-txt').textContent='Toque para falar novamente';
+}
+// ── Fim Voz ──────────────────────────────────────────────
+function fmtDM(dt){ if(!dt) return ''; var p=dt.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+
+function wppM(tel){
+  var num = tel.replace(/\D/g,'');
+  if(!num){ toastM('Telefone não cadastrado'); return; }
+  if(!num.startsWith('55')) num='55'+num;
+  window.open('https://wa.me/'+num);
+}
+
+function mapsCliM(id){
+  var c=DB.clientes.find(x=>x.id===id); if(!c) return;
+  var end=c.end&&c.end.trim()?c.end.trim()+', '+(c.cid||''):c.rs+', '+(c.cid||'');
+  window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(end),'_blank');
+}
+function selTodosCli(cb){ document.querySelectorAll('.cli-cb-m').forEach(x=>x.checked=cb.checked); }
+function rotaLoteCli(){
+  var ids=[...document.querySelectorAll('.cli-cb-m:checked')].map(x=>x.dataset.cliid);
+  if(!ids.length){toastM('Selecione clientes primeiro');return;}
+  if(ids.length>23){toastM('Máximo 23 clientes por rota');return;}
+  var cls=ids.map(id=>DB.clientes.find(x=>x.id===id)).filter(Boolean);
+  var ends=cls.map(c=>encodeURIComponent(c.end&&c.end.trim()?c.end.trim()+', '+(c.cid||''):c.rs+', '+(c.cid||'')));
+  var dest=ends.pop();
+  var url=ends.length
+    ?'https://www.google.com/maps/dir/?api=1&destination='+dest+'&waypoints='+ends.join('|')
+    :'https://www.google.com/maps/search/?api=1&query='+dest;
+  toastM('Abrindo rota com '+cls.length+' cliente(s)...');
+  window.open(url,'_blank');
+}
+function sacPedM(pedId){ sacCliM(pedId); }
+function sacCliM(pedId){
+  var p=DB.pedidos.find(x=>x.id===pedId); if(!p) return;
+  var c=DB.clientes.find(x=>x.id===p.cliId);
+  var e=DB.empresas.find(x=>x.id===p.empId);
+  if(!e?.sac){toastM('E-mail SAC não cadastrado na empresa');return;}
+  var nf=p.nf||p.num||'(sem NF)'; var razao=c?.rs||'—';
+  var assunto=encodeURIComponent('Chamado SAC ('+nf+') - ('+razao+')');
+  var corpo=encodeURIComponent('Olá! Referente a NF '+nf+' - Cliente '+razao+', segue item para análise.');
+  var cc=c?.email?'&cc='+encodeURIComponent(c.email):'';
+  var mailto='mailto:'+e.sac+'?subject='+assunto+'&body='+corpo+cc;
+  var a=document.createElement('a'); a.href=mailto; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+// ── Init ─────────────────────────────────────────────────
+function init(){
+  carregarDB();
+  if(DB.empresas.length) empAtualM = DB.empresas[0].id;
+  atualizarBadgeAgendaM();
+  renderM();
+}
+
+window.addEventListener('load', function(){
+  init();
+  initFirebaseM();
+  setTimeout(atualizarBotaoAmora, 300);
+});
+</script>
+</body>
+</html>
