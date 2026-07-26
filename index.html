@@ -1588,43 +1588,88 @@ function iniciarVoz(){
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ toastM('Reconhecimento de voz não suportado. Use o Chrome.'); return; }
   document.getElementById('painel-voz').style.display='block';
+  var _fraseAcumulada = '';
+  var _pausaTimer = null;
+  var _aguardandoComando = false;
+
   reconhecimento=new SR();
-  reconhecimento.lang='pt-BR'; reconhecimento.continuous=true; reconhecimento.interimResults=true;
+  reconhecimento.lang='pt-BR';
+  reconhecimento.continuous=false;
+  reconhecimento.interimResults=true;
+  reconhecimento.maxAlternatives=1;
+
   reconhecimento.onstart=function(){
     vozAtiva=true;
     document.getElementById('btn-voz').style.boxShadow='0 0 0 4px rgba(219,39,119,.4),0 4px 20px rgba(124,58,237,.5)';
     document.getElementById('voz-status-dot').style.background='#db2777';
     document.getElementById('voz-status-txt').textContent='Ouvindo... diga "'+getNomeAmora()+'"';
-    document.getElementById('voz-transcricao').textContent='';
+    if(!_aguardandoComando) document.getElementById('voz-transcricao').textContent='';
   };
+
   reconhecimento.onresult=function(event){
     var txt='';
-    for(var i=event.resultIndex;i<event.results.length;i++) txt+=event.results[i][0].transcript;
-    var txLower=txt.toLowerCase().trim();
+    for(var i=0;i<event.results.length;i++) txt+=event.results[i][0].transcript;
+    txt=txt.trim();
     document.getElementById('voz-transcricao').textContent='🎤 "'+txt+'"';
-    if(event.results[event.resultIndex].isFinal){
+
+    if(event.results[event.results.length-1].isFinal){
+      _fraseAcumulada=(_fraseAcumulada+' '+txt).trim();
+      var txLower=_fraseAcumulada.toLowerCase();
       var nome=getNomeAmora();
+
+      // Detectou o nome — aguarda o resto do comando
       if(txLower.includes(nome)){
+        _aguardandoComando=true;
+        clearTimeout(_pausaTimer);
         var comando=txLower.replace(new RegExp(nome,'gi'),'').trim();
         if(comando.length>2){
-          document.getElementById('voz-status-txt').textContent='Amora processando...';
-          document.getElementById('voz-resposta').innerHTML='<span style="color:#7c3aed">⏳ Analisando...</span>';
-          processarComandoVoz(comando);
+          // Tem comando junto com o nome — processa com delay para capturar mais
+          _pausaTimer=setTimeout(function(){
+            document.getElementById('voz-status-txt').textContent='Amora processando...';
+            document.getElementById('voz-resposta').innerHTML='<span style="color:#7c3aed">⏳ Analisando...</span>';
+            processarComandoVoz(_fraseAcumulada.replace(new RegExp(nome,'gi'),'').trim());
+            _fraseAcumulada=''; _aguardandoComando=false;
+          },1200);
         } else {
-          var saud='Olá! Sou a Amora. Como posso ajudar?';
+          // Só o nome — responde e fica ouvindo o comando
+          var saud='Olá! Como posso ajudar?';
           document.getElementById('voz-resposta').innerHTML='<span style="color:#7c3aed">👋 '+saud+'</span>';
           falarAmora(saud);
-          document.getElementById('voz-status-txt').textContent='Ouvindo... fale seu comando';
+          document.getElementById('voz-status-txt').textContent='Ouvindo seu comando...';
         }
+      } else if(_aguardandoComando && _fraseAcumulada.length>2){
+        // Já ouviu o nome antes, agora recebeu o comando
+        clearTimeout(_pausaTimer);
+        _pausaTimer=setTimeout(function(){
+          var fraseCompleta=_fraseAcumulada.toLowerCase();
+          var nome2=getNomeAmora();
+          var cmd=fraseCompleta.replace(new RegExp(nome2,'gi'),'').trim();
+          if(cmd.length>2){
+            document.getElementById('voz-status-txt').textContent='Amora processando...';
+            document.getElementById('voz-resposta').innerHTML='<span style="color:#7c3aed">⏳ Analisando...</span>';
+            processarComandoVoz(cmd);
+          }
+          _fraseAcumulada=''; _aguardandoComando=false;
+        },800);
       }
     }
   };
+
   reconhecimento.onerror=function(e){
-    var msgs={'not-allowed':'Permissão de microfone negada.','no-speech':'','network':'Erro de rede.'};
+    var msgs={'not-allowed':'Permissão de microfone negada.','network':'Erro de rede.'};
     if(msgs[e.error]) document.getElementById('voz-resposta').innerHTML='❌ '+msgs[e.error];
-    if(e.error!=='no-speech') pararVoz();
+    if(e.error==='not-allowed'||e.error==='network') pararVoz();
   };
-  reconhecimento.onend=function(){ if(vozAtiva){ try{ reconhecimento.start(); }catch(e){} } };
+
+  reconhecimento.onend=function(){
+    // Reinicia automaticamente enquanto ativo
+    if(vozAtiva){
+      setTimeout(function(){
+        try{ reconhecimento.start(); }catch(e){}
+      },200);
+    }
+  };
+
   reconhecimento.start();
 }
 
