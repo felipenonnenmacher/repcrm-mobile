@@ -470,9 +470,10 @@ function renderDashM(){
   var ps = e ? DB.pedidos.filter(p => p.empId===empAtualM && !p.cancelado) : [];
 
   var vendaMes = ps.filter(p=>{if(!p.dt)return false;var d=new Date(p.dt+'T12:00');return d.getMonth()===mes&&d.getFullYear()===ano;}).reduce((a,p)=>a+(p.val||0),0);
-  var fatMes   = ps.filter(p=>{if(!p.dtFat)return false;var d=new Date(p.dtFat+'T12:00');return d.getMonth()===mes&&d.getFullYear()===ano;}).reduce((a,p)=>a+(p.valfat||0),0);
+  var fatMes   = ps.filter(p=>{if(!p.dtFat)return false;var d=new Date(p.dtFat+'T12:00');return d.getMonth()===mes&&d.getFullYear()===ano;}).reduce((a,p)=>a+(p.valfat||p.val||0),0);
   var emAberto = ps.filter(p=>!p.dtFat).length;
-  var metaV=e?.meta||0; var metaF=e?.metaFat||0;
+  var metaV=getMetaMensalM(empAtualM, ano, mes, 'meta');
+  var metaF=getMetaMensalM(empAtualM, ano, mes, 'metaFat');
   var pctV=metaV?Math.round(vendaMes/metaV*100):0;
   var pctF=metaF?Math.round(fatMes/metaF*100):0;
   var corV=pctV>=100?'var(--grn)':pctV>=70?'var(--org)':'var(--red)';
@@ -487,8 +488,19 @@ function renderDashM(){
   var tarAtraso=DB.tarefas.filter(t=>t.dt&&t.dt<hjStr&&!t.done);
 
   var totalVendaMes=DB.empresas.reduce((sum,emp)=>sum+DB.pedidos.filter(p=>p.empId===emp.id&&!p.cancelado).filter(p=>{if(!p.dt)return false;var d=new Date(p.dt+'T12:00');return d.getMonth()===mes&&d.getFullYear()===ano;}).reduce((a,p)=>a+(p.val||0),0),0);
-  var totalFatMes=DB.empresas.reduce((sum,emp)=>sum+DB.pedidos.filter(p=>p.empId===emp.id&&!p.cancelado).filter(p=>{if(!p.dtFat)return false;var d=new Date(p.dtFat+'T12:00');return d.getMonth()===mes&&d.getFullYear()===ano;}).reduce((a,p)=>a+(p.valfat||0),0),0);
+  var totalFatMes=DB.empresas.reduce((sum,emp)=>sum+DB.pedidos.filter(p=>p.empId===emp.id&&!p.cancelado).filter(p=>{if(!p.dtFat)return false;var d=new Date(p.dtFat+'T12:00');return d.getMonth()===mes&&d.getFullYear()===ano;}).reduce((a,p)=>a+(p.valfat||p.val||0),0),0);
   var totalAberto=DB.pedidos.filter(p=>!p.cancelado&&!p.dtFat).length;
+
+  // Metas somadas de todas as empresas
+  var totalMetaV=DB.empresas.reduce((sum,emp)=>sum+getMetaMensalM(emp.id,ano,mes,'meta'),0);
+  var totalMetaF=DB.empresas.reduce((sum,emp)=>sum+getMetaMensalM(emp.id,ano,mes,'metaFat'),0);
+  var pctVTotal=totalMetaV?Math.round(totalVendaMes/totalMetaV*100):0;
+  var pctFTotal=totalMetaF?Math.round(totalFatMes/totalMetaF*100):0;
+  var corVT=pctVTotal>=100?'var(--grn)':pctVTotal>=70?'var(--org)':'var(--red)';
+  var corFT=pctFTotal>=100?'var(--grn)':pctFTotal>=70?'var(--org)':'var(--red)';
+  var todosClientes=DB.clientes.filter(c=>!c.encerrado);
+  var ativosTotal=todosClientes.filter(c=>dias(c)<=60).length;
+  var inativosTotal=todosClientes.filter(c=>dias(c)>90).length;
 
   var empTabs=DB.empresas.map(emp=>`<button class="emp-tab ${emp.id===empAtualM?'act':''}" onclick="selecionarEmpM('${emp.id}')"><div class="emp-dot" style="background:${emp.cor}"></div>${emp.nome.split(' ')[0]}</button>`).join('');
 
@@ -667,6 +679,14 @@ function abrirClienteM(id){
 }
 
 // ══════════════════════════════
+function getMetaMensalM(empId, ano, mes, campo){
+  var e=DB.empresas.find(function(x){return x.id===empId;});
+  if(!e) return 0;
+  if(e.metasMensais&&e.metasMensais[ano]&&e.metasMensais[ano][mes]&&e.metasMensais[ano][mes][campo]!=null)
+    return e.metasMensais[ano][mes][campo];
+  return campo==='meta'?(e.meta||0):(e.metaFat||0);
+}
+
 function selecionarEmpM(id){ empAtualM=id; renderM(); }
 function clientesDaEmpresaM(empId){
   return DB.clientes.filter(c=>!c.encerrado&&DB.pedidos.some(p=>p.cliId===c.id&&p.empId===empId));
@@ -1503,21 +1523,10 @@ function carregarVozAmora(){
 if(_vozSintetizador){ _vozSintetizador.onvoiceschanged=carregarVozAmora; carregarVozAmora(); }
 
 function falarAmora(texto){
-  if(!_vozSintetizador) return;
-  _vozSintetizador.cancel();
+  // Síntese de voz desativada — resposta apenas em texto
   _ultimaResposta=texto;
   var el=document.getElementById('btn-falar');
-  if(el) el.style.display='block';
-  var textoVoz=texto.replace(/\*\*(.*?)\*\*/g,'$1').replace(/<[^>]+>/g,'').replace(/R\$/g,'Reais').trim();
-  var partes=textoVoz.match(/.{1,180}(?:[.!?]|$)/g)||[textoVoz];
-  partes.forEach(function(parte,i){
-    setTimeout(function(){
-      var utt=new SpeechSynthesisUtterance(parte.trim());
-      utt.lang='pt-BR'; utt.rate=0.92; utt.pitch=1.1; utt.volume=1;
-      if(_vozAmora) utt.voice=_vozAmora;
-      _vozSintetizador.speak(utt);
-    },i*50);
-  });
+  if(el) el.style.display='none';
 }
 
 function falarUltima(){ if(_ultimaResposta) falarAmora(_ultimaResposta); }
