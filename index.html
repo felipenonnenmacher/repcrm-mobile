@@ -517,6 +517,7 @@ function renderDashM(){
     <div style="font-size:12px;font-weight:700;color:var(--red)"><i class="ti ti-alert-triangle"></i> ${tarAtraso.length} tarefa(s) atrasada(s)</div>
     ${tarAtraso.slice(0,2).map(t=>`<div style="font-size:11px;color:var(--t2);margin-top:4px">• ${t.desc} — ${fmtD(t.dt)}</div>`).join('')}
   </div>`:''}
+  ${renderCardPosVendasM()}
   <div class="emp-tabs">${empTabs}</div>
   <div class="section">
     <div class="metrics">
@@ -563,7 +564,6 @@ function renderDashM(){
         </div>
       </div>`;}).join('')}
     </div>`:''}
-    ${renderCardPosVendasM(empAtualM)}
     <div style="display:flex;gap:10px;margin-top:4px">
       <button class="btn bp" style="flex:1" onclick="prepNovoPedidoM()"><i class="ti ti-plus"></i> Novo pedido</button>
       <button class="btn bs" style="flex:1" onclick="prepNovoTarM()"><i class="ti ti-bell"></i> Lembrete</button>
@@ -691,31 +691,43 @@ function getMetaMensalM(empId, ano, mes, campo){
 function selecionarEmpM(id){ empAtualM=id; renderM(); }
 
 // ══ PÓS-VENDAS MOBILE ══
-function renderCardPosVendasM(empId){
-  var e=DB.empresas.find(function(x){return x.id===empId;});
-  if(!e) return '';
+function renderCardPosVendasM(){
   var hoje=new Date();
   var pvDe=7; var pvAte=15;
-  var pedsFat=DB.pedidos.filter(function(p){
-    if(p.empId!==empId||!p.dtFat||p.cancelado) return false;
-    var d=Math.floor((hoje-new Date(p.dtFat+'T12:00'))/86400000);
-    return d>=pvDe&&d<=pvAte;
-  });
   var porCli={};
-  pedsFat.forEach(function(p){ if(!porCli[p.cliId]||p.dtFat>porCli[p.cliId].dtFat) porCli[p.cliId]=p; });
-  var lista=Object.values(porCli).sort(function(a,b){return a.dtFat>b.dtFat?1:-1;});
+  // Busca em todas as empresas
+  DB.empresas.forEach(function(e){
+    var pedsFat=DB.pedidos.filter(function(p){
+      if(p.empId!==e.id||!p.dtFat||p.cancelado) return false;
+      var d=Math.floor((hoje-new Date(p.dtFat+'T12:00'))/86400000);
+      return d>=pvDe&&d<=pvAte;
+    });
+    pedsFat.forEach(function(p){
+      if(!porCli[p.cliId]||p.dtFat>porCli[p.cliId].p.dtFat)
+        porCli[p.cliId]={p:p,e:e};
+    });
+  });
+  var lista=Object.values(porCli).sort(function(a,b){return a.p.dtFat>b.p.dtFat?1:-1;});
   if(!lista.length) return '';
   var cfg=loadCfg();
   var template=cfg.pvMsgTemplate||'Olá {CONTATO}! Tudo bem?\nPassando para verificar se o pedido da {EMPRESA} já chegou e se está tudo certo. 😊\nNF: {NF} · Valor: {VALOR}\nQualquer dúvida estou à disposição!';
-  var itens=lista.map(function(p){
-    var c=DB.clientes.find(function(x){return x.id===p.cliId;});
+  var itens=lista.map(function(x){
+    var p=x.p; var e=x.e;
+    var cl=DB.clientes.find(function(c){return c.id===p.cliId;});
     var d=Math.floor((hoje-new Date(p.dtFat+'T12:00'))/86400000);
-    var tel=(c?.cel||c?.fone||'').replace(/\D/g,'');
-    var msg=template.replace(/{CONTATO}/g,c?.comp||c?.rs||'').replace(/{CLIENTE}/g,c?.rs||'').replace(/{NF}/g,p.nf||'—').replace(/{VALOR}/g,fmt(p.valfat||0)).replace(/{DTFAT}/g,fmtD(p.dtFat)).replace(/{EMPRESA}/g,e.nome);
-    var wpp=tel?'<a href="https://wa.me/55'+tel+'?text='+encodeURIComponent(msg)+'" target="_blank" style="background:none;border:1px solid #25d366;border-radius:8px;padding:4px 10px;font-size:11px;color:#25d366;text-decoration:none;flex-shrink:0"><i class="ti ti-brand-whatsapp"></i></a>':'';
-    return '<div class="list-item"><div class="list-body" onclick="abrirClienteM(\''+p.cliId+'\')"><div class="list-name">'+(c?.rs||'—')+'</div><div class="list-sub">NF '+(p.nf||'—')+' · '+fmtD(p.dtFat)+' · '+d+'d · '+fmt(p.valfat||0)+'</div></div>'+wpp+'</div>';
+    var tel=(cl?.cel||cl?.fone||'').replace(/\D/g,'');
+    var msg=template.replace(/{CONTATO}/g,cl?.comp||cl?.rs||'').replace(/{CLIENTE}/g,cl?.rs||'').replace(/{NF}/g,p.nf||'—').replace(/{VALOR}/g,fmt(p.valfat||0)).replace(/{DTFAT}/g,fmtD(p.dtFat)).replace(/{EMPRESA}/g,e.nome);
+    var wpp=tel?'<a href="https://wa.me/55'+tel+'?text='+encodeURIComponent(msg)+'" target="_blank" style="background:none;border:1px solid #25d366;border-radius:8px;padding:4px 10px;font-size:12px;color:#25d366;text-decoration:none;flex-shrink:0"><i class="ti ti-brand-whatsapp"></i></a>':'';
+    return '<div class="list-item"><div class="list-body" onclick="abrirClienteM(\''+p.cliId+'\')" style="cursor:pointer">'+
+      '<div class="list-name">'+(cl?.rs||'—')+'</div>'+
+      '<div class="list-sub">'+e.nome+' · NF '+(p.nf||'—')+' · '+fmtD(p.dtFat)+' · '+d+'d · '+fmt(p.valfat||0)+'</div>'+
+      '</div>'+wpp+'</div>';
   }).join('');
-  return '<div class="card" style="border-left:3px solid #25d366"><div class="card-title"><i class="ti ti-heart-handshake" style="color:#25d366"></i>Pós-Vendas <span style="font-size:10px;background:#25d366;color:#fff;padding:1px 7px;border-radius:10px;margin-left:4px">'+lista.length+'</span></div>'+itens+'</div>';
+  return '<div class="card" style="margin:8px 12px 0;border-left:3px solid #25d366">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'+
+      '<div style="font-size:13px;font-weight:700;color:#25d366"><i class="ti ti-heart-handshake"></i> Pós-Vendas</div>'+
+      '<span style="font-size:10px;background:#25d366;color:#fff;padding:1px 8px;border-radius:10px">'+lista.length+' cliente(s)</span>'+
+    '</div>'+itens+'</div>';
 }
 
 // ══ ALERTA MATINAL MOBILE ══
