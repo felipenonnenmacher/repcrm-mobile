@@ -563,6 +563,7 @@ function renderDashM(){
         </div>
       </div>`;}).join('')}
     </div>`:''}
+    ${renderCardPosVendasM(empAtualM)}
     <div style="display:flex;gap:10px;margin-top:4px">
       <button class="btn bp" style="flex:1" onclick="prepNovoPedidoM()"><i class="ti ti-plus"></i> Novo pedido</button>
       <button class="btn bs" style="flex:1" onclick="prepNovoTarM()"><i class="ti ti-bell"></i> Lembrete</button>
@@ -688,6 +689,93 @@ function getMetaMensalM(empId, ano, mes, campo){
 }
 
 function selecionarEmpM(id){ empAtualM=id; renderM(); }
+
+// ══ PÓS-VENDAS MOBILE ══
+function renderCardPosVendasM(empId){
+  var e=DB.empresas.find(function(x){return x.id===empId;});
+  if(!e) return '';
+  var hoje=new Date();
+  var pvDe=7; var pvAte=15;
+  var pedsFat=DB.pedidos.filter(function(p){
+    if(p.empId!==empId||!p.dtFat||p.cancelado) return false;
+    var d=Math.floor((hoje-new Date(p.dtFat+'T12:00'))/86400000);
+    return d>=pvDe&&d<=pvAte;
+  });
+  var porCli={};
+  pedsFat.forEach(function(p){ if(!porCli[p.cliId]||p.dtFat>porCli[p.cliId].dtFat) porCli[p.cliId]=p; });
+  var lista=Object.values(porCli).sort(function(a,b){return a.dtFat>b.dtFat?1:-1;});
+  if(!lista.length) return '';
+  var cfg=loadCfg();
+  var template=cfg.pvMsgTemplate||'Olá {CONTATO}! Tudo bem?\nPassando para verificar se o pedido da {EMPRESA} já chegou e se está tudo certo. 😊\nNF: {NF} · Valor: {VALOR}\nQualquer dúvida estou à disposição!';
+  var itens=lista.map(function(p){
+    var c=DB.clientes.find(function(x){return x.id===p.cliId;});
+    var d=Math.floor((hoje-new Date(p.dtFat+'T12:00'))/86400000);
+    var tel=(c?.cel||c?.fone||'').replace(/\D/g,'');
+    var msg=template.replace(/{CONTATO}/g,c?.comp||c?.rs||'').replace(/{CLIENTE}/g,c?.rs||'').replace(/{NF}/g,p.nf||'—').replace(/{VALOR}/g,fmt(p.valfat||0)).replace(/{DTFAT}/g,fmtD(p.dtFat)).replace(/{EMPRESA}/g,e.nome);
+    var wpp=tel?'<a href="https://wa.me/55'+tel+'?text='+encodeURIComponent(msg)+'" target="_blank" style="background:none;border:1px solid #25d366;border-radius:8px;padding:4px 10px;font-size:11px;color:#25d366;text-decoration:none;flex-shrink:0"><i class="ti ti-brand-whatsapp"></i></a>':'';
+    return '<div class="list-item"><div class="list-body" onclick="abrirClienteM(\''+p.cliId+'\')"><div class="list-name">'+(c?.rs||'—')+'</div><div class="list-sub">NF '+(p.nf||'—')+' · '+fmtD(p.dtFat)+' · '+d+'d · '+fmt(p.valfat||0)+'</div></div>'+wpp+'</div>';
+  }).join('');
+  return '<div class="card" style="border-left:3px solid #25d366"><div class="card-title"><i class="ti ti-heart-handshake" style="color:#25d366"></i>Pós-Vendas <span style="font-size:10px;background:#25d366;color:#fff;padding:1px 7px;border-radius:10px;margin-left:4px">'+lista.length+'</span></div>'+itens+'</div>';
+}
+
+// ══ ALERTA MATINAL MOBILE ══
+function verificarAlertaManhaM(){
+  var hoje=new Date().toISOString().split('T')[0];
+  var cfg=loadCfg();
+  if(cfg.ultimoAlertaManha===hoje) return;
+  var hora=new Date().getHours();
+  if(hora<6||hora>=13) return;
+
+  var hojeRef=new Date();
+  var clientesPV=[];
+  DB.empresas.forEach(function(e){
+    var peds=DB.pedidos.filter(function(p){
+      if(p.empId!==e.id||!p.dtFat||p.cancelado) return false;
+      var d=Math.floor((hojeRef-new Date(p.dtFat+'T12:00'))/86400000);
+      return d>=7&&d<=15;
+    });
+    var porCli={};
+    peds.forEach(function(p){ if(!porCli[p.cliId]) porCli[p.cliId]={p:p,emp:e}; });
+    Object.values(porCli).forEach(function(x){ clientesPV.push(x); });
+  });
+
+  var atrasadas=DB.tarefas.filter(function(t){return t.dt&&t.dt<hoje&&!t.done;});
+  var hojeStr=hoje;
+  var tarefasHoje=DB.tarefas.filter(function(t){return t.dt===hojeStr&&!t.done;});
+
+  if(!clientesPV.length&&!atrasadas.length&&!tarefasHoje.length) return;
+
+  var msg='☀️ *Bom dia!*\n\n';
+  if(clientesPV.length){
+    msg+='💚 *'+clientesPV.length+' cliente(s) para pós-vendas:*\n';
+    clientesPV.slice(0,3).forEach(function(x){
+      var c=DB.clientes.find(function(cl){return cl.id===x.p.cliId;});
+      var d=Math.floor((hojeRef-new Date(x.p.dtFat+'T12:00'))/86400000);
+      msg+='• '+(c?.rs||'—')+' ('+d+'d)\n';
+    });
+    msg+='\n';
+  }
+  if(atrasadas.length) msg+='🔴 *'+atrasadas.length+' tarefa(s) atrasada(s)*\n';
+  if(tarefasHoje.length) msg+='📅 *'+tarefasHoje.length+' tarefa(s) para hoje*\n';
+
+  // Mostra toast com resumo
+  var toastEl=document.getElementById('toast-m');
+  if(toastEl){
+    var linha1=clientesPV.length?'💚 '+clientesPV.length+' pós-vendas':'';
+    var linha2=atrasadas.length?'🔴 '+atrasadas.length+' atrasadas':'';
+    var linha3=tarefasHoje.length?'📅 '+tarefasHoje.length+' hoje':'';
+    var resumo=[linha1,linha2,linha3].filter(Boolean).join(' · ');
+    toastEl.textContent='Bom dia! '+resumo;
+    toastEl.style.display='block';
+    toastEl.style.background='var(--acc)';
+    toastEl.style.bottom='90px';
+    setTimeout(function(){ toastEl.style.display='none'; toastEl.style.bottom=''; },6000);
+  }
+
+  cfg.ultimoAlertaManha=hoje;
+  saveCfg(cfg);
+}
+// ══ FIM PÓS-VENDAS / ALERTA ══
 function clientesDaEmpresaM(empId){
   return DB.clientes.filter(c=>!c.encerrado&&DB.pedidos.some(p=>p.cliId===c.id&&p.empId===empId));
 }
@@ -1944,6 +2032,7 @@ window.addEventListener('load', function(){
   init();
   initFirebaseM();
   setTimeout(atualizarBotaoAmora, 300);
+  setTimeout(verificarAlertaManhaM, 2000);
 });
 </script>
 </body>
