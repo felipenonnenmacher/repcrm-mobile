@@ -164,8 +164,9 @@ if('serviceWorker' in navigator){var b=new Blob(["const CACHE='repcrm-mob-v26';s
   <button class="bnav-item" id="bnav-clientes" onclick="navM('clientes')">
     <i class="ti ti-users"></i>Clientes
   </button>
-  <button class="bnav-item" id="bnav-proximos" onclick="navM('proximos')">
-    <i class="ti ti-map-pin"></i>Próximos
+  <button class="bnav-item" id="bnav-leads" onclick="navM('leads')">
+    <i class="ti ti-target-arrow" style="color:var(--org)"></i>Leads
+    <span class="bnav-badge" id="badge-leads-m" style="display:none">0</span>
   </button>
   <button class="bnav-item" id="bnav-agenda" onclick="navM('agenda')">
     <i class="ti ti-calendar-event"></i>Agenda
@@ -305,8 +306,21 @@ if('serviceWorker' in navigator){var b=new Blob(["const CACHE='repcrm-mob-v26';s
 <div class="mbg" id="mCfgM">
   <div class="msheet">
     <div class="mhandle"></div>
-    <div class="mtt">Configurações</div>
+    <div class="mtt">⚙️ Configurações</div>
+
+    <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Conta</div>
     <div class="fg"><label class="fl">Seu nome</label><input class="fi" id="mcfg-nome" placeholder="Nome do representante"></div>
+
+    <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px">Dados</div>
+    <div style="background:var(--s2);border-radius:10px;padding:10px 14px;margin-bottom:10px">
+      <div style="font-size:12px;color:var(--t2)" id="mcfg-db-info">Carregando...</div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button class="btn bs" style="flex:1;padding:10px;font-size:12px" onclick="abrirModalNuvemM()"><i class="ti ti-cloud"></i> Nuvem</button>
+      <button class="btn bs" style="flex:1;padding:10px;font-size:12px" onclick="abrirModalBackupM()"><i class="ti ti-cloud-upload"></i> Backup</button>
+    </div>
+
+    <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px">Configurações</div>
     <div class="fg"><label class="fl">Chave API Gemini (IA)</label><input class="fi" id="mcfg-key" type="password" placeholder="AQ... ou AIza..."></div>
     <div class="fg"><label class="fl">Google Places API Key</label><input class="fi" id="mcfg-places-key" type="password" placeholder="AIza... (busca de lojas)"></div>
     <div style="font-size:11px;color:var(--t3);margin-top:-8px;margin-bottom:8px">console.cloud.google.com → Places API (nova)</div>
@@ -452,6 +466,7 @@ function renderM(){
     case 'agenda':   renderAgendaM(); break;
     case 'mais':     renderMaisM(); break;
     case 'proximos': renderProximosM(); break;
+    case 'leads':    renderLeadsM(); break;
   }
 }
 
@@ -691,29 +706,26 @@ function getMetaMensalM(empId, ano, mes, campo){
 function selecionarEmpM(id){ empAtualM=id; renderM(); }
 
 // ══ PÓS-VENDAS MOBILE ══
-var _pvEnviados = [];
+// Carrega enviados do dia do localStorage
+var _pvEnviados = JSON.parse(localStorage.getItem('pv_enviados_'+new Date().toISOString().split('T')[0])||'[]');
 var _pvExpandido = true;
 
 function marcarPvEnviado(cliId){
-  // Adiciona à lista de enviados (sessão)
   if(!_pvEnviados.includes(cliId)) _pvEnviados.push(cliId);
-  // Remove o item visualmente com animação
+  // Persiste no dia de hoje
+  localStorage.setItem('pv_enviados_'+new Date().toISOString().split('T')[0], JSON.stringify(_pvEnviados));
   var el = document.getElementById('pv-item-'+cliId);
   if(el){
-    el.style.transition='opacity .3s,max-height .3s';
+    el.style.transition='opacity .3s';
     el.style.opacity='0';
-    el.style.maxHeight='0';
-    el.style.overflow='hidden';
     setTimeout(function(){
       el.remove();
-      // Atualiza badge
       var lista = document.getElementById('pv-lista-m');
       var itens = lista ? lista.querySelectorAll('.list-item').length : 0;
-      var badge = document.querySelector('#pv-toggle-btn').closest('.card').querySelector('span[style*="background:#25d366"]');
+      var badge = document.getElementById('pv-badge-m');
       if(badge) badge.textContent = itens+' cliente(s)';
-      // Se zerou, remove o card
       if(itens===0){
-        var card = document.getElementById('pv-lista-m')?.closest('.card');
+        var card = document.getElementById('pv-card-m');
         if(card){ card.style.transition='opacity .3s'; card.style.opacity='0'; setTimeout(function(){ card.remove(); },300); }
       }
     },300);
@@ -725,15 +737,16 @@ function togglePosVendasM(){
   _pvExpandido = !_pvExpandido;
   var lista = document.getElementById('pv-lista-m');
   var btn = document.getElementById('pv-toggle-btn');
+  var hdr = document.getElementById('pv-header-m');
   if(lista) lista.style.display = _pvExpandido ? 'block' : 'none';
   if(btn) btn.innerHTML = _pvExpandido ? '<i class="ti ti-chevron-up"></i>' : '<i class="ti ti-chevron-down"></i>';
+  if(hdr) hdr.style.marginBottom = _pvExpandido ? '8px' : '0';
 }
 
 function renderCardPosVendasM(){
   var hoje=new Date();
-  var pvDe=7; var pvAte=15;
+  var pvDe=7; var pvAte=10; // Filtro 7 a 10 dias
   var porCli={};
-  // Busca em todas as empresas
   DB.empresas.forEach(function(e){
     var pedsFat=DB.pedidos.filter(function(p){
       if(p.empId!==e.id||!p.dtFat||p.cancelado) return false;
@@ -745,6 +758,10 @@ function renderCardPosVendasM(){
         porCli[p.cliId]={p:p,e:e};
     });
   });
+  // Remove clientes já enviados hoje
+  Object.keys(porCli).forEach(function(cliId){
+    if(_pvEnviados.includes(cliId)) delete porCli[cliId];
+  });
   var lista=Object.values(porCli).sort(function(a,b){return a.p.dtFat>b.p.dtFat?1:-1;});
   if(!lista.length) return '';
   var cfg=loadCfg();
@@ -755,29 +772,31 @@ function renderCardPosVendasM(){
     var d=Math.floor((hoje-new Date(p.dtFat+'T12:00'))/86400000);
     var tel=(cl?.cel||cl?.fone||'').replace(/\D/g,'');
     var msg=template.replace(/{CONTATO}/g,cl?.comp||cl?.rs||'').replace(/{CLIENTE}/g,cl?.rs||'').replace(/{NF}/g,p.nf||'—').replace(/{VALOR}/g,fmt(p.valfat||0)).replace(/{DTFAT}/g,fmtD(p.dtFat)).replace(/{EMPRESA}/g,e.nome);
-    var wpp=tel?'<a href="https://wa.me/55'+tel+'?text='+encodeURIComponent(msg)+'" target="_blank" style="background:none;border:1px solid #25d366;border-radius:8px;padding:4px 10px;font-size:12px;color:#25d366;text-decoration:none;flex-shrink:0"><i class="ti ti-brand-whatsapp"></i></a>':'';
-    return '<div class="list-item" id="pv-item-'+p.cliId+'"><div class="list-body" onclick="abrirClienteM(\''+p.cliId+'\')" style="cursor:pointer">'+
-      '<div class="list-name">'+(cl?.rs||'—')+'</div>'+
-      '<div class="list-sub">'+e.nome+' · NF '+(p.nf||'—')+' · '+fmtD(p.dtFat)+' · '+d+'d · '+fmt(p.valfat||0)+'</div>'+
-      '</div>'+
-      '<div style="display:flex;gap:6px;flex-shrink:0">'+
-        wpp+
-        '<button onclick="marcarPvEnviado(\''+p.cliId+'\')" style="background:none;border:1px solid var(--bdr);border-radius:8px;padding:4px 10px;font-size:12px;color:var(--grn);cursor:pointer" title="Marcar como contatado"><i class="ti ti-check"></i></button>'+
-      '</div>'+
-    '</div>';
+    var wpp=tel?'<a href="https://wa.me/55'+tel+'?text='+encodeURIComponent(msg)+'" target="_blank" onclick="setTimeout(function(){marcarPvEnviado(\''+p.cliId+'\')},2000)" style="background:none;border:1px solid #25d366;border-radius:8px;padding:4px 10px;font-size:12px;color:#25d366;text-decoration:none;flex-shrink:0"><i class="ti ti-brand-whatsapp"></i></a>':'';
+    return '<div class="list-item" id="pv-item-'+p.cliId+'">'
+      +'<div class="list-body" onclick="abrirClienteM(\''+p.cliId+'\')" style="cursor:pointer">'
+      +'<div class="list-name">'+(cl?.rs||'—')+'</div>'
+      +'<div class="list-sub">'+e.nome+' · NF '+(p.nf||'—')+' · '+d+'d · '+fmt(p.valfat||0)+'</div>'
+      +'</div>'
+      +'<div style="display:flex;gap:6px;flex-shrink:0">'
+      +wpp
+      +'<button onclick="marcarPvEnviado(\''+p.cliId+'\')" style="background:none;border:1px solid var(--bdr);border-radius:8px;padding:4px 10px;font-size:12px;color:var(--grn);cursor:pointer"><i class="ti ti-check"></i></button>'
+      +'</div>'
+      +'</div>';
   }).join('');
-  return '<div class="card" style="margin:8px 12px 0;border-left:3px solid #25d366">'+
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:'+(_pvExpandido?'8px':'0')+'" onclick="togglePosVendasM()" style="cursor:pointer">'+
-      '<div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="togglePosVendasM()">'+
-        '<div style="font-size:13px;font-weight:700;color:#25d366"><i class="ti ti-heart-handshake"></i> Pós-Vendas</div>'+
-        '<span style="font-size:10px;background:#25d366;color:#fff;padding:1px 8px;border-radius:10px">'+lista.length+' cliente(s)</span>'+
-      '</div>'+
-      '<button id="pv-toggle-btn" onclick="togglePosVendasM()" style="background:none;border:1px solid #25d36644;border-radius:8px;padding:3px 8px;color:#25d366;cursor:pointer;font-size:13px">'+
-        (_pvExpandido?'<i class="ti ti-chevron-up"></i>':'<i class="ti ti-chevron-down"></i>')+
-      '</button>'+
-    '</div>'+
-    '<div id="pv-lista-m" style="display:'+(_pvExpandido?'block':'none')+'">'+itens+'</div>'+
-  '</div>';
+
+  return '<div class="card" id="pv-card-m" style="margin:8px 12px 0;border-left:3px solid #25d366">'
+    +'<div id="pv-header-m" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:'+(_pvExpandido?'8px':'0')+';cursor:pointer" onclick="togglePosVendasM()">'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+        +'<div style="font-size:13px;font-weight:700;color:#25d366"><i class="ti ti-heart-handshake"></i> Pós-Vendas</div>'
+        +'<span id="pv-badge-m" style="font-size:10px;background:#25d366;color:#fff;padding:1px 8px;border-radius:10px">'+lista.length+' cliente(s)</span>'
+      +'</div>'
+      +'<button id="pv-toggle-btn" onclick="event.stopPropagation();togglePosVendasM()" style="background:none;border:1px solid #25d36644;border-radius:8px;padding:3px 8px;color:#25d366;cursor:pointer;font-size:13px">'
+        +(_pvExpandido?'<i class="ti ti-chevron-up"></i>':'<i class="ti ti-chevron-down"></i>')
+      +'</button>'
+    +'</div>'
+    +'<div id="pv-lista-m" style="display:'+(_pvExpandido?'block':'none')+'">'+itens+'</div>'
+  +'</div>';
 }
 
 // ══ ALERTA MATINAL MOBILE ══
@@ -892,6 +911,226 @@ function renderPedidosM(){
 // ══════════════════════════════
 // AGENDA
 // ══════════════════════════════
+// ══ LEADS MOBILE ══
+var _leadEditIdM = null;
+var _cameraStream = null;
+
+const ESTAGIOS_COR = {
+  'Novo':'#94a3b8','Contato feito':'#2563eb','Proposta enviada':'#0891b2',
+  'Negociação':'#d97706','Convertido':'#059669','Perdido':'#dc2626'
+};
+
+function renderLeadsM(){
+  if(!DB.leads) DB.leads=[];
+  var ativos=DB.leads.filter(function(l){return l.estagio!=='Convertido'&&l.estagio!=='Perdido';}).length;
+  var b=document.getElementById('badge-leads-m');
+  if(b){b.textContent=ativos;b.style.display=ativos?'block':'none';}
+
+  var html='<div style="padding:12px">';
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
+  html+='<div style="font-size:16px;font-weight:700;color:var(--t1)"><i class="ti ti-target-arrow" style="color:var(--org)"></i> Leads</div>';
+  html+='<div style="display:flex;gap:8px">';
+  html+='<button class="btn bs" style="padding:8px 12px;font-size:13px" onclick="abrirCameraLeadM()" title="Capturar cartão de visita"><i class="ti ti-camera"></i></button>';
+  html+='<button class="btn bp" style="padding:8px 14px;font-size:13px" onclick="abrirModalLeadM(null)"><i class="ti ti-plus"></i> Novo</button>';
+  html+='</div></div>';
+
+  // Resumo por estágio
+  html+='<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px">';
+  ['Novo','Contato feito','Proposta enviada','Negociação','Convertido','Perdido'].forEach(function(e){
+    var n=DB.leads.filter(function(l){return l.estagio===e;}).length;
+    html+='<div style="background:'+ESTAGIOS_COR[e]+'22;border:1px solid '+ESTAGIOS_COR[e]+'44;border-radius:8px;padding:6px 10px;text-align:center;min-width:70px;flex-shrink:0">';
+    html+='<div style="font-weight:700;font-size:18px;color:'+ESTAGIOS_COR[e]+'">'+n+'</div>';
+    html+='<div style="font-size:9px;color:var(--t3)">'+e+'</div></div>';
+  });
+  html+='</div>';
+
+  // Lista de leads
+  if(!DB.leads.length){
+    html+='<div style="text-align:center;color:var(--t3);padding:30px;font-size:13px">Nenhum lead cadastrado.<br>Toque em + Novo para começar.</div>';
+  } else {
+    DB.leads.slice().reverse().forEach(function(l){
+      var tel=(l.tel||'').replace(/\D/g,'');
+      var cor=ESTAGIOS_COR[l.estagio]||'#94a3b8';
+      html+='<div class="card" style="margin-bottom:10px;border-left:3px solid '+cor+'">';
+      html+='<div style="display:flex;justify-content:space-between;align-items:flex-start">';
+      html+='<div style="flex:1"><div style="font-weight:700;font-size:14px;color:var(--t1)">'+l.nome+'</div>';
+      if(l.empresa) html+='<div style="font-size:11px;color:var(--t2)">'+l.empresa+'</div>';
+      html+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">';
+      if(l.cidade) html+='<span style="font-size:10px;color:var(--t3)"><i class="ti ti-map-pin"></i> '+l.cidade+'</span>';
+      if(l.origem) html+='<span style="font-size:10px;color:var(--t3)"><i class="ti ti-source-code"></i> '+l.origem+'</span>';
+      if(l.visita) html+='<span style="font-size:10px;color:var(--t3)"><i class="ti ti-calendar"></i> '+fmtD(l.visita)+'</span>';
+      html+='</div>';
+      html+='<div style="margin-top:6px"><span style="background:'+cor+'22;color:'+cor+';border:1px solid '+cor+'44;border-radius:12px;padding:2px 10px;font-size:10px;font-weight:600">'+l.estagio+'</span></div>';
+      if(l.obs) html+='<div style="font-size:10px;color:var(--t3);margin-top:4px">'+l.obs+'</div>';
+      html+='</div></div>';
+      // Botões de ação
+      html+='<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">';
+      if(tel) html+='<a href="https://wa.me/55'+tel+'" target="_blank" class="btn bs" style="padding:6px 12px;font-size:12px;color:#25d366;border-color:#25d366"><i class="ti ti-brand-whatsapp"></i> WhatsApp</a>';
+      if(tel) html+='<a href="tel:'+l.tel+'" class="btn bs" style="padding:6px 12px;font-size:12px"><i class="ti ti-phone"></i> Ligar</a>';
+      html+='<button class="btn bs" style="padding:6px 12px;font-size:12px" onclick="abrirModalLeadM(\''+l.id+'\')"><i class="ti ti-pencil"></i></button>';
+      if(l.estagio!=='Convertido') html+='<button class="btn bs" style="padding:6px 12px;font-size:12px;color:var(--grn);border-color:var(--grn)" onclick="converterLeadM(\''+l.id+'\')"><i class="ti ti-user-check"></i> Cliente</button>';
+      html+='<button class="btn bs" style="padding:6px 12px;font-size:12px;color:var(--red);border-color:var(--red)" onclick="excluirLeadM(\''+l.id+'\')"><i class="ti ti-trash"></i></button>';
+      html+='</div></div>';
+    });
+  }
+  html+='</div>';
+
+  // Modal de novo/editar lead
+  html+='<div id="modal-lead-m" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:flex-end">';
+  html+='<div style="background:var(--s1);border-radius:16px 16px 0 0;padding:20px;width:100%;max-height:90vh;overflow-y:auto">';
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
+  html+='<div style="font-size:16px;font-weight:700" id="lead-modal-titulo-m">Novo Lead</div>';
+  html+='<button onclick="fecharModalLeadM()" style="background:none;border:none;font-size:24px;color:var(--t3)">&times;</button></div>';
+  html+='<div style="display:flex;flex-direction:column;gap:10px">';
+  html+='<input class="fi" id="lead-nome-m" placeholder="Nome *" style="font-size:14px;padding:10px">';
+  html+='<input class="fi" id="lead-empresa-m" placeholder="Empresa / Loja" style="font-size:14px;padding:10px">';
+  html+='<input class="fi" id="lead-tel-m" placeholder="Telefone / WhatsApp" type="tel" style="font-size:14px;padding:10px">';
+  html+='<input class="fi" id="lead-cidade-m" placeholder="Cidade" style="font-size:14px;padding:10px">';
+  html+='<select class="fi" id="lead-origem-m" style="font-size:14px;padding:10px"><option value="">Origem —</option><option>Indicação</option><option>Feira</option><option>Redes Sociais</option><option>Cold Call</option><option>Visita</option><option>Site</option><option>WhatsApp</option><option>Outro</option></select>';
+  html+='<select class="fi" id="lead-estagio-m" style="font-size:14px;padding:10px"><option>Novo</option><option>Contato feito</option><option>Proposta enviada</option><option>Negociação</option><option>Convertido</option><option>Perdido</option></select>';
+  html+='<input class="fi" id="lead-visita-m" type="date" style="font-size:14px;padding:10px">';
+  html+='<textarea class="fi" id="lead-obs-m" placeholder="Observações" style="font-size:14px;padding:10px;height:80px;resize:none"></textarea>';
+  html+='<button class="btn bp" style="padding:14px;font-size:15px;font-weight:700" onclick="salvarLeadM()"><i class="ti ti-check"></i> Salvar Lead</button>';
+  html+='</div></div></div>';
+
+  // Modal câmera cartão de visita
+  html+='<div id="modal-camera-m" style="display:none;position:fixed;inset:0;background:#000;z-index:600;flex-direction:column">';
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:rgba(0,0,0,.7)">';
+  html+='<div style="color:#fff;font-size:15px;font-weight:700"><i class="ti ti-camera"></i> Capturar Cartão de Visita</div>';
+  html+='<button onclick="fecharCameraM()" style="background:none;border:none;color:#fff;font-size:24px">&times;</button></div>';
+  html+='<video id="camera-video-m" autoplay playsinline style="flex:1;width:100%;object-fit:cover"></video>';
+  html+='<canvas id="camera-canvas-m" style="display:none"></canvas>';
+  html+='<div style="padding:16px;background:rgba(0,0,0,.7);display:flex;gap:10px;justify-content:center">';
+  html+='<button class="btn bp" style="padding:14px 28px;font-size:15px;border-radius:50px" onclick="capturarFotoM()"><i class="ti ti-camera"></i> Capturar</button>';
+  html+='<label style="background:var(--s2);color:var(--t1);border-radius:50px;padding:14px 20px;font-size:13px;cursor:pointer"><i class="ti ti-upload"></i> Galeria<input type="file" accept="image/*" style="display:none" onchange="usarFotoGaleriaM(this)"></label>';
+  html+='</div></div>';
+
+  document.getElementById('main-content').innerHTML=html;
+}
+
+function abrirModalLeadM(id){
+  _leadEditIdM=id||null;
+  var el=document.getElementById('modal-lead-m');
+  if(!el) return;
+  el.style.display='flex';
+  document.getElementById('lead-modal-titulo-m').textContent=id?'Editar Lead':'Novo Lead';
+  if(id){
+    var l=DB.leads.find(function(x){return x.id===id;}); if(!l) return;
+    document.getElementById('lead-nome-m').value=l.nome||'';
+    document.getElementById('lead-empresa-m').value=l.empresa||'';
+    document.getElementById('lead-tel-m').value=l.tel||'';
+    document.getElementById('lead-cidade-m').value=l.cidade||'';
+    document.getElementById('lead-origem-m').value=l.origem||'';
+    document.getElementById('lead-estagio-m').value=l.estagio||'Novo';
+    document.getElementById('lead-visita-m').value=l.visita||'';
+    document.getElementById('lead-obs-m').value=l.obs||'';
+  } else {
+    ['lead-nome-m','lead-empresa-m','lead-tel-m','lead-cidade-m','lead-obs-m'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+    var es=document.getElementById('lead-estagio-m'); if(es) es.value='Novo';
+    var or=document.getElementById('lead-origem-m'); if(or) or.value='';
+    var vi=document.getElementById('lead-visita-m'); if(vi) vi.value='';
+  }
+}
+
+function fecharModalLeadM(){ var el=document.getElementById('modal-lead-m'); if(el) el.style.display='none'; }
+
+function salvarLeadM(){
+  var nome=(document.getElementById('lead-nome-m')?.value||'').trim();
+  if(!nome){ toastM('Informe o nome do lead'); return; }
+  if(!DB.leads) DB.leads=[];
+  var dados={
+    nome:nome,
+    empresa:(document.getElementById('lead-empresa-m')?.value||'').trim(),
+    tel:(document.getElementById('lead-tel-m')?.value||'').trim(),
+    cidade:(document.getElementById('lead-cidade-m')?.value||'').trim(),
+    origem:document.getElementById('lead-origem-m')?.value||'',
+    estagio:document.getElementById('lead-estagio-m')?.value||'Novo',
+    visita:document.getElementById('lead-visita-m')?.value||null,
+    obs:(document.getElementById('lead-obs-m')?.value||'').trim(),
+    dtCriacao:new Date().toISOString().split('T')[0]
+  };
+  if(_leadEditIdM){
+    var l=DB.leads.find(function(x){return x.id===_leadEditIdM;}); if(l) Object.assign(l,dados);
+  } else {
+    dados.id=uid(); DB.leads.push(dados);
+  }
+  salvarDB(); fecharModalLeadM(); renderLeadsM(); toastM(_leadEditIdM?'Lead atualizado!':'Lead salvo!');
+}
+
+function excluirLeadM(id){
+  if(!confirm('Excluir este lead?')) return;
+  DB.leads=DB.leads.filter(function(x){return x.id!==id;});
+  salvarDB(); renderLeadsM(); toastM('Lead removido!');
+}
+
+function converterLeadM(id){
+  var l=DB.leads.find(function(x){return x.id===id;}); if(!l) return;
+  if(!confirm('Converter "'+l.nome+'" em cliente?')) return;
+  var novoCli={id:uid(),rs:l.empresa||l.nome,comp:l.nome,fone:l.tel,cel:l.tel,cid:l.cidade,uf:'',obs:l.obs||'',email:'',cnpj:'',empId:DB.empresas[0]?.id||'',rede:'',ultFat:null,hist:[]};
+  if(!DB.clientes) DB.clientes=[];
+  DB.clientes.push(novoCli);
+  l.estagio='Convertido';
+  salvarDB(); renderLeadsM(); toastM('✅ '+l.nome+' convertido em cliente!');
+}
+
+// ── Câmera ──
+async function abrirCameraLeadM(){
+  var el=document.getElementById('modal-camera-m');
+  if(!el) return;
+  el.style.display='flex';
+  try{
+    _cameraStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
+    var video=document.getElementById('camera-video-m');
+    if(video){ video.srcObject=_cameraStream; }
+  }catch(e){
+    fecharCameraM();
+    toastM('Câmera não disponível. Use a galeria.');
+  }
+}
+
+function fecharCameraM(){
+  if(_cameraStream){ _cameraStream.getTracks().forEach(function(t){t.stop();}); _cameraStream=null; }
+  var el=document.getElementById('modal-camera-m'); if(el) el.style.display='none';
+}
+
+function capturarFotoM(){
+  var video=document.getElementById('camera-video-m');
+  var canvas=document.getElementById('camera-canvas-m');
+  if(!video||!canvas) return;
+  canvas.width=video.videoWidth;
+  canvas.height=video.videoHeight;
+  canvas.getContext('2d').drawImage(video,0,0);
+  var dataUrl=canvas.toDataURL('image/jpeg',0.8);
+  fecharCameraM();
+  processarImagemCartaoM(dataUrl);
+}
+
+function usarFotoGaleriaM(input){
+  var file=input.files[0]; if(!file) return;
+  var reader=new FileReader();
+  reader.onload=function(e){ fecharCameraM(); processarImagemCartaoM(e.target.result); };
+  reader.readAsDataURL(file);
+}
+
+function processarImagemCartaoM(dataUrl){
+  toastM('📷 Imagem capturada! Preencha os dados do lead.');
+  // Abre modal de novo lead com a foto disponível para referência
+  abrirModalLeadM(null);
+  // Guarda a imagem no canvas para o usuário ver enquanto digita
+  var img=new Image();
+  img.onload=function(){
+    var modal=document.getElementById('modal-lead-m');
+    if(!modal) return;
+    var preview=document.createElement('img');
+    preview.src=dataUrl;
+    preview.style.cssText='width:100%;border-radius:8px;margin-bottom:10px;max-height:180px;object-fit:cover';
+    var form=modal.querySelector('div[style*="flex-direction:column"]');
+    if(form) form.insertBefore(preview,form.firstChild);
+  };
+  img.src=dataUrl;
+}
+// ══ FIM LEADS MOBILE ══
+
 function renderAgendaM(){
   var cont = document.getElementById('main-content');
   var hoje = new Date().toISOString().split('T')[0];
@@ -1027,63 +1266,14 @@ function atualizarBadgeAgendaM(){
 // ══════════════════════════════
 function renderMaisM(){
   var cont = document.getElementById('main-content');
-  var cfg = loadCfg();
   cont.innerHTML = `
   <div class="section">
-    <div class="section-title">Conta</div>
-    <div class="card">
-      <div class="list-item" style="padding:12px 0">
-        <i class="ti ti-user" style="font-size:22px;color:var(--acc)"></i>
-        <div class="list-body">
-          <div class="list-name">${cfg.nome||'Representante'}</div>
-          <div class="list-sub">Usuário atual</div>
-        </div>
-      </div>
-    </div>
-
     <div class="section-title">Ferramentas</div>
     <div class="card">
       <div class="list-item" style="padding:12px 0" onclick="navM('proximos')">
         <i class="ti ti-map-pin" style="font-size:22px;color:var(--acc2)"></i>
-        <div class="list-body"><div class="list-name">📍 Clientes próximos</div><div class="list-sub">Encontrar clientes na sua cidade atual</div></div>
+        <div class="list-body"><div class="list-name">📍 Clientes Próximos</div><div class="list-sub">Encontrar clientes na sua cidade atual</div></div>
         <i class="ti ti-chevron-right" style="color:var(--t3)"></i>
-      </div>
-    </div>
-
-    <div class="section-title">Dados</div>
-    <div class="card">
-      <div class="list-item" style="padding:12px 0" onclick="abrirModalNuvemM()">
-        <i class="ti ti-cloud" style="font-size:22px;color:var(--acc)" id="ic-nuvem-mais"></i>
-        <div class="list-body"><div class="list-name">☁️ Sincronização em nuvem</div><div class="list-sub" id="sub-nuvem-mais">Configurar Firebase</div></div>
-        <i class="ti ti-chevron-right" style="color:var(--t3)"></i>
-      </div>
-      <div class="list-item" style="padding:12px 0" onclick="abrirModalBackupM()">
-        <i class="ti ti-cloud-upload" style="font-size:22px;color:var(--grn)"></i>
-        <div class="list-body"><div class="list-name">Backup & Restauração</div><div class="list-sub">Baixar ou importar backup JSON</div></div>
-        <i class="ti ti-chevron-right" style="color:var(--t3)"></i>
-      </div>
-      <div class="list-item" style="padding:12px 0">
-        <i class="ti ti-database" style="font-size:22px;color:var(--acc)"></i>
-        <div class="list-body">
-          <div class="list-name">${DB.clientes.length} clientes · ${DB.pedidos.length} pedidos</div>
-          <div class="list-sub">${DB.empresas.length} empresa(s) cadastrada(s)</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="section-title">Configurações</div>
-    <div class="card">
-      <div class="list-item" style="padding:12px 0" onclick="abrirModalCfgM()">
-        <i class="ti ti-settings" style="font-size:22px;color:var(--t2)"></i>
-        <div class="list-body"><div class="list-name">Configurações gerais</div><div class="list-sub">Nome, chave API</div></div>
-        <i class="ti ti-chevron-right" style="color:var(--t3)"></i>
-      </div>
-    </div>
-
-    <div class="card" style="background:rgba(37,99,235,.05);border-color:rgba(37,99,235,.2)">
-      <div style="text-align:center;font-size:12px;color:var(--t3)">
-        <div style="font-weight:700;color:var(--acc);margin-bottom:4px">RepCRM Mobile</div>
-        Dados compartilhados com a versão Desktop<br>via localStorage do mesmo navegador
       </div>
     </div>
   </div>`;
@@ -1239,6 +1429,9 @@ function abrirModalCfgM(){
   document.getElementById('mcfg-key').value = cfg.iakey||'';
   var epk=document.getElementById('mcfg-places-key'); if(epk) epk.value=cfg.placesKey||'';
   var ea=document.getElementById('mcfg-amora'); if(ea) ea.value=cfg.nomeAmora||'Amora';
+  // Atualiza dados no modal
+  var dbInfo=document.getElementById('mcfg-db-info');
+  if(dbInfo) dbInfo.textContent=DB.clientes.length+' clientes · '+DB.pedidos.length+' pedidos · '+DB.empresas.length+' empresa(s)';
   carregarFotoAmoraSettings();
   abrirModal('mCfgM');
 }
