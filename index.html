@@ -575,7 +575,7 @@ function renderDashM(){
       ${ultPedidos.map(p=>{var cli=DB.clientes.find(x=>x.id===p.cliId);return `<div class="list-item">
         <div class="list-body">
           <div class="list-name">${cli?.rs||'—'}</div>
-          <div class="list-sub">${fmtD(p.dt)} · ${fmt(p.val||0)}${p.dtFat?` · <span style="color:var(--grn)">Fat.</span>`:`<span style="color:var(--org)"> · Em aberto</span>`}</div>
+          <div class="list-sub">${fmtD(p.dt)} · ${fmt(p.val||0)}${p.dtFat?` · <span style="color:var(--grn)">Fat.</span> <span style="color:var(--t3);font-size:9px">${p.nf?'NF '+p.nf:''}</span>`:`<span style="color:var(--org)"> · Em aberto</span>`}</div>
         </div>
       </div>`;}).join('')}
     </div>`:''}
