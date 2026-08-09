@@ -467,6 +467,7 @@ function renderM(){
     case 'mais':     renderMaisM(); break;
     case 'proximos': renderProximosM(); break;
     case 'leads':    renderLeadsM(); break;
+    case 'vendas':   renderVendasM(); break;
   }
 }
 
@@ -911,7 +912,122 @@ function renderPedidosM(){
 // ══════════════════════════════
 // AGENDA
 // ══════════════════════════════
-// ══ LEADS MOBILE ══
+// ══ VENDAS MOBILE ══
+var _vendasAnoM = new Date().getFullYear();
+
+function renderVendasM(){
+  var cont=document.getElementById('main-content');
+  var hj=new Date(); var anoAtual=_vendasAnoM; var mesAtual=hj.getMonth();
+  var anoHoje=hj.getFullYear();
+  var nomesMes=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  var nomesMesFull=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+  // Anos disponíveis
+  var todosAnos=[...new Set(DB.pedidos.filter(function(p){return p.dt;}).map(function(p){return parseInt(p.dt.slice(0,4));}))].sort();
+  if(!todosAnos.length) todosAnos=[anoHoje];
+  var mesFim=anoAtual<anoHoje?11:mesAtual;
+
+  var html='<div style="padding:12px">';
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
+  html+='<div style="font-size:16px;font-weight:700;color:var(--t1)"><i class="ti ti-chart-line" style="color:var(--grn)"></i> Vendas</div>';
+  html+='<button onclick="navM(\'mais\')" style="background:none;border:none;color:var(--t3);font-size:22px;cursor:pointer"><i class="ti ti-arrow-left"></i></button>';
+  html+='</div>';
+
+  // Filtro de ano
+  html+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">';
+  html+='<button onclick="_vendasAnoM=_vendasAnoM-1;renderVendasM()" style="background:var(--s2);border:1px solid var(--bdr);border-radius:8px;padding:6px 14px;font-size:16px;cursor:pointer;color:var(--t1)">‹</button>';
+  html+='<div style="flex:1;text-align:center;font-size:18px;font-weight:700;color:var(--t1)">'+anoAtual+'</div>';
+  html+='<button onclick="_vendasAnoM=_vendasAnoM+1;renderVendasM()" style="background:var(--s2);border:1px solid var(--bdr);border-radius:8px;padding:6px 14px;font-size:16px;cursor:pointer;color:var(--t1)">›</button>';
+  html+='</div>';
+
+  DB.empresas.forEach(function(e){
+    var ps=DB.pedidos.filter(function(p){return p.empId===e.id&&!p.cancelado;});
+    var totalVendaAno=0; var totalFatAno=0; var totalMetaV=0; var totalMetaF=0;
+
+    // Cards do ano atual
+    var vendaAno=ps.filter(function(p){return p.dt&&new Date(p.dt+'T12:00').getFullYear()===anoAtual;}).reduce(function(a,p){return a+(p.val||0);},0);
+    var fatAno=ps.filter(function(p){return p.dtFat&&new Date(p.dtFat+'T12:00').getFullYear()===anoAtual;}).reduce(function(a,p){return a+(p.valfat||0);},0);
+    var vendaMes=ps.filter(function(p){if(!p.dt)return false;var d=new Date(p.dt+'T12:00');return d.getMonth()===mesAtual&&d.getFullYear()===anoAtual;}).reduce(function(a,p){return a+(p.val||0);},0);
+    var fatMes=ps.filter(function(p){if(!p.dtFat)return false;var d=new Date(p.dtFat+'T12:00');return d.getMonth()===mesAtual&&d.getFullYear()===anoAtual;}).reduce(function(a,p){return a+(p.valfat||0);},0);
+    var metaV=typeof getMetaMensalM==='function'?getMetaMensalM(e.id,anoAtual,mesAtual,'meta'):(e.meta||0);
+    var metaF=typeof getMetaMensalM==='function'?getMetaMensalM(e.id,anoAtual,mesAtual,'metaFat'):(e.metaFat||0);
+    var pctV=metaV?Math.round(vendaMes/metaV*100):0;
+    var pctF=metaF?Math.round(fatMes/metaF*100):0;
+    var corPV=pctV>=100?'var(--grn)':pctV>=70?'var(--org)':'var(--red)';
+    var corPF=pctF>=100?'var(--grn)':pctF>=70?'var(--org)':'var(--red)';
+
+    html+='<div style="margin-bottom:20px">';
+    // Header empresa
+    html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
+    html+='<div style="width:10px;height:10px;border-radius:50%;background:'+e.cor+';flex-shrink:0"></div>';
+    html+='<div style="font-size:15px;font-weight:700;color:var(--t1)">'+e.nome+'</div></div>';
+
+    // Cards resumo mês
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">';
+    html+='<div class="card" style="padding:10px;border-left:3px solid var(--acc)">';
+    html+='<div style="font-size:9px;color:var(--t3);text-transform:uppercase">Venda '+nomesMesFull[mesAtual]+'</div>';
+    html+='<div style="font-size:16px;font-weight:700;color:var(--t1)">'+fmt(vendaMes)+'</div>';
+    if(metaV) html+='<div style="font-size:10px;color:'+corPV+'">'+pctV+'% da meta</div>';
+    html+='</div>';
+    html+='<div class="card" style="padding:10px;border-left:3px solid var(--grn)">';
+    html+='<div style="font-size:9px;color:var(--t3);text-transform:uppercase">Fat. '+nomesMesFull[mesAtual]+'</div>';
+    html+='<div style="font-size:16px;font-weight:700;color:var(--grn)">'+fmt(fatMes)+'</div>';
+    if(metaF) html+='<div style="font-size:10px;color:'+corPF+'">'+pctF+'% da meta</div>';
+    html+='</div>';
+    html+='<div class="card" style="padding:10px;border-left:3px solid var(--acc2)">';
+    html+='<div style="font-size:9px;color:var(--t3);text-transform:uppercase">Venda Ano '+anoAtual+'</div>';
+    html+='<div style="font-size:15px;font-weight:700;color:var(--t1)">'+fmt(vendaAno)+'</div>';
+    html+='</div>';
+    html+='<div class="card" style="padding:10px;border-left:3px solid var(--cyn)">';
+    html+='<div style="font-size:9px;color:var(--t3);text-transform:uppercase">Fat. Ano '+anoAtual+'</div>';
+    html+='<div style="font-size:15px;font-weight:700;color:var(--grn)">'+fmt(fatAno)+'</div>';
+    html+='</div></div>';
+
+    // Tabela mensal
+    html+='<div class="card" style="padding:0;overflow:hidden">';
+    html+='<div style="background:var(--s2);padding:8px 12px;font-size:11px;font-weight:700;color:var(--t2)">Mês a mês — '+anoAtual+'</div>';
+    html+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">';
+    html+='<thead><tr style="background:var(--s2)">';
+    html+='<th style="padding:6px 10px;text-align:left;color:var(--t3)">Mês</th>';
+    html+='<th style="padding:6px 8px;text-align:right;color:var(--acc)">Venda</th>';
+    html+='<th style="padding:6px 8px;text-align:right;color:var(--t3)">%V</th>';
+    html+='<th style="padding:6px 8px;text-align:right;color:var(--grn)">Fat.</th>';
+    html+='<th style="padding:6px 8px;text-align:right;color:var(--t3)">%F</th>';
+    html+='</tr></thead><tbody>';
+
+    for(var m=0;m<=mesFim;m++){
+      var vM=ps.filter(function(p){if(!p.dt)return false;var d=new Date(p.dt+'T12:00');return d.getMonth()===m&&d.getFullYear()===anoAtual;}).reduce(function(a,p){return a+(p.val||0);},0);
+      var fM=ps.filter(function(p){if(!p.dtFat)return false;var d=new Date(p.dtFat+'T12:00');return d.getMonth()===m&&d.getFullYear()===anoAtual;}).reduce(function(a,p){return a+(p.valfat||0);},0);
+      var mV=typeof getMetaMensalM==='function'?getMetaMensalM(e.id,anoAtual,m,'meta'):(e.meta||0);
+      var mF=typeof getMetaMensalM==='function'?getMetaMensalM(e.id,anoAtual,m,'metaFat'):(e.metaFat||0);
+      var pV=mV?Math.round(vM/mV*100):0;
+      var pF=mF?Math.round(fM/mF*100):0;
+      var cV=pV>=100?'var(--grn)':pV>=70?'var(--org)':'var(--red)';
+      var cF=pF>=100?'var(--grn)':pF>=70?'var(--org)':'var(--red)';
+      var isAtual=m===mesAtual&&anoAtual===anoHoje;
+      html+='<tr style="border-bottom:1px solid var(--s3)'+(isAtual?';background:var(--s2)':'')+'">';
+      html+='<td style="padding:6px 10px;font-weight:'+(isAtual?'700':'400')+';color:var(--t'+(isAtual?'1':'2')+')">'+nomesMes[m]+'</td>';
+      html+='<td style="padding:6px 8px;text-align:right;color:var(--t1)">'+(vM?fmt(vM):'—')+'</td>';
+      html+='<td style="padding:6px 8px;text-align:right;font-weight:600;color:'+(mV&&vM?cV:'var(--t3)')+'">'+( mV&&vM?pV+'%':'—')+'</td>';
+      html+='<td style="padding:6px 8px;text-align:right;color:var(--grn)">'+(fM?fmt(fM):'—')+'</td>';
+      html+='<td style="padding:6px 8px;text-align:right;font-weight:600;color:'+(mF&&fM?cF:'var(--t3)')+'">'+( mF&&fM?pF+'%':'—')+'</td>';
+      html+='</tr>';
+      totalVendaAno+=vM; totalFatAno+=fM;
+    }
+    // Linha total
+    html+='<tr style="background:var(--s2);font-weight:700;border-top:2px solid var(--bdr)">';
+    html+='<td style="padding:6px 10px;color:var(--t1)">Total</td>';
+    html+='<td style="padding:6px 8px;text-align:right;color:var(--t1)">'+fmt(totalVendaAno)+'</td>';
+    html+='<td style="padding:6px 8px"></td>';
+    html+='<td style="padding:6px 8px;text-align:right;color:var(--grn)">'+fmt(totalFatAno)+'</td>';
+    html+='<td style="padding:6px 8px"></td></tr>';
+    html+='</tbody></table></div></div></div>';
+  });
+
+  html+='</div>';
+  cont.innerHTML=html;
+}
+// ══ FIM VENDAS MOBILE ══
 var _leadEditIdM = null;
 var _cameraStream = null;
 
@@ -1273,6 +1389,11 @@ function renderMaisM(){
       <div class="list-item" style="padding:12px 0" onclick="navM('proximos')">
         <i class="ti ti-map-pin" style="font-size:22px;color:var(--acc2)"></i>
         <div class="list-body"><div class="list-name">📍 Clientes Próximos</div><div class="list-sub">Encontrar clientes na sua cidade atual</div></div>
+        <i class="ti ti-chevron-right" style="color:var(--t3)"></i>
+      </div>
+      <div class="list-item" style="padding:12px 0" onclick="navM('vendas')">
+        <i class="ti ti-chart-line" style="font-size:22px;color:var(--grn)"></i>
+        <div class="list-body"><div class="list-name">📊 Vendas por Empresa</div><div class="list-sub">Metas, faturamento e comparativo mensal</div></div>
         <i class="ti ti-chevron-right" style="color:var(--t3)"></i>
       </div>
     </div>
