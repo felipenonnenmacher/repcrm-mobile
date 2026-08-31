@@ -2164,12 +2164,18 @@ function initFirebaseM(){
         var remoto = snap.val();
         if(!remoto) return;
         if(remoto._ts && DB._ts && remoto._ts <= DB._ts) return;
-        DB.empresas = remoto.empresas||[];
-        DB.clientes = remoto.clientes||[];
-        DB.pedidos  = remoto.pedidos||[];
-        DB.tarefas  = remoto.tarefas||[];
-        DB.eventos  = remoto.eventos||[];
-        DB._ts      = remoto._ts;
+        DB.empresas    = remoto.empresas    || [];
+        DB.clientes    = remoto.clientes    || [];
+        DB.pedidos     = remoto.pedidos     || [];
+        DB.tarefas     = remoto.tarefas     || [];
+        DB.eventos     = remoto.eventos     || [];
+        DB.fiscal      = remoto.fiscal      || [];
+        DB.finalidades = remoto.finalidades || [];
+        DB.leads       = remoto.leads       || [];
+        DB.cicloAcoes  = remoto.cicloAcoes  || {};
+        DB._ts         = remoto._ts;
+        // Re-renderiza fiscal se estiver na página
+        if(paginaAtual==='fiscal') renderFiscalM();
         // Restaura config e foto da nuvem
         if(remoto._cfg){
           var cfgLocal = loadCfg();
@@ -2202,12 +2208,16 @@ function salvarNuvemM(){
   DB._ts = Date.now();
   var cfg = loadCfg();
   fbRefM.set({
-    empresas: DB.empresas,
-    clientes: DB.clientes,
-    pedidos:  DB.pedidos,
-    tarefas:  DB.tarefas,
-    eventos:  DB.eventos,
-    _ts:      DB._ts,
+    empresas:    DB.empresas,
+    clientes:    DB.clientes,
+    pedidos:     DB.pedidos,
+    tarefas:     DB.tarefas,
+    eventos:     DB.eventos,
+    fiscal:      DB.fiscal      || [],
+    finalidades: DB.finalidades || [],
+    leads:       DB.leads       || [],
+    cicloAcoes:  DB.cicloAcoes  || {},
+    _ts:         DB._ts,
     _cfg:{
       iakey:     cfg.iakey||'',
       placesKey: cfg.placesKey||'',
