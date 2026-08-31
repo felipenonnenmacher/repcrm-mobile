@@ -851,7 +851,7 @@ async function lerNFcomIAM(){
       +'{"data":"AAAA-MM-DD","num":"numero NF","rs":"razao social","cnpj":"XX.XXX.XXX/XXXX-XX","valor":0.00}\n'
       +'- data: data de emissão formato AAAA-MM-DD\n- num: número da NF\n- rs: razão social do emitente\n- cnpj: CNPJ formatado\n- valor: valor total decimal';
 
-    var resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent',{
+    var resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-goog-api-key':apiKey},
       body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:_nfImgMimeM,data:_nfImgB64M}},{text:prompt}]}],generationConfig:{maxOutputTokens:400,temperature:0.1}})
@@ -2650,7 +2650,7 @@ window.addEventListener('load', function(){
 
 <!-- MODAL NF MOBILE -->
 <div class="mbg" id="modal-nf-m">
-<div class="modal-sheet" style="background:var(--s1);border-radius:16px 16px 0 0;position:fixed;bottom:0;left:0;right:0;max-height:95vh;overflow-y:auto;padding:16px;z-index:200">
+<div class="msheet" style="max-height:95vh;overflow-y:auto">
   <div style="width:36px;height:4px;background:var(--bdr);border-radius:2px;margin:0 auto 14px"></div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
     <div style="font-size:16px;font-weight:700;color:var(--t1)"><i class="ti ti-receipt" style="color:#185FA5"></i> Nota Fiscal</div>
@@ -2688,7 +2688,7 @@ window.addEventListener('load', function(){
 
   <!-- Botões ação -->
   <div style="display:flex;gap:10px">
-    <button onclick="excluirNFM(_nfEditIdM)" id="btn-del-nf-m" style="padding:12px;border:1px solid var(--red);border-radius:10px;background:none;color:var(--red);cursor:pointer;font-size:13px"><i class="ti ti-trash"></i></button>
+    <button onclick="if(_nfEditIdM)excluirNFM(_nfEditIdM)" id="btn-del-nf-m" style="padding:12px;border:1px solid var(--red);border-radius:10px;background:none;color:var(--red);cursor:pointer;font-size:13px"><i class="ti ti-trash"></i></button>
     <button onclick="salvarNFM()" style="flex:1;padding:12px;border:none;border-radius:10px;background:var(--acc);color:#fff;font-size:14px;font-weight:600;cursor:pointer"><i class="ti ti-check"></i> Salvar NF</button>
   </div>
 </div>
