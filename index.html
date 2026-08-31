@@ -172,6 +172,9 @@ if('serviceWorker' in navigator){var b=new Blob(["const CACHE='repcrm-mob-v26';s
     <i class="ti ti-calendar-event"></i>Agenda
     <span class="bnav-badge" id="badge-agenda-m" style="display:none">0</span>
   </button>
+  <button class="bnav-item" id="bnav-fiscal" onclick="navM('fiscal')">
+    <i class="ti ti-receipt-2" style="color:#185FA5"></i>Fiscal
+  </button>
   <button class="bnav-item" id="bnav-mais" onclick="navM('mais')">
     <i class="ti ti-dots"></i>Mais
   </button>
@@ -417,14 +420,18 @@ function carregarDB(){
   DB.clientes = load('clientes');
   DB.pedidos  = load('pedidos');
   DB.tarefas  = load('tarefas',[]);
-  DB.eventos  = load('eventos',[]);
+  DB.eventos     = load('eventos',[]);
+  DB.fiscal      = load('fiscal',[]);
+  DB.finalidades = load('finalidades',['Combustível','Alimentação','Hospedagem','Impostos','Diversos','Captação','Manutenção','Comunicação']);
 }
 function salvarDB(){
   save('empresas', DB.empresas);
   save('clientes', DB.clientes);
   save('pedidos',  DB.pedidos);
   save('tarefas',  DB.tarefas);
-  save('eventos',  DB.eventos);
+  save('eventos',    DB.eventos);
+  save('fiscal',      DB.fiscal||[]);
+  save('finalidades', DB.finalidades||[]);
   salvarNuvemM();
 }
 
@@ -468,6 +475,7 @@ function renderM(){
     case 'proximos': renderProximosM(); break;
     case 'leads':    renderLeadsM(); break;
     case 'vendas':   renderVendasM(); break;
+    case 'fiscal':   renderFiscalM(); break;
   }
 }
 
@@ -705,6 +713,234 @@ function getMetaMensalM(empId, ano, mes, campo){
 }
 
 function selecionarEmpM(id){ empAtualM=id; renderM(); }
+
+// ══ MÓDULO FISCAL MOBILE ══
+var _fiscalMesM = new Date().getMonth();
+var _fiscalAnoM = new Date().getFullYear();
+var _nfImgB64M  = null;
+var _nfImgMimeM = 'image/jpeg';
+var _nfEditIdM  = null;
+
+const MESES_FISCAL_M = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const MESES_FULL_M   = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+function fiscalBgFinM(nome){
+  var m={'Combustível':'#FAEEDA','Alimentação':'#EAF3DE','Hospedagem':'#E6F1FB','Impostos':'#FCEBEB','Diversos':'#F1EFE8','Captação':'#EEEDFE','Manutenção':'#E1F5EE','Comunicação':'#FBEAF0'};
+  return m[nome]||'var(--s2)';
+}
+function fiscalTxtFinM(nome){
+  var m={'Combustível':'#633806','Alimentação':'#27500A','Hospedagem':'#0C447C','Impostos':'#791F1F','Diversos':'#444441','Captação':'#3C3489','Manutenção':'#085041','Comunicação':'#72243E'};
+  return m[nome]||'var(--t2)';
+}
+
+function renderFiscalM(){
+  var cont=document.getElementById('main-content'); if(!cont) return;
+  if(!DB.fiscal) DB.fiscal=[];
+  if(!DB.finalidades) DB.finalidades=['Combustível','Alimentação','Hospedagem','Impostos','Diversos','Captação'];
+
+  var mesStr=_fiscalAnoM+'-'+String(_fiscalMesM+1).padStart(2,'0');
+  var nfs=DB.fiscal.filter(function(n){return n.data&&n.data.startsWith(mesStr);});
+  nfs.sort(function(a,b){return (b.data||'')>(a.data||'')?1:-1;});
+  var total=nfs.reduce(function(a,n){return a+(n.valor||0);},0);
+
+  var html='<div style="padding:16px 14px">';
+
+  // Header com mês e botão câmera
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">';
+  html+='<button onclick="_fiscalMesM--;if(_fiscalMesM<0){_fiscalMesM=11;_fiscalAnoM--;}renderFiscalM()" style="background:none;border:1px solid var(--bdr);border-radius:8px;padding:6px 10px;color:var(--t2);cursor:pointer"><i class="ti ti-chevron-left"></i></button>';
+  html+='<div style="font-size:15px;font-weight:700;color:var(--t1)">'+MESES_FULL_M[_fiscalMesM]+' / '+_fiscalAnoM+'</div>';
+  html+='<button onclick="_fiscalMesM++;if(_fiscalMesM>11){_fiscalMesM=0;_fiscalAnoM++;}renderFiscalM()" style="background:none;border:1px solid var(--bdr);border-radius:8px;padding:6px 10px;color:var(--t2);cursor:pointer"><i class="ti ti-chevron-right"></i></button>';
+  html+='</div>';
+
+  // Botão principal — câmera/galeria
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">';
+  html+='<label style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:var(--acc);color:#fff;border-radius:12px;padding:16px;cursor:pointer;font-size:13px;font-weight:600">';
+  html+='<i class="ti ti-camera" style="font-size:28px"></i>Tirar foto NF';
+  html+='<input type="file" accept="image/*" capture="environment" style="display:none" onchange="nfCapturaM(this)">';
+  html+='</label>';
+  html+='<label style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:var(--s2);border:1px solid var(--bdr);color:var(--t2);border-radius:12px;padding:16px;cursor:pointer;font-size:13px;font-weight:600">';
+  html+='<i class="ti ti-photo" style="font-size:28px"></i>Galeria';
+  html+='<input type="file" accept="image/*" style="display:none" onchange="nfCapturaM(this)">';
+  html+='</label>';
+  html+='</div>';
+
+  // Cards resumo
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">';
+  html+='<div class="card" style="padding:10px"><div style="font-size:10px;color:var(--t3);text-transform:uppercase;margin-bottom:3px">Total gastos</div><div style="font-size:18px;font-weight:700;color:var(--red)">'+fmtM(total)+'</div></div>';
+  html+='<div class="card" style="padding:10px"><div style="font-size:10px;color:var(--t3);text-transform:uppercase;margin-bottom:3px">Notas fiscais</div><div style="font-size:18px;font-weight:700;color:var(--acc)">'+nfs.length+'</div></div>';
+  html+='</div>';
+
+  // Lista de NFs
+  if(!nfs.length){
+    html+='<div style="text-align:center;padding:30px 20px;color:var(--t3)"><i class="ti ti-receipt" style="font-size:40px;opacity:.3"></i><div style="margin-top:10px">Nenhuma NF em '+MESES_FULL_M[_fiscalMesM]+'.<br>Tire uma foto para começar!</div></div>';
+  } else {
+    html+='<div style="font-size:12px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:8px">Notas Fiscais</div>';
+    nfs.forEach(function(n){
+      var bg=fiscalBgFinM(n.finalidade); var txt=fiscalTxtFinM(n.finalidade);
+      html+='<div class="card" style="margin-bottom:10px;overflow:hidden" onclick="abrirDetalhesNFM(\''+n.id+'\')">';
+      // Foto da NF se existir
+      if(n.imgB64){
+        html+='<img src="data:'+n.imgMime+';base64,'+n.imgB64+'" style="width:100%;height:100px;object-fit:cover;display:block">';
+      }
+      html+='<div style="padding:10px 12px">';
+      html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">';
+      html+='<div><div style="font-weight:700;font-size:14px;color:var(--t1)">'+(n.rs||'—')+'</div>';
+      html+='<div style="font-size:11px;color:var(--t3);margin-top:2px">'+(n.cnpj||'')+'</div></div>';
+      html+='<div style="font-size:16px;font-weight:700;color:var(--t1)">'+fmtM(n.valor||0)+'</div>';
+      html+='</div>';
+      html+='<div style="display:flex;justify-content:space-between;align-items:center">';
+      html+='<div style="display:flex;gap:8px;align-items:center">';
+      html+='<span style="background:'+bg+';color:'+txt+';border-radius:10px;padding:2px 10px;font-size:10px;font-weight:600">'+(n.finalidade||'—')+'</span>';
+      html+='<span style="font-size:11px;color:var(--t3)">'+(n.num?'NF '+n.num:'')+'</span>';
+      html+='</div>';
+      html+='<span style="font-size:11px;color:var(--t3)">'+(fmtDM(n.data)||'—')+'</span>';
+      html+='</div></div></div>';
+    });
+  }
+
+  html+='</div>';
+  cont.innerHTML=html;
+}
+
+function fmtM(v){ return 'R$ '+(+(v||0)).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtDM(s){ if(!s) return ''; var p=s.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+
+// Captura foto e abre modal de leitura IA
+function nfCapturaM(input){
+  var file=input.files[0]; if(!file) return;
+  _nfImgMimeM=file.type||'image/jpeg';
+  var reader=new FileReader();
+  reader.onload=function(e){
+    _nfImgB64M=e.target.result.split(',')[1];
+    _nfEditIdM=null;
+    abrirModalLerNFM();
+  };
+  reader.readAsDataURL(file);
+}
+
+function abrirModalLerNFM(){
+  // Preenche select finalidade
+  var sel=document.getElementById('nf-fin-m');
+  if(sel){
+    sel.innerHTML=(DB.finalidades||[]).map(function(f){ return '<option>'+f+'</option>'; }).join('');
+  }
+  // Preview da imagem
+  var prev=document.getElementById('nf-preview-m');
+  if(prev&&_nfImgB64M){ prev.src='data:'+_nfImgMimeM+';base64,'+_nfImgB64M; prev.style.display='block'; }
+  // Limpa campos
+  ['nf-data-m','nf-num-m','nf-rs-m','nf-cnpj-m','nf-val-m','nf-obs-m'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.value='';
+  });
+  document.getElementById('nf-data-m').value=new Date().toISOString().split('T')[0];
+  document.getElementById('btn-status-nf-m').style.display='none';
+  abrirModal('modal-nf-m');
+}
+
+async function lerNFcomIAM(){
+  if(!_nfImgB64M){ toastM('Selecione uma imagem'); return; }
+  var cfg=typeof loadCfg==='function'?loadCfg():{};
+  var apiKey=cfg.iakey||localStorage.getItem('gemini_key')||'';
+  if(!apiKey){ toastM('Configure a chave Gemini nas configurações'); return; }
+
+  var btn=document.getElementById('btn-ler-nf-m');
+  btn.disabled=true; btn.innerHTML='<i class="ti ti-loader-2 ti-spin"></i> Lendo...';
+  document.getElementById('btn-status-nf-m').style.display='none';
+
+  try{
+    var prompt='Analise esta nota fiscal e extraia os dados. Retorne SOMENTE JSON:\n'
+      +'{"data":"AAAA-MM-DD","num":"numero NF","rs":"razao social","cnpj":"XX.XXX.XXX/XXXX-XX","valor":0.00}\n'
+      +'- data: data de emissão formato AAAA-MM-DD\n- num: número da NF\n- rs: razão social do emitente\n- cnpj: CNPJ formatado\n- valor: valor total decimal';
+
+    var resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-goog-api-key':apiKey},
+      body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:_nfImgMimeM,data:_nfImgB64M}},{text:prompt}]}],generationConfig:{maxOutputTokens:400,temperature:0.1}})
+    });
+    if(!resp.ok){ var er=await resp.json(); throw new Error(er.error?.message||'Erro '+resp.status); }
+    var data=await resp.json();
+    var txt=(data.candidates?.[0]?.content?.parts?.[0]?.text||'').trim();
+    var jm=txt.match(/\{[\s\S]*\}/);
+    if(!jm) throw new Error('IA não retornou JSON');
+    var p=JSON.parse(jm[0]);
+
+    if(p.data) document.getElementById('nf-data-m').value=p.data;
+    if(p.num)  document.getElementById('nf-num-m').value=p.num;
+    if(p.rs)   document.getElementById('nf-rs-m').value=p.rs;
+    if(p.cnpj) document.getElementById('nf-cnpj-m').value=p.cnpj;
+    if(p.valor)document.getElementById('nf-val-m').value=p.valor;
+
+    var st=document.getElementById('btn-status-nf-m');
+    st.style.display='block';
+    st.innerHTML='<span style="color:var(--grn);font-size:12px"><i class="ti ti-check"></i> IA leu os dados! Confira e salve.</span>';
+    toastM('✅ Dados extraídos! Confira os campos.');
+
+  }catch(err){
+    toastM('Erro: '+err.message);
+    var st=document.getElementById('btn-status-nf-m');
+    st.style.display='block';
+    st.innerHTML='<span style="color:var(--red);font-size:12px"><i class="ti ti-alert"></i> '+err.message+'. Preencha manualmente.</span>';
+  }finally{
+    btn.disabled=false; btn.innerHTML='<i class="ti ti-sparkles"></i> Ler com IA';
+  }
+}
+
+function salvarNFM(){
+  var rs=document.getElementById('nf-rs-m')?.value.trim();
+  var val=parseFloat(document.getElementById('nf-val-m')?.value)||0;
+  var fin=document.getElementById('nf-fin-m')?.value;
+  if(!rs){ toastM('Informe a razão social'); return; }
+  if(!val){ toastM('Informe o valor'); return; }
+
+  var nf={
+    id:_nfEditIdM||uid(),
+    data:document.getElementById('nf-data-m')?.value||new Date().toISOString().split('T')[0],
+    num:document.getElementById('nf-num-m')?.value.trim()||'',
+    rs:rs, cnpj:document.getElementById('nf-cnpj-m')?.value.trim()||'',
+    valor:val, finalidade:fin||'Diversos',
+    obs:document.getElementById('nf-obs-m')?.value.trim()||'',
+    imgB64:_nfImgB64M, imgMime:_nfImgMimeM,
+    dtCad:new Date().toISOString().split('T')[0]
+  };
+
+  if(!DB.fiscal) DB.fiscal=[];
+  if(_nfEditIdM){
+    var idx=DB.fiscal.findIndex(function(x){return x.id===_nfEditIdM;});
+    if(idx>=0) DB.fiscal[idx]=nf;
+  } else { DB.fiscal.push(nf); }
+
+  salvarDB(); fecharModal('modal-nf-m');
+  if(nf.data){ _fiscalMesM=parseInt(nf.data.slice(5,7))-1; _fiscalAnoM=parseInt(nf.data.slice(0,4)); }
+  _nfImgB64M=null; _nfEditIdM=null;
+  renderFiscalM();
+  toastM('✅ NF salva!');
+}
+
+function abrirDetalhesNFM(id){
+  var n=(DB.fiscal||[]).find(function(x){return x.id===id;}); if(!n) return;
+  _nfEditIdM=id;
+  _nfImgB64M=n.imgB64||null;
+  _nfImgMimeM=n.imgMime||'image/jpeg';
+
+  var prev=document.getElementById('nf-preview-m');
+  if(prev){ prev.src=_nfImgB64M?'data:'+_nfImgMimeM+';base64,'+_nfImgB64M:''; prev.style.display=_nfImgB64M?'block':'none'; }
+  document.getElementById('nf-data-m').value=n.data||'';
+  document.getElementById('nf-num-m').value=n.num||'';
+  document.getElementById('nf-rs-m').value=n.rs||'';
+  document.getElementById('nf-cnpj-m').value=n.cnpj||'';
+  document.getElementById('nf-val-m').value=n.valor||'';
+  document.getElementById('nf-obs-m').value=n.obs||'';
+  var sel=document.getElementById('nf-fin-m');
+  if(sel){ sel.innerHTML=(DB.finalidades||[]).map(function(f){return '<option'+(f===n.finalidade?' selected':'')+'>'+f+'</option>';}).join(''); }
+  document.getElementById('btn-status-nf-m').style.display='none';
+  abrirModal('modal-nf-m');
+}
+
+function excluirNFM(id){
+  if(!confirm('Excluir esta NF?')) return;
+  DB.fiscal=(DB.fiscal||[]).filter(function(x){return x.id!==id;});
+  salvarDB(); fecharModal('modal-nf-m'); renderFiscalM(); toastM('NF removida!');
+}
+// ══ FIM MÓDULO FISCAL MOBILE ══
 
 // ══ PÓS-VENDAS MOBILE ══
 // Carrega enviados do dia do localStorage
@@ -2411,5 +2647,52 @@ window.addEventListener('load', function(){
   setTimeout(verificarAlertaManhaM, 2000);
 });
 </script>
+
+<!-- MODAL NF MOBILE -->
+<div class="mbg" id="modal-nf-m">
+<div class="modal-sheet" style="background:var(--s1);border-radius:16px 16px 0 0;position:fixed;bottom:0;left:0;right:0;max-height:95vh;overflow-y:auto;padding:16px;z-index:200">
+  <div style="width:36px;height:4px;background:var(--bdr);border-radius:2px;margin:0 auto 14px"></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+    <div style="font-size:16px;font-weight:700;color:var(--t1)"><i class="ti ti-receipt" style="color:#185FA5"></i> Nota Fiscal</div>
+    <button onclick="fecharModal('modal-nf-m')" style="background:none;border:none;font-size:24px;color:var(--t3);cursor:pointer">✕</button>
+  </div>
+
+  <!-- Preview imagem -->
+  <img id="nf-preview-m" style="display:none;width:100%;max-height:160px;object-fit:contain;border-radius:10px;border:1px solid var(--bdr);margin-bottom:10px;background:var(--s2)">
+
+  <!-- Botão IA -->
+  <button id="btn-ler-nf-m" onclick="lerNFcomIAM()" style="width:100%;padding:11px;border:none;border-radius:10px;background:linear-gradient(135deg,#0C447C,#185FA5);color:#fff;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px">
+    <i class="ti ti-sparkles" style="font-size:18px"></i> Ler NF com IA (Gemini)
+  </button>
+  <div id="btn-status-nf-m" style="display:none;margin-bottom:10px;text-align:center"></div>
+
+  <!-- Campos -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+    <div><label style="font-size:11px;color:var(--t3);text-transform:uppercase">Data</label>
+      <input class="fi" id="nf-data-m" type="date" style="width:100%;margin-top:3px"></div>
+    <div><label style="font-size:11px;color:var(--t3);text-transform:uppercase">Nº NF</label>
+      <input class="fi" id="nf-num-m" placeholder="Ex: 4521" style="width:100%;margin-top:3px"></div>
+  </div>
+  <div style="margin-bottom:10px"><label style="font-size:11px;color:var(--t3);text-transform:uppercase">Razão Social *</label>
+    <input class="fi" id="nf-rs-m" placeholder="Nome do emitente" style="width:100%;margin-top:3px"></div>
+  <div style="margin-bottom:10px"><label style="font-size:11px;color:var(--t3);text-transform:uppercase">CNPJ</label>
+    <input class="fi" id="nf-cnpj-m" placeholder="XX.XXX.XXX/XXXX-XX" style="width:100%;margin-top:3px"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+    <div><label style="font-size:11px;color:var(--t3);text-transform:uppercase">Valor R$ *</label>
+      <input class="fi" id="nf-val-m" type="number" step="0.01" placeholder="0,00" style="width:100%;margin-top:3px"></div>
+    <div><label style="font-size:11px;color:var(--t3);text-transform:uppercase">Finalidade *</label>
+      <select class="fi" id="nf-fin-m" style="width:100%;margin-top:3px"></select></div>
+  </div>
+  <div style="margin-bottom:14px"><label style="font-size:11px;color:var(--t3);text-transform:uppercase">Observação</label>
+    <input class="fi" id="nf-obs-m" placeholder="Opcional..." style="width:100%;margin-top:3px"></div>
+
+  <!-- Botões ação -->
+  <div style="display:flex;gap:10px">
+    <button onclick="excluirNFM(_nfEditIdM)" id="btn-del-nf-m" style="padding:12px;border:1px solid var(--red);border-radius:10px;background:none;color:var(--red);cursor:pointer;font-size:13px"><i class="ti ti-trash"></i></button>
+    <button onclick="salvarNFM()" style="flex:1;padding:12px;border:none;border-radius:10px;background:var(--acc);color:#fff;font-size:14px;font-weight:600;cursor:pointer"><i class="ti ti-check"></i> Salvar NF</button>
+  </div>
+</div>
+</div>
+
 </body>
 </html>
