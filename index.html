@@ -421,16 +421,33 @@ function carregarDB(){
   DB.pedidos  = load('pedidos');
   DB.tarefas  = load('tarefas',[]);
   DB.eventos     = load('eventos',[]);
-  DB.fiscal      = load('fiscal',[]);
+  // Carrega fiscal e restaura imagens das chaves separadas
+  var fiscalBase = load('fiscal',[]);
+  DB.fiscal = fiscalBase.map(function(n){
+    try{
+      var imgData=localStorage.getItem('repcm_nf_img_'+n.id);
+      if(imgData){ var p=JSON.parse(imgData); n.imgB64=p.b64; n.imgMime=p.mime||'image/jpeg'; }
+    }catch(e){}
+    return n;
+  });
   DB.finalidades = load('finalidades',['Combustível','Alimentação','Hospedagem','Impostos','Diversos','Captação','Manutenção','Comunicação']);
 }
 function salvarDB(){
-  save('empresas', DB.empresas);
-  save('clientes', DB.clientes);
-  save('pedidos',  DB.pedidos);
-  save('tarefas',  DB.tarefas);
+  save('empresas',   DB.empresas);
+  save('clientes',   DB.clientes);
+  save('pedidos',    DB.pedidos);
+  save('tarefas',    DB.tarefas);
   save('eventos',    DB.eventos);
-  save('fiscal',      DB.fiscal||[]);
+  // Salva fiscal sem as imagens no localStorage (imagens ficam em chave separada)
+  var fiscalSemImg=(DB.fiscal||[]).map(function(n){
+    var copia=Object.assign({},n);
+    if(copia.imgB64){
+      try{ localStorage.setItem('repcm_nf_img_'+n.id, JSON.stringify({b64:n.imgB64,mime:n.imgMime||'image/jpeg'})); }catch(e){}
+      delete copia.imgB64; delete copia.imgMime;
+    }
+    return copia;
+  });
+  save('fiscal',      fiscalSemImg);
   save('finalidades', DB.finalidades||[]);
   salvarNuvemM();
 }
@@ -811,12 +828,23 @@ function fmtDM(s){ if(!s) return ''; var p=s.split('-'); return p[2]+'/'+p[1]+'/
 // Captura foto e abre modal de leitura IA
 function nfCapturaM(input){
   var file=input.files[0]; if(!file) return;
-  _nfImgMimeM=file.type||'image/jpeg';
+  _nfImgMimeM='image/jpeg'; // sempre salva como JPEG comprimido
   var reader=new FileReader();
   reader.onload=function(e){
-    _nfImgB64M=e.target.result.split(',')[1];
-    _nfEditIdM=null;
-    abrirModalLerNFM();
+    // Comprime a imagem antes de armazenar
+    var img=new Image();
+    img.onload=function(){
+      var canvas=document.createElement('canvas');
+      var MAX=800; // máximo 800px
+      var ratio=Math.min(MAX/img.width, MAX/img.height, 1);
+      canvas.width=Math.round(img.width*ratio);
+      canvas.height=Math.round(img.height*ratio);
+      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+      _nfImgB64M=canvas.toDataURL('image/jpeg',0.7).split(',')[1];
+      _nfEditIdM=null;
+      abrirModalLerNFM();
+    };
+    img.src=e.target.result;
   };
   reader.readAsDataURL(file);
 }
@@ -986,8 +1014,12 @@ function abrirDetalhesNFM(id){
 
 function excluirNFM(id){
   if(!confirm('Excluir esta NF?')) return;
+  var removed=DB.fiscal.find(function(x){return x.id===id;});
+  if(removed) try{localStorage.removeItem('repcm_nf_img_'+id);}catch(e){}
   DB.fiscal=(DB.fiscal||[]).filter(function(x){return x.id!==id;});
-  salvarDB(); fecharModal('modal-nf-m'); renderFiscalM(); toastM('NF removida!');
+  salvarDB();
+  var mEl=document.getElementById('modal-nf-m'); if(mEl) mEl.classList.remove('open');
+  renderFiscalM(); toastM('NF removida!');
 }
 // ══ FIM MÓDULO FISCAL MOBILE ══
 
@@ -2213,7 +2245,8 @@ function salvarNuvemM(){
     pedidos:     DB.pedidos,
     tarefas:     DB.tarefas,
     eventos:     DB.eventos,
-    fiscal:      DB.fiscal      || [],
+    // Envia fiscal sem imagens para o Firebase (imagens ficam no dispositivo)
+    fiscal:      (DB.fiscal||[]).map(function(n){var c=Object.assign({},n);delete c.imgB64;delete c.imgMime;return c;}),
     finalidades: DB.finalidades || [],
     leads:       DB.leads       || [],
     cicloAcoes:  DB.cicloAcoes  || {},
