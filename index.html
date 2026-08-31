@@ -777,12 +777,12 @@ function renderFiscalM(){
     html+='<div style="font-size:12px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:8px">Notas Fiscais</div>';
     nfs.forEach(function(n){
       var bg=fiscalBgFinM(n.finalidade); var txt=fiscalTxtFinM(n.finalidade);
-      html+='<div class="card" style="margin-bottom:10px;overflow:hidden" onclick="abrirDetalhesNFM(\''+n.id+'\')">';
+      html+='<div class="card" style="margin-bottom:10px;overflow:hidden">';
       // Foto da NF se existir
       if(n.imgB64){
-        html+='<img src="data:'+n.imgMime+';base64,'+n.imgB64+'" style="width:100%;height:100px;object-fit:cover;display:block">';
+        html+='<img src="data:'+n.imgMime+';base64,'+n.imgB64+'" style="width:100%;height:100px;object-fit:cover;display:block" onclick="abrirDetalhesNFM(\''+n.id+'\')">';
       }
-      html+='<div style="padding:10px 12px">';
+      html+='<div style="padding:10px 12px" onclick="abrirDetalhesNFM(\''+n.id+'\')">';
       html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">';
       html+='<div><div style="font-weight:700;font-size:14px;color:var(--t1)">'+(n.rs||'—')+'</div>';
       html+='<div style="font-size:11px;color:var(--t3);margin-top:2px">'+(n.cnpj||'')+'</div></div>';
@@ -793,7 +793,10 @@ function renderFiscalM(){
       html+='<span style="background:'+bg+';color:'+txt+';border-radius:10px;padding:2px 10px;font-size:10px;font-weight:600">'+(n.finalidade||'—')+'</span>';
       html+='<span style="font-size:11px;color:var(--t3)">'+(n.num?'NF '+n.num:'')+'</span>';
       html+='</div>';
+      html+='<div style="display:flex;align-items:center;gap:8px">';
       html+='<span style="font-size:11px;color:var(--t3)">'+(fmtDM(n.data)||'—')+'</span>';
+      html+='<button onclick="event.stopPropagation();if(confirm(\'Excluir esta NF?\'))excluirNFM(\''+n.id+'\')" style="background:none;border:1px solid var(--red);border-radius:8px;padding:4px 8px;color:var(--red);cursor:pointer;font-size:13px;line-height:1"><i class="ti ti-trash"></i></button>';
+      html+='</div>';
       html+='</div></div></div>';
     });
   }
@@ -847,72 +850,118 @@ async function lerNFcomIAM(){
   document.getElementById('btn-status-nf-m').style.display='none';
 
   try{
-    var prompt='Analise esta nota fiscal e extraia os dados. Retorne SOMENTE JSON:\n'
-      +'{"data":"AAAA-MM-DD","num":"numero NF","rs":"razao social","cnpj":"XX.XXX.XXX/XXXX-XX","valor":0.00}\n'
-      +'- data: data de emissão formato AAAA-MM-DD\n- num: número da NF\n- rs: razão social do emitente\n- cnpj: CNPJ formatado\n- valor: valor total decimal';
+    var prompt='Você é um leitor de notas fiscais. Analise a imagem e extraia os dados.\n\n'
+      +'Responda APENAS com um objeto JSON puro, sem markdown, sem explicações, sem ```json, somente o JSON:\n'
+      +'{"data":"2026-08-31","num":"12345","rs":"Nome do Emitente","cnpj":"00.000.000/0000-00","valor":99.90}\n\n'
+      +'Instruções:\n'
+      +'- data: data de emissão no formato AAAA-MM-DD (ex: 2026-08-31)\n'
+      +'- num: número da nota fiscal (só números)\n'
+      +'- rs: razão social ou nome do estabelecimento emitente\n'
+      +'- cnpj: CNPJ do emitente com formatação XX.XXX.XXX/XXXX-XX\n'
+      +'- valor: valor total da nota como número decimal (ex: 118.80)\n'
+      +'- Se não encontrar um campo, use string vazia "" ou 0\n'
+      +'- NÃO use markdown, NÃO use ```json, retorne SOMENTE o JSON puro';
 
-    var resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',{
+    var resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-goog-api-key':apiKey},
-      body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:_nfImgMimeM,data:_nfImgB64M}},{text:prompt}]}],generationConfig:{maxOutputTokens:400,temperature:0.1}})
+      body:JSON.stringify({
+        contents:[{parts:[{inline_data:{mime_type:_nfImgMimeM,data:_nfImgB64M}},{text:prompt}]}],
+        generationConfig:{maxOutputTokens:400,temperature:0.1,responseMimeType:'application/json'}
+      })
     });
     if(!resp.ok){ var er=await resp.json(); throw new Error(er.error?.message||'Erro '+resp.status); }
     var data=await resp.json();
     var txt=(data.candidates?.[0]?.content?.parts?.[0]?.text||'').trim();
-    var jm=txt.match(/\{[\s\S]*\}/);
-    if(!jm) throw new Error('IA não retornou JSON');
-    var p=JSON.parse(jm[0]);
 
-    if(p.data) document.getElementById('nf-data-m').value=p.data;
-    if(p.num)  document.getElementById('nf-num-m').value=p.num;
-    if(p.rs)   document.getElementById('nf-rs-m').value=p.rs;
-    if(p.cnpj) document.getElementById('nf-cnpj-m').value=p.cnpj;
-    if(p.valor)document.getElementById('nf-val-m').value=p.valor;
+    // Tenta extrair JSON de várias formas
+    var parsed=null;
+    // Tenta parse direto
+    try{ parsed=JSON.parse(txt); } catch(e){}
+    // Tenta extrair bloco JSON com regex
+    if(!parsed){
+      var jm=txt.match(/\{[\s\S]*?\}/);
+      if(jm) try{ parsed=JSON.parse(jm[0]); } catch(e){}
+    }
+    // Remove markdown e tenta de novo
+    if(!parsed){
+      var clean=txt.replace(/```json/gi,'').replace(/```/g,'').trim();
+      try{ parsed=JSON.parse(clean); } catch(e){}
+    }
+
+    if(!parsed) throw new Error('IA não retornou JSON. Resposta: '+txt.slice(0,100));
+
+    if(parsed.data) document.getElementById('nf-data-m').value=parsed.data;
+    if(parsed.num)  document.getElementById('nf-num-m').value=parsed.num;
+    if(parsed.rs)   document.getElementById('nf-rs-m').value=parsed.rs;
+    if(parsed.cnpj) document.getElementById('nf-cnpj-m').value=parsed.cnpj;
+    if(parsed.valor)document.getElementById('nf-val-m').value=parsed.valor;
 
     var st=document.getElementById('btn-status-nf-m');
     st.style.display='block';
-    st.innerHTML='<span style="color:var(--grn);font-size:12px"><i class="ti ti-check"></i> IA leu os dados! Confira e salve.</span>';
-    toastM('✅ Dados extraídos! Confira os campos.');
+    st.innerHTML='<span style="color:var(--grn);font-size:12px"><i class="ti ti-check"></i> Dados extraídos! Confira e salve.</span>';
+    toastM('✅ NF lida com sucesso!');
 
   }catch(err){
-    toastM('Erro: '+err.message);
     var st=document.getElementById('btn-status-nf-m');
     st.style.display='block';
-    st.innerHTML='<span style="color:var(--red);font-size:12px"><i class="ti ti-alert"></i> '+err.message+'. Preencha manualmente.</span>';
+    st.innerHTML='<span style="color:var(--red);font-size:12px"><i class="ti ti-alert-triangle"></i> '+err.message+'. Preencha manualmente.</span>';
+    toastM('Erro: '+err.message);
   }finally{
     btn.disabled=false; btn.innerHTML='<i class="ti ti-sparkles"></i> Ler com IA';
   }
 }
-
 function salvarNFM(){
+  // Previne duplo clique
+  var btnSalvar = document.querySelector('#modal-nf-m .btn-salvar-nf');
+  if(btnSalvar){ btnSalvar.disabled=true; btnSalvar.textContent='Salvando...'; }
+
   var rs=document.getElementById('nf-rs-m')?.value.trim();
   var val=parseFloat(document.getElementById('nf-val-m')?.value)||0;
   var fin=document.getElementById('nf-fin-m')?.value;
-  if(!rs){ toastM('Informe a razão social'); return; }
-  if(!val){ toastM('Informe o valor'); return; }
+
+  if(!rs){ toastM('Informe a razão social');
+    if(btnSalvar){ btnSalvar.disabled=false; btnSalvar.innerHTML='<i class="ti ti-check"></i> Salvar NF'; }
+    return;
+  }
+  if(!val){ toastM('Informe o valor');
+    if(btnSalvar){ btnSalvar.disabled=false; btnSalvar.innerHTML='<i class="ti ti-check"></i> Salvar NF'; }
+    return;
+  }
+
+  // Gera ID fixo antes de salvar para evitar duplicatas
+  var nfId = _nfEditIdM || uid();
 
   var nf={
-    id:_nfEditIdM||uid(),
-    data:document.getElementById('nf-data-m')?.value||new Date().toISOString().split('T')[0],
-    num:document.getElementById('nf-num-m')?.value.trim()||'',
-    rs:rs, cnpj:document.getElementById('nf-cnpj-m')?.value.trim()||'',
+    id: nfId,
+    data: document.getElementById('nf-data-m')?.value||new Date().toISOString().split('T')[0],
+    num:  document.getElementById('nf-num-m')?.value.trim()||'',
+    rs:rs, cnpj: document.getElementById('nf-cnpj-m')?.value.trim()||'',
     valor:val, finalidade:fin||'Diversos',
-    obs:document.getElementById('nf-obs-m')?.value.trim()||'',
+    obs:  document.getElementById('nf-obs-m')?.value.trim()||'',
     imgB64:_nfImgB64M, imgMime:_nfImgMimeM,
     dtCad:new Date().toISOString().split('T')[0]
   };
 
   if(!DB.fiscal) DB.fiscal=[];
-  if(_nfEditIdM){
-    var idx=DB.fiscal.findIndex(function(x){return x.id===_nfEditIdM;});
-    if(idx>=0) DB.fiscal[idx]=nf;
-  } else { DB.fiscal.push(nf); }
+  var existeIdx = DB.fiscal.findIndex(function(x){return x.id===nfId;});
+  if(existeIdx>=0){ DB.fiscal[existeIdx]=nf; }
+  else { DB.fiscal.push(nf); }
 
-  salvarDB(); fecharModal('modal-nf-m');
+  salvarDB();
+
+  // Fecha modal diretamente
+  var modalEl = document.getElementById('modal-nf-m');
+  if(modalEl) modalEl.classList.remove('open');
+
+  // Navega para o mês da NF
   if(nf.data){ _fiscalMesM=parseInt(nf.data.slice(5,7))-1; _fiscalAnoM=parseInt(nf.data.slice(0,4)); }
+
+  // Limpa estado
   _nfImgB64M=null; _nfEditIdM=null;
+
   renderFiscalM();
-  toastM('✅ NF salva!');
+  toastM('✅ NF salva com sucesso!');
 }
 
 function abrirDetalhesNFM(id){
@@ -2689,7 +2738,7 @@ window.addEventListener('load', function(){
   <!-- Botões ação -->
   <div style="display:flex;gap:10px">
     <button onclick="if(_nfEditIdM)excluirNFM(_nfEditIdM)" id="btn-del-nf-m" style="padding:12px;border:1px solid var(--red);border-radius:10px;background:none;color:var(--red);cursor:pointer;font-size:13px"><i class="ti ti-trash"></i></button>
-    <button onclick="salvarNFM()" style="flex:1;padding:12px;border:none;border-radius:10px;background:var(--acc);color:#fff;font-size:14px;font-weight:600;cursor:pointer"><i class="ti ti-check"></i> Salvar NF</button>
+    <button onclick="salvarNFM()" class="btn-salvar-nf" style="flex:1;padding:12px;border:none;border-radius:10px;background:var(--acc);color:#fff;font-size:14px;font-weight:600;cursor:pointer"><i class="ti ti-check"></i> Salvar NF</button>
   </div>
 </div>
 </div>
