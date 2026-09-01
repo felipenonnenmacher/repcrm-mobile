@@ -755,6 +755,16 @@ function renderFiscalM(){
   if(!DB.fiscal) DB.fiscal=[];
   if(!DB.finalidades) DB.finalidades=['Combustível','Alimentação','Hospedagem','Impostos','Diversos','Captação'];
 
+  // Restaura imagens faltando do localStorage antes de renderizar
+  DB.fiscal.forEach(function(n){
+    if(!n.imgB64){
+      try{
+        var raw=localStorage.getItem('repcm_nf_img_'+n.id);
+        if(raw){ var p=JSON.parse(raw); n.imgB64=p.b64; n.imgMime=p.mime||'image/jpeg'; }
+      }catch(e){}
+    }
+  });
+
   var mesStr=_fiscalAnoM+'-'+String(_fiscalMesM+1).padStart(2,'0');
   var nfs=DB.fiscal.filter(function(n){return n.data&&n.data.startsWith(mesStr);});
   nfs.sort(function(a,b){return (b.data||'')>(a.data||'')?1:-1;});
@@ -828,19 +838,18 @@ function fmtDM(s){ if(!s) return ''; var p=s.split('-'); return p[2]+'/'+p[1]+'/
 // Captura foto e abre modal de leitura IA
 function nfCapturaM(input){
   var file=input.files[0]; if(!file) return;
-  _nfImgMimeM='image/jpeg'; // sempre salva como JPEG comprimido
+  _nfImgMimeM='image/jpeg';
   var reader=new FileReader();
   reader.onload=function(e){
-    // Comprime a imagem antes de armazenar
     var img=new Image();
     img.onload=function(){
       var canvas=document.createElement('canvas');
-      var MAX=800; // máximo 800px
-      var ratio=Math.min(MAX/img.width, MAX/img.height, 1);
+      var MAX=800; var ratio=Math.min(MAX/img.width, MAX/img.height, 1);
       canvas.width=Math.round(img.width*ratio);
       canvas.height=Math.round(img.height*ratio);
       canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
-      _nfImgB64M=canvas.toDataURL('image/jpeg',0.7).split(',')[1];
+      _nfImgB64M=canvas.toDataURL('image/jpeg',0.65).split(',')[1];
+      _nfImgMimeM='image/jpeg';
       _nfEditIdM=null;
       abrirModalLerNFM();
     };
@@ -975,6 +984,28 @@ function salvarNFM(){
   var existeIdx = DB.fiscal.findIndex(function(x){return x.id===nfId;});
   if(existeIdx>=0){ DB.fiscal[existeIdx]=nf; }
   else { DB.fiscal.push(nf); }
+
+  // Salva imagem SEPARADA no localStorage (evita quota)
+  if(nf.imgB64){
+    try{
+      localStorage.setItem('repcm_nf_img_'+nfId, JSON.stringify({b64:nf.imgB64, mime:nf.imgMime||'image/jpeg'}));
+    }catch(e){
+      // Tenta com qualidade menor se falhar por quota
+      try{
+        var img2=new Image();
+        img2.onload=function(){
+          var c2=document.createElement('canvas');
+          var r2=Math.min(600/img2.width,600/img2.height,1);
+          c2.width=Math.round(img2.width*r2); c2.height=Math.round(img2.height*r2);
+          c2.getContext('2d').drawImage(img2,0,0,c2.width,c2.height);
+          var b2=c2.toDataURL('image/jpeg',0.5).split(',')[1];
+          localStorage.setItem('repcm_nf_img_'+nfId, JSON.stringify({b64:b2,mime:'image/jpeg'}));
+          nf.imgB64=b2;
+        };
+        img2.src='data:image/jpeg;base64,'+nf.imgB64;
+      }catch(e2){ toastM('⚠️ Foto não salva: armazenamento cheio'); }
+    }
+  }
 
   salvarDB();
 
