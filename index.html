@@ -989,6 +989,8 @@ function salvarNFM(){
   if(nf.imgB64){
     try{
       localStorage.setItem('repcm_nf_img_'+nfId, JSON.stringify({b64:nf.imgB64, mime:nf.imgMime||'image/jpeg'}));
+      // Sincroniza a foto pela nuvem, pra aparecer nos outros aparelhos
+      if(fbRefImgsM){ fbRefImgsM.child(nfId).set({b64:nf.imgB64, mime:nf.imgMime||'image/jpeg'}).catch(function(){}); }
     }catch(e){
       // Tenta com qualidade menor se falhar por quota
       try{
@@ -1001,6 +1003,7 @@ function salvarNFM(){
           var b2=c2.toDataURL('image/jpeg',0.5).split(',')[1];
           localStorage.setItem('repcm_nf_img_'+nfId, JSON.stringify({b64:b2,mime:'image/jpeg'}));
           nf.imgB64=b2;
+          if(fbRefImgsM){ fbRefImgsM.child(nfId).set({b64:b2, mime:'image/jpeg'}).catch(function(){}); }
         };
         img2.src='data:image/jpeg;base64,'+nf.imgB64;
       }catch(e2){ toastM('⚠️ Foto não salva: armazenamento cheio'); }
@@ -1047,6 +1050,7 @@ function excluirNFM(id){
   if(!confirm('Excluir esta NF?')) return;
   var removed=DB.fiscal.find(function(x){return x.id===id;});
   if(removed) try{localStorage.removeItem('repcm_nf_img_'+id);}catch(e){}
+  if(fbRefImgsM){ fbRefImgsM.child(id).remove().catch(function(){}); }
   DB.fiscal=(DB.fiscal||[]).filter(function(x){return x.id!==id;});
   salvarDB();
   var mEl=document.getElementById('modal-nf-m'); if(mEl) mEl.classList.remove('open');
@@ -2187,9 +2191,31 @@ function parseFbConfig(raw){
 }
 var fbDBM  = null;
 var fbRefM = null;
+var fbRefImgsM = null;
 var fbEscutandoM = false;
 
 function fbChaveM(){ return localStorage.getItem('fb_chave')||'repcrm'; }
+
+// Aplica no app uma foto de NF que chegou de outro aparelho (via Firebase)
+function aplicarImagemFiscalRemotaM(id, dados){
+  if(!id || !dados || !dados.b64) return;
+  try{
+    var atual=localStorage.getItem('repcm_nf_img_'+id);
+    if(atual){ var p=JSON.parse(atual); if(p.b64===dados.b64) return; }
+  }catch(e){}
+  try{ localStorage.setItem('repcm_nf_img_'+id, JSON.stringify({b64:dados.b64, mime:dados.mime||'image/jpeg'})); }catch(e){}
+  var n=(DB.fiscal||[]).find(function(x){ return x.id===id; });
+  if(n){ n.imgB64=dados.b64; n.imgMime=dados.mime||'image/jpeg'; }
+  if(paginaAtual==='fiscal') renderFiscalM();
+}
+// Remove localmente a foto de uma NF quando ela é apagada em outro aparelho
+function removerImagemFiscalLocalM(id){
+  if(!id) return;
+  try{ localStorage.removeItem('repcm_nf_img_'+id); }catch(e){}
+  var n=(DB.fiscal||[]).find(function(x){ return x.id===id; });
+  if(n){ delete n.imgB64; delete n.imgMime; }
+  if(paginaAtual==='fiscal') renderFiscalM();
+}
 
 function setSyncStatusM(status){
   var btn = document.getElementById('btn-nuvem-m');
@@ -2218,11 +2244,17 @@ function initFirebaseM(){
     else fbAppM = firebase.app();
     fbDBM = firebase.database();
     fbRefM = fbDBM.ref(fbChaveM()+'/db');
+    fbRefImgsM = fbDBM.ref(fbChaveM()+'/fiscalImgs');
     firebase.database().ref('.info/connected').on('value', function(snap){
       setSyncStatusM(snap.val() ? 'conectado' : 'offline');
     });
     if(!fbEscutandoM){
       fbEscutandoM = true;
+      // Fotos das NFs sincronizam à parte (não junto do resto do CRM), pra não
+      // deixar toda sincronização pesada — cada foto vai e vem sozinha.
+      fbRefImgsM.on('child_added',   function(snap){ aplicarImagemFiscalRemotaM(snap.key, snap.val()); });
+      fbRefImgsM.on('child_changed', function(snap){ aplicarImagemFiscalRemotaM(snap.key, snap.val()); });
+      fbRefImgsM.on('child_removed', function(snap){ removerImagemFiscalLocalM(snap.key); });
       fbRefM.on('value', function(snap){
         var remoto = snap.val();
         if(!remoto) return;
