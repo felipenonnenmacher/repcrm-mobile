@@ -2334,7 +2334,10 @@ function abrirModalNuvemM(){
 }
 
 function salvarCfgNuvemM(){
-  var raw = document.getElementById('nuvem-cfg-m').value.trim();
+  var raw = document.getElementById('nuvem-cfg-m').value.trim() || localStorage.getItem('fb_config') || '';
+  if(!raw && typeof FB_CONFIG_PADRAO_M!=='undefined' && FB_CONFIG_PADRAO_M && FB_CONFIG_PADRAO_M.apiKey){
+    raw = JSON.stringify(FB_CONFIG_PADRAO_M);
+  }
   var chave = document.getElementById('nuvem-chave-m').value.trim()||'repcrm';
   var s = document.getElementById('nuvem-status-m');
   try { var cfg = parseFbConfig(raw); raw = JSON.stringify(cfg); } catch(e){ s.textContent='❌ JSON inválido'; s.style.color='var(--red)'; return; }
