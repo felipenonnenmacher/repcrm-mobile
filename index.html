@@ -873,6 +873,10 @@ function abrirModalLerNFM(){
   });
   document.getElementById('nf-data-m').value=new Date().toISOString().split('T')[0];
   document.getElementById('btn-status-nf-m').style.display='none';
+  // Garante que o botão "Salvar NF" está habilitado toda vez que o modal
+  // abre (segurança extra, além do reset feito no fim de salvarNFM()).
+  var btnSalvarReset=document.querySelector('#modal-nf-m .btn-salvar-nf');
+  if(btnSalvarReset){ btnSalvarReset.disabled=false; btnSalvarReset.innerHTML='<i class="ti ti-check"></i> Salvar NF'; }
   abrirModal('modal-nf-m');
   // Lê automaticamente com IA assim que a foto é selecionada — sem precisar
   // tocar em "Ler com IA" (só dispara se houver uma chave configurada nas
@@ -909,19 +913,35 @@ async function lerNFcomIAM(){
 
     var isGemini=!apiKey.startsWith('sk-ant-');
     var txt;
+    var _finishReason='';
 
     if(isGemini){
-      var resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent',{
-        method:'POST',
-        headers:{'Content-Type':'application/json','x-goog-api-key':apiKey},
-        body:JSON.stringify({
-          contents:[{parts:[{inline_data:{mime_type:_nfImgMimeM,data:_nfImgB64M}},{text:prompt}]}],
-          generationConfig:{maxOutputTokens:400,temperature:0.1,responseMimeType:'application/json'}
-        })
-      });
-      if(!resp.ok){ var er=await resp.json(); throw new Error(er.error?.message||'Erro '+resp.status); }
-      var data=await resp.json();
-      txt=(data.candidates?.[0]?.content?.parts?.[0]?.text||'').trim();
+      var callGeminiM=async function(maxTok){
+        var r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent',{
+          method:'POST',
+          headers:{'Content-Type':'application/json','x-goog-api-key':apiKey},
+          body:JSON.stringify({
+            contents:[{parts:[{inline_data:{mime_type:_nfImgMimeM,data:_nfImgB64M}},{text:prompt}]}],
+            generationConfig:{maxOutputTokens:maxTok,temperature:0.1,responseMimeType:'application/json',thinkingConfig:{thinkingBudget:0}}
+          })
+        });
+        if(!r.ok){ var er=await r.json(); throw new Error(er.error?.message||'Erro '+r.status); }
+        var d=await r.json();
+        // Concatena todas as partes de texto (modelos com "thinking" podem
+        // devolver mais de uma parte) — pegar só a parte [0] às vezes vinha
+        // truncado.
+        var partsG=d.candidates?.[0]?.content?.parts||[];
+        return { txt:partsG.map(function(p){return p.text||'';}).join('').trim(), finishReason:d.candidates?.[0]?.finishReason||'' };
+      };
+      var g=await callGeminiM(3072);
+      // Se voltou vazio/curto demais e o motivo foi limite de tokens, o
+      // "thinking" do modelo pode estar consumindo o orçamento mesmo com
+      // thinkingBudget:0 — tenta de novo com um teto bem maior antes de desistir.
+      if((!g.txt || g.txt.length<15) && g.finishReason==='MAX_TOKENS'){
+        g=await callGeminiM(8192);
+      }
+      txt=g.txt;
+      _finishReason=g.finishReason;
     } else {
       // Claude (Anthropic) — mesma chave/detecção usada no assistente de IA do CRM
       var resp=await fetch('https://api.anthropic.com/v1/messages',{
@@ -955,7 +975,7 @@ async function lerNFcomIAM(){
       try{ parsed=JSON.parse(clean); } catch(e){}
     }
 
-    if(!parsed) throw new Error('IA não retornou JSON. Resposta: '+txt.slice(0,100));
+    if(!parsed) throw new Error('IA não retornou JSON'+(_finishReason?(' (motivo: '+_finishReason+')'):'')+'. Resposta: '+(txt||'(vazia)').slice(0,150));
 
     if(parsed.data) document.getElementById('nf-data-m').value=parsed.data;
     if(parsed.num)  document.getElementById('nf-num-m').value=parsed.num;
@@ -1055,6 +1075,12 @@ function salvarNFM(){
   // Limpa estado
   _nfImgB64M=null; _nfEditIdM=null;
 
+  // Reabilita o botão "Salvar NF" — ele foi desabilitado lá em cima pra
+  // evitar duplo clique, mas esse caminho de sucesso nunca reabilitava.
+  // Como o modal é fixo no HTML (não é recriado a cada abertura), o botão
+  // ficava travado desabilitado pra sempre depois da 1ª NF salva.
+  if(btnSalvar){ btnSalvar.disabled=false; btnSalvar.innerHTML='<i class="ti ti-check"></i> Salvar NF'; }
+
   renderFiscalM();
   toastM('✅ NF salva com sucesso!');
 }
@@ -1076,6 +1102,8 @@ function abrirDetalhesNFM(id){
   var sel=document.getElementById('nf-fin-m');
   if(sel){ sel.innerHTML=(DB.finalidades||[]).map(function(f){return '<option'+(f===n.finalidade?' selected':'')+'>'+f+'</option>';}).join(''); }
   document.getElementById('btn-status-nf-m').style.display='none';
+  var btnSalvarReset2=document.querySelector('#modal-nf-m .btn-salvar-nf');
+  if(btnSalvarReset2){ btnSalvarReset2.disabled=false; btnSalvarReset2.innerHTML='<i class="ti ti-check"></i> Salvar NF'; }
   abrirModal('modal-nf-m');
 }
 
