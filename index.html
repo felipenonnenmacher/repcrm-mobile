@@ -874,42 +874,71 @@ function abrirModalLerNFM(){
   document.getElementById('nf-data-m').value=new Date().toISOString().split('T')[0];
   document.getElementById('btn-status-nf-m').style.display='none';
   abrirModal('modal-nf-m');
+  // Lê automaticamente com IA assim que a foto é selecionada — sem precisar
+  // tocar em "Ler com IA" (só dispara se houver uma chave configurada nas
+  // configurações; senão fica como estava, à espera do toque manual).
+  var cfgAuto=typeof loadCfg==='function'?loadCfg():{};
+  if((cfgAuto.iakey||localStorage.getItem('gemini_key'))) lerNFcomIAM();
 }
 
 async function lerNFcomIAM(){
   if(!_nfImgB64M){ toastM('Selecione uma imagem'); return; }
   var cfg=typeof loadCfg==='function'?loadCfg():{};
-  var apiKey=cfg.iakey||localStorage.getItem('gemini_key')||'';
-  if(!apiKey){ toastM('Configure a chave Gemini nas configurações'); return; }
+  var apiKey=(cfg.iakey||localStorage.getItem('gemini_key')||'').trim();
+  if(!apiKey){ toastM('Configure sua API Key nas configurações (Gemini gratuito ou Claude)'); return; }
 
   var btn=document.getElementById('btn-ler-nf-m');
   btn.disabled=true; btn.innerHTML='<i class="ti ti-loader-2 ti-spin"></i> Lendo...';
   document.getElementById('btn-status-nf-m').style.display='none';
 
   try{
+    var finList=JSON.stringify(DB.finalidades||[]);
     var prompt='Você é um leitor de notas fiscais. Analise a imagem e extraia os dados.\n\n'
       +'Responda APENAS com um objeto JSON puro, sem markdown, sem explicações, sem ```json, somente o JSON:\n'
-      +'{"data":"2026-08-31","num":"12345","rs":"Nome do Emitente","cnpj":"00.000.000/0000-00","valor":99.90}\n\n'
+      +'{"data":"2026-08-31","num":"12345","rs":"Nome do Emitente","cnpj":"00.000.000/0000-00","valor":99.90,"finalidade":"Alimentação","obs":"Descrição curta"}\n\n'
       +'Instruções:\n'
       +'- data: data de emissão no formato AAAA-MM-DD (ex: 2026-08-31)\n'
       +'- num: número da nota fiscal (só números)\n'
       +'- rs: razão social ou nome do estabelecimento emitente\n'
       +'- cnpj: CNPJ do emitente com formatação XX.XXX.XXX/XXXX-XX\n'
       +'- valor: valor total da nota como número decimal (ex: 118.80)\n'
+      +'- finalidade: classifique o gasto em UMA destas opções, escrita EXATAMENTE como aparece nesta lista: '+finList+'. Se nenhuma se encaixar bem, use ""\n'
+      +'- obs: descrição curta (até 6 palavras) do que foi comprado, com base nos itens da nota\n'
       +'- Se não encontrar um campo, use string vazia "" ou 0\n'
       +'- NÃO use markdown, NÃO use ```json, retorne SOMENTE o JSON puro';
 
-    var resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-goog-api-key':apiKey},
-      body:JSON.stringify({
-        contents:[{parts:[{inline_data:{mime_type:_nfImgMimeM,data:_nfImgB64M}},{text:prompt}]}],
-        generationConfig:{maxOutputTokens:400,temperature:0.1,responseMimeType:'application/json'}
-      })
-    });
-    if(!resp.ok){ var er=await resp.json(); throw new Error(er.error?.message||'Erro '+resp.status); }
-    var data=await resp.json();
-    var txt=(data.candidates?.[0]?.content?.parts?.[0]?.text||'').trim();
+    var isGemini=!apiKey.startsWith('sk-ant-');
+    var txt;
+
+    if(isGemini){
+      var resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-goog-api-key':apiKey},
+        body:JSON.stringify({
+          contents:[{parts:[{inline_data:{mime_type:_nfImgMimeM,data:_nfImgB64M}},{text:prompt}]}],
+          generationConfig:{maxOutputTokens:400,temperature:0.1,responseMimeType:'application/json'}
+        })
+      });
+      if(!resp.ok){ var er=await resp.json(); throw new Error(er.error?.message||'Erro '+resp.status); }
+      var data=await resp.json();
+      txt=(data.candidates?.[0]?.content?.parts?.[0]?.text||'').trim();
+    } else {
+      // Claude (Anthropic) — mesma chave/detecção usada no assistente de IA do CRM
+      var resp=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        body:JSON.stringify({
+          model:'claude-sonnet-4-6', max_tokens:400,
+          messages:[{role:'user',content:[
+            {type:'image',source:{type:'base64',media_type:_nfImgMimeM,data:_nfImgB64M}},
+            {type:'text',text:prompt}
+          ]}]
+        })
+      });
+      var data=await resp.json();
+      if(data.error) throw new Error(data.error.message||'Erro da API Anthropic');
+      txt=((data.content&&data.content[0]&&data.content[0].text)||'').trim();
+    }
 
     // Tenta extrair JSON de várias formas
     var parsed=null;
@@ -933,6 +962,10 @@ async function lerNFcomIAM(){
     if(parsed.rs)   document.getElementById('nf-rs-m').value=parsed.rs;
     if(parsed.cnpj) document.getElementById('nf-cnpj-m').value=parsed.cnpj;
     if(parsed.valor)document.getElementById('nf-val-m').value=parsed.valor;
+    if(parsed.obs)  document.getElementById('nf-obs-m').value=parsed.obs;
+    if(parsed.finalidade && (DB.finalidades||[]).indexOf(parsed.finalidade)!==-1){
+      var selFin=document.getElementById('nf-fin-m'); if(selFin) selFin.value=parsed.finalidade;
+    }
 
     var st=document.getElementById('btn-status-nf-m');
     st.style.display='block';
