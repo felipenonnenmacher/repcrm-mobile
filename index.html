@@ -922,7 +922,7 @@ async function lerNFcomIAM(){
           headers:{'Content-Type':'application/json','x-goog-api-key':apiKey},
           body:JSON.stringify({
             contents:[{parts:[{inline_data:{mime_type:_nfImgMimeM,data:_nfImgB64M}},{text:prompt}]}],
-            generationConfig:{maxOutputTokens:maxTok,temperature:0.1,responseMimeType:'application/json',thinkingConfig:{thinkingBudget:0}}
+            generationConfig:{maxOutputTokens:maxTok,responseMimeType:'application/json',thinkingConfig:{thinkingLevel:'low'}}
           })
         });
         if(!r.ok){ var er=await r.json(); throw new Error(er.error?.message||'Erro '+r.status); }
