@@ -523,7 +523,7 @@ function renderDashM(){
   var cliEmp=DB.clientes.filter(c=>!c.encerrado&&DB.pedidos.some(p=>p.cliId===c.id&&p.empId===empAtualM));
   var ativos=cliEmp.filter(c=>dias(c)<=60).length;
   var inativos=cliEmp.filter(c=>dias(c)>90).length;
-  var emRisco=cliEmp.filter(c=>{var d=dias(c);return d>=80&&d<=90;});
+  var alertasCiclo=calcAlertasCicloM();
   var pedMes=ps.filter(p=>{if(!p.dt)return false;var d=new Date(p.dt+'T12:00');return d.getMonth()===mes&&d.getFullYear()===ano;});
   var ultPedidos=ps.filter(p=>p.dt).sort((a,b)=>b.dt>a.dt?1:-1).slice(0,30);
   var tarAtraso=DB.tarefas.filter(t=>t.dt&&t.dt<hjStr&&!t.done);
@@ -554,10 +554,43 @@ function renderDashM(){
       <div style="text-align:center"><div style="font-size:10px;color:var(--t3)">Em aberto</div><div style="font-size:14px;font-weight:700;color:var(--org)">${totalAberto}</div></div>
     </div>
   </div>
+  <div style="display:flex;gap:8px;margin:8px 12px 0">
+    ${briefingTileM(DB.tarefas.filter(t=>!t.done&&t.dt&&t.dt<=hjStr).length,'Tarefas pendentes','var(--red)',"navM('agenda')")}
+    ${briefingTileM(alertasCiclo.length,'Hora de comprar','#7c3aed',"document.getElementById('card-alertas-ciclo')?.scrollIntoView({behavior:'smooth'})")}
+    ${briefingTileM(DB.pedidos.filter(p=>!p.dtFat&&!p.nf&&!p.cancelado).length,'Sem NF','var(--org)',"navM('pedidos')")}
+  </div>
   ${tarAtraso.length?`<div class="card" style="margin:8px 12px 0;border-left:3px solid var(--red);padding:10px 12px">
     <div style="font-size:12px;font-weight:700;color:var(--red)"><i class="ti ti-alert-triangle"></i> ${tarAtraso.length} tarefa(s) atrasada(s)</div>
     ${tarAtraso.slice(0,2).map(t=>`<div style="font-size:11px;color:var(--t2);margin-top:4px">• ${t.desc} — ${fmtD(t.dt)}</div>`).join('')}
   </div>`:''}
+  <div class="card" id="card-alertas-ciclo" style="margin:8px 12px 0">
+    <div class="card-title"><i class="ti ti-repeat" style="color:#7c3aed"></i>Alertas de Ciclo de Compra</div>
+    ${!alertasCiclo.length?`<div style="color:var(--grn);font-size:12px;padding:4px 0"><i class="ti ti-circle-check"></i> Todos os clientes dentro do ciclo ou já contatados! 🎉</div>`:
+    alertasCiclo.slice(0,8).map(a=>{
+      var cor=a.atrasado?'var(--red)':a.proximo?'var(--org)':'var(--cyn)';
+      var txt=a.atrasado?'⚠️ Atrasado':a.proximo?'🕐 Próximo':'📅 Mês habitual pendente';
+      return `<div class="list-item" style="flex-wrap:wrap">
+        <div class="list-body" onclick="abrirClienteM('${a.cli.id}')" style="cursor:pointer">
+          <div class="list-name">${a.cli.rs}</div>
+          <div class="list-sub" style="color:${cor}">${txt} · ${a.diasSem}d sem comprar (média ${a.intervMedio}d)</div>
+        </div>
+        <div style="display:flex;gap:4px">
+          <button class="nota-btn" onclick="wppFollowUpCicloM('${a.cli.id}')" title="WhatsApp"><i class="ti ti-brand-whatsapp" style="color:var(--grn)"></i></button>
+          <button class="nota-btn" onclick="emailFollowUpCicloM('${a.cli.id}')" title="E-mail"><i class="ti ti-mail" style="color:var(--acc)"></i></button>
+          <button class="nota-btn" onclick="cicloAcaoM('${a.cli.id}','contatado')" title="Marcar como contatado (some por 7 dias)"><i class="ti ti-phone-check" style="color:var(--grn)"></i></button>
+          <button class="nota-btn" onclick="cicloAcaoM('${a.cli.id}','seminteresse')" title="Sem interesse neste ciclo"><i class="ti ti-x" style="color:var(--red)"></i></button>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>
+  <div class="card" id="card-ia-assistente-m" style="margin:8px 12px 0">
+    <div class="card-title"><i class="ti ti-sparkles" style="color:var(--acc)"></i>Perguntar à IA</div>
+    <div id="ia-msgs-box-m" style="max-height:220px;overflow-y:auto;font-size:12px;margin-bottom:8px"></div>
+    <div style="display:flex;gap:6px">
+      <input id="ia-pergunta-input-m" placeholder="Ex: quais clientes estão em risco?" style="flex:1;border:1px solid var(--bdr);border-radius:8px;padding:8px 10px;font-size:12px;background:var(--s1);color:var(--t1)" onkeydown="if(event.key==='Enter')iaPerguntarLivreM()">
+      <button class="btn bp" style="padding:8px 12px" onclick="iaPerguntarLivreM()"><i class="ti ti-send"></i></button>
+    </div>
+  </div>
   ${renderCardPosVendasM()}
   <div class="emp-tabs">${empTabs}</div>
   <div class="section">
@@ -587,15 +620,6 @@ function renderDashM(){
         </div>
       </div>
     </div>
-    ${emRisco.length?`<div class="card">
-      <div class="card-title"><i class="ti ti-flame" style="color:var(--org)"></i>Em risco (80–90 dias)</div>
-      ${emRisco.slice(0,5).map(c=>`<div class="list-item">
-        <div class="list-body" onclick="abrirClienteM('${c.id}')" style="cursor:pointer">
-          <div class="list-name">${c.rs}</div><div class="list-sub">${dias(c)} dias sem comprar</div>
-        </div>
-        <button class="nota-btn" onclick="wppM('${c.cel||c.fone||''}')"><i class="ti ti-brand-whatsapp" style="color:var(--grn)"></i></button>
-      </div>`).join('')}
-    </div>`:''}
     ${ultPedidos.length?`<div class="card">
       <div class="card-title"><i class="ti ti-shopping-cart" style="color:var(--acc)"></i>Pedidos — ${e?.nome||''} <span style="font-size:10px;background:var(--acc);color:#fff;padding:1px 7px;border-radius:10px;margin-left:4px">${pedMes.length} no mês</span></div>
       ${ultPedidos.map(p=>{var cli=DB.clientes.find(x=>x.id===p.cliId);return `<div class="list-item">
@@ -611,6 +635,175 @@ function renderDashM(){
     </div>
   </div>`;
 }
+
+function briefingTileM(n,lbl,cor,onclick){
+  return `<div style="flex:1;background:var(--s2);border-radius:8px;padding:8px 6px;text-align:center;cursor:pointer" onclick="${onclick}">
+    <div style="font-size:19px;font-weight:800;color:${cor}">${n}</div>
+    <div style="font-size:9.5px;color:var(--t3);line-height:1.2">${lbl}</div>
+  </div>`;
+}
+
+// ══ ALERTAS DE CICLO DE COMPRA (média de intervalo entre pedidos) ══
+// Mesma lógica usada no desktop: para cada cliente ativo com 2+ pedidos,
+// calcula o intervalo médio entre compras e avisa quando já passou desse
+// intervalo (ou quando um "mês habitual" de compra ficou pra trás).
+function calcAlertasCicloM(){
+  var hoje=new Date();
+  var alertas=[];
+  DB.clientes.filter(function(c){return !c.encerrado;}).forEach(function(cli){
+    var peds=DB.pedidos.filter(function(p){return p.cliId===cli.id&&!p.cancelado&&p.dt;});
+    if(peds.length<2) return;
+    var datas=peds.map(function(p){return new Date(p.dt+'T12:00');}).sort(function(a,b){return a-b;});
+    var somaInterv=0;
+    for(var i=1;i<datas.length;i++) somaInterv+=(datas[i]-datas[i-1])/86400000;
+    var intervMedio=Math.round(somaInterv/(datas.length-1));
+    var ultData=datas[datas.length-1];
+    var diasSem=Math.floor((hoje-ultData)/86400000);
+
+    var porAnoMes={};
+    peds.forEach(function(p){
+      var d=new Date(p.dt+'T12:00'); var key=d.getFullYear()+'-'+d.getMonth();
+      if(!porAnoMes[key]) porAnoMes[key]={ano:d.getFullYear(),mes:d.getMonth()};
+    });
+    var mesesFreq={};
+    Object.values(porAnoMes).forEach(function(e){
+      if(!mesesFreq[e.mes]) mesesFreq[e.mes]=[];
+      if(!mesesFreq[e.mes].includes(e.ano)) mesesFreq[e.mes].push(e.ano);
+    });
+    var mesesHab=Object.keys(mesesFreq).filter(function(m){return mesesFreq[m].length>=2;}).map(Number);
+    var compradosMesAno=Object.values(porAnoMes).filter(function(e){return e.ano===hoje.getFullYear();}).map(function(e){return e.mes;});
+    var mesesAtrasados=mesesHab.filter(function(m){return !compradosMesAno.includes(m)&&m<=hoje.getMonth();});
+
+    var atrasado=diasSem>intervMedio*1.3;
+    var proximo=!atrasado&&diasSem>intervMedio*0.85;
+
+    if(atrasado||proximo||mesesAtrasados.length){
+      var e=DB.empresas.find(function(x){return x.id===cli.empId;});
+      alertas.push({cli:cli,e:e,diasSem:diasSem,intervMedio:intervMedio,atrasado:atrasado,proximo:proximo,mesesAtrasados:mesesAtrasados});
+    }
+  });
+  if(!DB.cicloAcoes) DB.cicloAcoes={};
+  var hojeStr=hoje.toISOString().split('T')[0];
+  var filtrados=alertas.filter(function(a){
+    var acao=DB.cicloAcoes[a.cli.id];
+    if(!acao) return true;
+    return acao.ate<hojeStr;
+  });
+  filtrados.sort(function(a,b){return b.diasSem-a.diasSem;});
+  return filtrados;
+}
+function cicloAcaoM(cliId, tipo){
+  if(!DB.cicloAcoes) DB.cicloAcoes={};
+  var hoje=new Date();
+  if(tipo==='contatado'){
+    var ate=new Date(hoje); ate.setDate(ate.getDate()+7);
+    DB.cicloAcoes[cliId]={tipo:'contatado', ate:ate.toISOString().split('T')[0], dt:hoje.toISOString().split('T')[0]};
+    toastM('✅ Marcado como contatado — retorna em 7 dias.');
+  } else {
+    var ate2=new Date(hoje); ate2.setDate(1); ate2.setMonth(ate2.getMonth()+2); ate2.setDate(0);
+    DB.cicloAcoes[cliId]={tipo:'seminteresse', ate:ate2.toISOString().split('T')[0], dt:hoje.toISOString().split('T')[0]};
+    toastM('❌ Removido da lista até '+fmtD(ate2.toISOString().split('T')[0])+'.');
+  }
+  salvarDB();
+  if(paginaAtual==='dash') renderDashM();
+}
+// Follow-up de vendas — WhatsApp/e-mail já com a mensagem pronta; o usuário
+// revisa e confirma o envio no próprio app (nada é enviado automaticamente daqui).
+function wppFollowUpCicloM(cliId){
+  var c=DB.clientes.find(function(x){return x.id===cliId;}); if(!c){ toastM('Cliente não encontrado'); return; }
+  var cel=(c.cel||c.fone||'').replace(/\D/g,'');
+  if(!cel){ toastM('Cliente sem telefone/celular cadastrado.'); return; }
+  var d=dias(c);
+  var msg='Olá'+(c.comp?' '+c.comp:'')+'! Tudo bem? Notei que já faz '+d+' dias desde nossa última venda para a '+c.rs+' e pensei em passar para saber se já está na hora de repor o estoque ou se tem alguma novidade que eu possa te apresentar. Fico à disposição!';
+  if(!cel.startsWith('55')) cel='55'+cel;
+  window.open('https://wa.me/'+cel+'?text='+encodeURIComponent(msg),'_blank');
+}
+function emailFollowUpCicloM(cliId){
+  var c=DB.clientes.find(function(x){return x.id===cliId;}); if(!c){ toastM('Cliente não encontrado'); return; }
+  if(!c.email){ toastM('Cliente sem e-mail cadastrado.'); return; }
+  var d=dias(c);
+  var assunto='Hora de repor o estoque, '+c.rs+'?';
+  var corpo='Olá'+(c.comp?' '+c.comp:'')+'!\n\nNotei que já faz '+d+' dias desde a última compra da '+c.rs+' conosco. Gostaria de saber se está na hora de fazer um novo pedido ou se posso ajudar com alguma novidade em nosso catálogo.\n\nFico à disposição para conversar!';
+  window.location.href='mailto:'+c.email+'?subject='+encodeURIComponent(assunto)+'&body='+encodeURIComponent(corpo);
+  toastM('Abrindo e-mail...');
+}
+// ══ FIM ALERTAS DE CICLO ══
+
+// ══ ASSISTENTE IA (caixa de perguntas digitadas, dashboard) ══
+function iaContextoCompletoM(){
+  var hoje=new Date().toISOString().split('T')[0];
+  var mesAtual=new Date().getMonth(); var anoAtual=new Date().getFullYear();
+  var emRisco=DB.clientes.filter(function(c){var e=DB.empresas.find(function(x){return x.id===c.empId;});return !c.encerrado&&dias(c)>(e?.risco||90);});
+  var fatMes=DB.pedidos.filter(function(p){if(!p.dtFat)return false;var d=new Date(p.dtFat+'T12:00');return d.getMonth()===mesAtual&&d.getFullYear()===anoAtual;}).reduce(function(a,p){return a+(p.valfat||0);},0);
+  var pedAbertos=DB.pedidos.filter(function(p){return !p.dtFat&&!p.cancelado;});
+  var topCli=DB.clientes.filter(function(c){return !c.encerrado;}).map(function(c){var t=DB.pedidos.filter(function(p){return p.cliId===c.id;}).reduce(function(a,p){return a+(p.val||0);},0);return{rs:c.rs,total:t,dias:dias(c)};}).sort(function(a,b){return b.total-a.total;}).slice(0,10);
+  var ciclos=calcAlertasCicloM().slice(0,15).map(function(a){return{rs:a.cli.rs,diasSemCompra:a.diasSem,intervaloMedio:a.intervMedio,situacao:a.atrasado?'atrasado':a.proximo?'proximo':'mes_habitual_pendente'};});
+  return {
+    hoje:hoje, empresas:DB.empresas.map(function(e){return e.nome;}), totalClientes:DB.clientes.filter(function(c){return !c.encerrado;}).length,
+    totalPedidos:DB.pedidos.length, faturamentoMesAtual:fatMes,
+    clientesEmRisco:emRisco.map(function(c){return {nome:c.rs,dias:dias(c)};}).slice(0,20),
+    pedidosEmAberto:pedAbertos.length, topClientes:topCli,
+    ciclosCompraVencidos:ciclos,
+    tarefasPendentes:DB.tarefas.filter(function(t){return !t.done;}).length
+  };
+}
+async function iaClaudeM(prompt, contexto, maxTokens){
+  maxTokens=maxTokens||800;
+  var cfg=loadCfg();
+  if(!cfg.iakey) throw new Error('Configure sua API Key em Configurações → IA.');
+  var key=cfg.iakey.trim();
+  var isGemini=!key.startsWith('sk-ant-');
+  if(isGemini){
+    var url='https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent';
+    var body={
+      contents:[{parts:[{text:'Você é um assistente especializado em análise de CRM para representantes comerciais. Responda sempre em português, de forma objetiva e prática. Use emojis para facilitar a leitura.\n\nDados do CRM:\n'+JSON.stringify(contexto,null,2)+'\n\n'+prompt}]}],
+      generationConfig:{maxOutputTokens:maxTokens,thinkingConfig:{thinkingLevel:'low'}}
+    };
+    var r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify(body)});
+    var d=await r.json();
+    if(d.error) throw new Error(d.error.message||'Erro da API Gemini');
+    return d.candidates?.[0]?.content?.parts?.[0]?.text||'Sem resposta.';
+  } else {
+    var r2=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-6', max_tokens:maxTokens,
+        system:'Você é um assistente especializado em análise de CRM para representantes comerciais. Responda sempre em português, de forma objetiva e prática. Use emojis para facilitar a leitura.',
+        messages:[{role:'user',content:'Dados do CRM:\n'+JSON.stringify(contexto,null,2)+'\n\n'+prompt}]
+      })
+    });
+    var d2=await r2.json();
+    if(d2.error) throw new Error(d2.error.message||'Erro da API Anthropic');
+    if(!d2.content||!d2.content[0]) throw new Error('Resposta inesperada da API');
+    return d2.content[0].text||'Sem resposta.';
+  }
+}
+function iaMsgStreamM(html){
+  var box=document.getElementById('ia-msgs-box-m'); if(!box) return;
+  box.insertAdjacentHTML('beforeend', html);
+  box.scrollTop=box.scrollHeight;
+}
+async function iaPerguntarLivreM(){
+  var inp=document.getElementById('ia-pergunta-input-m');
+  var pergunta=(inp&&inp.value||'').trim();
+  if(!pergunta){ toastM('Digite uma pergunta.'); return; }
+  var cfg=loadCfg();
+  if(!cfg.iakey){ iaMsgStreamM('<div style="margin-bottom:6px">⚠️ Configure sua API Key em <b>Mais → Configurações → IA</b>.</div>'); return; }
+  var perguntaSeg=pergunta.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  iaMsgStreamM('<div style="margin-bottom:4px;color:var(--t2)"><b>Você:</b> '+perguntaSeg+'</div><div id="ia-typing-m" style="margin-bottom:6px;color:var(--t3)">🔄 Pensando...</div>');
+  if(inp) inp.value='';
+  try{
+    var ctx=iaContextoCompletoM();
+    var txt=await iaClaudeM(pergunta, ctx, 700);
+    document.getElementById('ia-typing-m')?.remove();
+    iaMsgStreamM('<div style="margin-bottom:10px">'+txt.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<b>$1</b>')+'</div>');
+  }catch(e){
+    document.getElementById('ia-typing-m')?.remove();
+    iaMsgStreamM('<div style="margin-bottom:10px">❌ '+e.message+'</div>');
+  }
+}
+// ══ FIM ASSISTENTE IA ══
 
 // ══════════════════════════════
 // CLIENTES
@@ -2746,13 +2939,17 @@ async function processarComandoVoz(texto){
       }).join('\n');
   }
 
-  var nomesClientes=DB.clientes.slice(0,20).map(function(c){return c.rs;}).join(', ');
-  var prompt='Você é a Amora, assistente virtual de CRM. Responda de forma natural e fluida para ser lida em voz alta. Máximo 3 frases curtas.\n\n'+(contextoCliente||'Clientes: '+nomesClientes)+'\n\nPergunta: '+texto;
+  // Sem cliente específico identificado: usa o contexto completo do CRM (mesmo
+  // resumo rico usado na caixa "Perguntar à IA" do dashboard), não só os nomes.
+  var contextoGeral = contextoCliente || JSON.stringify(iaContextoCompletoM());
+  var prompt='Você é a Amora, assistente virtual de CRM. Responda de forma natural e fluida para ser lida em voz alta. Máximo 3 frases curtas.\n\n'+contextoGeral+'\n\nPergunta: '+texto;
 
   try{
-    var url='https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent';
+    // Endpoint generateContent (não /v1beta/interactions) + gemini-3.6-flash +
+    // thinkingConfig.thinkingLevel, mesmo padrão corrigido no restante do app.
+    var url='https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent';
     var r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},
-      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:120}})});
+      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:200,thinkingConfig:{thinkingLevel:'low'}}})});
     var d=await r.json();
     if(d.error) throw new Error(d.error.message);
     var resp=d.candidates?.[0]?.content?.parts?.[0]?.text||'Não consegui processar a solicitação.';
