@@ -414,7 +414,7 @@ const dias = c => c.ultFat ? Math.floor((Date.now()-new Date(c.ultFat+'T12:00'))
 const getSit = (c,r=60) => { if(c.encerrado) return 'Encerrado'; const d=dias(c); return d>r?'Inativo':d>r*.6?'Atenção':'Ativo'; };
 
 // ── DB ──────────────────────────────────────────────────
-var DB = { empresas:[], clientes:[], pedidos:[], tarefas:[], eventos:[] };
+var DB = { empresas:[], clientes:[], pedidos:[], tarefas:[], eventos:[], fiscal:[], finalidades:[], leads:[], cicloAcoes:{} };
 function carregarDB(){
   DB.empresas = load('empresas');
   DB.clientes = load('clientes');
@@ -431,6 +431,8 @@ function carregarDB(){
     return n;
   });
   DB.finalidades = load('finalidades',['Combustível','Alimentação','Hospedagem','Impostos','Diversos','Captação','Manutenção','Comunicação']);
+  DB.leads       = load('leads',[]);
+  DB.cicloAcoes  = load('cicloAcoes',{});
 }
 function salvarDB(){
   save('empresas',   DB.empresas);
@@ -449,6 +451,8 @@ function salvarDB(){
   });
   save('fiscal',      fiscalSemImg);
   save('finalidades', DB.finalidades||[]);
+  save('leads',       DB.leads||[]);
+  save('cicloAcoes',  DB.cicloAcoes||{});
   salvarNuvemM();
 }
 
@@ -1636,6 +1640,8 @@ function renderVendasM(){
 // ══ FIM VENDAS MOBILE ══
 var _leadEditIdM = null;
 var _cameraStream = null;
+var _leadImgB64M = null;
+var _leadImgMimeM = null;
 
 const ESTAGIOS_COR = {
   'Novo':'#94a3b8','Contato feito':'#2563eb','Proposta enviada':'#0891b2',
@@ -1704,11 +1710,14 @@ function renderLeadsM(){
   html+='<div style="font-size:16px;font-weight:700" id="lead-modal-titulo-m">Novo Lead</div>';
   html+='<button onclick="fecharModalLeadM()" style="background:none;border:none;font-size:24px;color:var(--t3)">&times;</button></div>';
   html+='<div style="display:flex;flex-direction:column;gap:10px">';
+  html+='<img id="lead-cartao-preview-m" style="display:none;width:100%;border-radius:8px;max-height:160px;object-fit:cover">';
+  html+='<button type="button" id="btn-ler-cartao-m" class="btn bs" style="display:none;font-size:13px;padding:9px" onclick="lerCartaoComIAM()"><i class="ti ti-sparkles"></i> Ler cartão com IA</button>';
+  html+='<div id="lead-ia-status-m" style="display:none;font-size:12px"></div>';
   html+='<input class="fi" id="lead-nome-m" placeholder="Nome *" style="font-size:14px;padding:10px">';
   html+='<input class="fi" id="lead-empresa-m" placeholder="Empresa / Loja" style="font-size:14px;padding:10px">';
   html+='<input class="fi" id="lead-tel-m" placeholder="Telefone / WhatsApp" type="tel" style="font-size:14px;padding:10px">';
   html+='<input class="fi" id="lead-cidade-m" placeholder="Cidade" style="font-size:14px;padding:10px">';
-  html+='<select class="fi" id="lead-origem-m" style="font-size:14px;padding:10px"><option value="">Origem —</option><option>Indicação</option><option>Feira</option><option>Redes Sociais</option><option>Cold Call</option><option>Visita</option><option>Site</option><option>WhatsApp</option><option>Outro</option></select>';
+  html+='<select class="fi" id="lead-origem-m" style="font-size:14px;padding:10px"><option value="">Origem —</option><option>Indicação</option><option>Feira</option><option>Redes Sociais</option><option>Cold Call</option><option>Visita</option><option>Site</option><option>WhatsApp</option><option>Cartão de visita</option><option>Outro</option></select>';
   html+='<select class="fi" id="lead-estagio-m" style="font-size:14px;padding:10px"><option>Novo</option><option>Contato feito</option><option>Proposta enviada</option><option>Negociação</option><option>Convertido</option><option>Perdido</option></select>';
   html+='<input class="fi" id="lead-visita-m" type="date" style="font-size:14px;padding:10px">';
   html+='<textarea class="fi" id="lead-obs-m" placeholder="Observações" style="font-size:14px;padding:10px;height:80px;resize:none"></textarea>';
@@ -1752,6 +1761,16 @@ function abrirModalLeadM(id){
     var or=document.getElementById('lead-origem-m'); if(or) or.value='';
     var vi=document.getElementById('lead-visita-m'); if(vi) vi.value='';
   }
+  // Reseta a foto do cartão/estado da leitura por IA a cada abertura do
+  // modal — só é preenchido de novo quando vem de uma captura de cartão de
+  // visita (processarImagemCartaoM chama isso e depois restaura a foto).
+  _leadImgB64M=null; _leadImgMimeM=null;
+  var prevCartao=document.getElementById('lead-cartao-preview-m');
+  if(prevCartao){ prevCartao.style.display='none'; prevCartao.src=''; }
+  var btnCartaoIa=document.getElementById('btn-ler-cartao-m');
+  if(btnCartaoIa){ btnCartaoIa.style.display='none'; btnCartaoIa.disabled=false; btnCartaoIa.innerHTML='<i class="ti ti-sparkles"></i> Ler cartão com IA'; }
+  var stCartao=document.getElementById('lead-ia-status-m');
+  if(stCartao){ stCartao.style.display='none'; stCartao.innerHTML=''; }
 }
 
 function fecharModalLeadM(){ var el=document.getElementById('modal-lead-m'); if(el) el.style.display='none'; }
@@ -1835,21 +1854,135 @@ function usarFotoGaleriaM(input){
 }
 
 function processarImagemCartaoM(dataUrl){
-  toastM('📷 Imagem capturada! Preencha os dados do lead.');
-  // Abre modal de novo lead com a foto disponível para referência
-  abrirModalLeadM(null);
-  // Guarda a imagem no canvas para o usuário ver enquanto digita
   var img=new Image();
   img.onload=function(){
-    var modal=document.getElementById('modal-lead-m');
-    if(!modal) return;
-    var preview=document.createElement('img');
-    preview.src=dataUrl;
-    preview.style.cssText='width:100%;border-radius:8px;margin-bottom:10px;max-height:180px;object-fit:cover';
-    var form=modal.querySelector('div[style*="flex-direction:column"]');
-    if(form) form.insertBefore(preview,form.firstChild);
+    // Reduz o tamanho da imagem antes de mandar pra IA (mais rápido e mais
+    // barato), do mesmo jeito que já é feito com as fotos de NF.
+    var canvas=document.createElement('canvas');
+    var MAX=1000; var ratio=Math.min(MAX/img.width, MAX/img.height, 1);
+    canvas.width=Math.round(img.width*ratio);
+    canvas.height=Math.round(img.height*ratio);
+    canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+    var b64=canvas.toDataURL('image/jpeg',0.7).split(',')[1];
+
+    // Abre modal de novo lead (isso reseta qualquer foto/estado anterior)
+    // e só então guarda a foto atual, senão o reset do abrirModalLeadM
+    // apagaria a imagem que acabamos de capturar.
+    abrirModalLeadM(null);
+    _leadImgB64M=b64;
+    _leadImgMimeM='image/jpeg';
+    var prevCartao=document.getElementById('lead-cartao-preview-m');
+    if(prevCartao){ prevCartao.src='data:image/jpeg;base64,'+b64; prevCartao.style.display='block'; }
+    var btnCartaoIa=document.getElementById('btn-ler-cartao-m');
+    if(btnCartaoIa) btnCartaoIa.style.display='block';
+
+    var cfgAuto=typeof loadCfg==='function'?loadCfg():{};
+    if(cfgAuto.iakey||localStorage.getItem('gemini_key')){
+      lerCartaoComIAM();
+    } else {
+      toastM('📷 Foto capturada! Preencha os dados manualmente ou configure a IA em Mais → Configurações.');
+    }
   };
+  img.onerror=function(){ toastM('Não foi possível processar a foto. Tente novamente.'); };
   img.src=dataUrl;
+}
+
+// Lê o cartão de visita com IA (Gemini ou Claude, mesma chave configurada
+// em Mais → Configurações usada para ler as NFs) e preenche os campos do
+// lead automaticamente.
+async function lerCartaoComIAM(){
+  if(!_leadImgB64M){ toastM('Nenhuma foto de cartão capturada'); return; }
+  var cfg=typeof loadCfg==='function'?loadCfg():{};
+  var apiKey=(cfg.iakey||localStorage.getItem('gemini_key')||'').trim();
+  if(!apiKey){ toastM('Configure sua API Key em Mais → Configurações → IA'); return; }
+
+  var btn=document.getElementById('btn-ler-cartao-m');
+  var stEl=document.getElementById('lead-ia-status-m');
+  if(stEl){ stEl.style.display='none'; stEl.innerHTML=''; }
+  if(btn){ btn.style.display='block'; btn.disabled=true; btn.innerHTML='<i class="ti ti-loader-2 ti-spin"></i> Lendo cartão...'; }
+
+  try{
+    var prompt='Você é um leitor de cartões de visita comerciais (business cards). Analise a imagem e extraia os dados de contato.\n\n'
+      +'Responda APENAS com um objeto JSON puro, sem markdown, sem explicações, sem ```json, somente o JSON:\n'
+      +'{"nome":"Nome da pessoa","empresa":"Nome da empresa/loja","tel":"51999998888","cidade":"Cidade","obs":"Cargo ou observação curta"}\n\n'
+      +'Instruções:\n'
+      +'- nome: nome da pessoa de contato impressa no cartão (não o nome da empresa)\n'
+      +'- empresa: razão social ou nome fantasia da empresa/loja\n'
+      +'- tel: telefone/celular, somente números com DDD (ex: 51999998888). Se houver mais de um número, prefira o celular/WhatsApp\n'
+      +'- cidade: cidade, se aparecer no endereço impresso no cartão\n'
+      +'- obs: cargo ou função da pessoa (ex: "Gerente Comercial"), se aparecer no cartão. Senão, deixe vazio\n'
+      +'- Se não encontrar um campo, use string vazia ""\n'
+      +'- NÃO use markdown, NÃO use ```json, retorne SOMENTE o JSON puro';
+
+    var isGemini=!apiKey.startsWith('sk-ant-');
+    var txt; var _finishReason='';
+
+    if(isGemini){
+      var callGeminiLeadM=async function(maxTok){
+        var r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent',{
+          method:'POST',
+          headers:{'Content-Type':'application/json','x-goog-api-key':apiKey},
+          body:JSON.stringify({
+            contents:[{parts:[{inline_data:{mime_type:_leadImgMimeM,data:_leadImgB64M}},{text:prompt}]}],
+            generationConfig:{maxOutputTokens:maxTok,responseMimeType:'application/json',thinkingConfig:{thinkingLevel:'low'}}
+          })
+        });
+        if(!r.ok){ var er=await r.json(); throw new Error(er.error?.message||'Erro '+r.status); }
+        var d=await r.json();
+        var partsG=d.candidates?.[0]?.content?.parts||[];
+        return { txt:partsG.map(function(p){return p.text||'';}).join('').trim(), finishReason:d.candidates?.[0]?.finishReason||'' };
+      };
+      var g=await callGeminiLeadM(2048);
+      if((!g.txt || g.txt.length<10) && g.finishReason==='MAX_TOKENS'){
+        g=await callGeminiLeadM(6144);
+      }
+      txt=g.txt; _finishReason=g.finishReason;
+    } else {
+      var resp=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        body:JSON.stringify({
+          model:'claude-sonnet-4-6', max_tokens:300,
+          messages:[{role:'user',content:[
+            {type:'image',source:{type:'base64',media_type:_leadImgMimeM,data:_leadImgB64M}},
+            {type:'text',text:prompt}
+          ]}]
+        })
+      });
+      var data=await resp.json();
+      if(data.error) throw new Error(data.error.message||'Erro da API Anthropic');
+      txt=((data.content&&data.content[0]&&data.content[0].text)||'').trim();
+    }
+
+    var parsed=null;
+    try{ parsed=JSON.parse(txt); } catch(e){}
+    if(!parsed){
+      var jm=txt.match(/\{[\s\S]*?\}/);
+      if(jm) try{ parsed=JSON.parse(jm[0]); } catch(e){}
+    }
+    if(!parsed){
+      var clean=txt.replace(/```json/gi,'').replace(/```/g,'').trim();
+      try{ parsed=JSON.parse(clean); } catch(e){}
+    }
+    if(!parsed) throw new Error('IA não retornou JSON'+(_finishReason?(' (motivo: '+_finishReason+')'):'')+'. Resposta: '+(txt||'(vazia)').slice(0,150));
+
+    if(parsed.nome)    document.getElementById('lead-nome-m').value=parsed.nome;
+    if(parsed.empresa) document.getElementById('lead-empresa-m').value=parsed.empresa;
+    if(parsed.tel)     document.getElementById('lead-tel-m').value=parsed.tel;
+    if(parsed.cidade)  document.getElementById('lead-cidade-m').value=parsed.cidade;
+    if(parsed.obs)     document.getElementById('lead-obs-m').value=parsed.obs;
+    var orig=document.getElementById('lead-origem-m');
+    if(orig && !orig.value) orig.value='Cartão de visita';
+
+    if(stEl){ stEl.style.display='block'; stEl.innerHTML='<span style="color:var(--grn)"><i class="ti ti-check"></i> Dados extraídos do cartão! Confira e salve.</span>'; }
+    toastM('✅ Cartão lido com sucesso!');
+
+  }catch(err){
+    if(stEl){ stEl.style.display='block'; stEl.innerHTML='<span style="color:var(--red)"><i class="ti ti-alert-triangle"></i> '+err.message+'. Preencha manualmente.</span>'; }
+    toastM('Erro ao ler cartão: '+err.message);
+  }finally{
+    if(btn){ btn.disabled=false; btn.innerHTML='<i class="ti ti-sparkles"></i> Ler cartão com IA'; }
+  }
 }
 // ══ FIM LEADS MOBILE ══
 
@@ -2590,10 +2723,23 @@ function salvarLocal_M(){
   save('pedidos',  DB.pedidos);
   save('tarefas',  DB.tarefas);
   save('eventos',  DB.eventos);
+  // Salva fiscal sem as imagens no localStorage (imagens ficam em chave separada)
+  var fiscalSemImg=(DB.fiscal||[]).map(function(n){
+    var copia=Object.assign({},n);
+    if(copia.imgB64){
+      try{ localStorage.setItem('repcm_nf_img_'+n.id, JSON.stringify({b64:n.imgB64,mime:n.imgMime||'image/jpeg'})); }catch(e){}
+      delete copia.imgB64; delete copia.imgMime;
+    }
+    return copia;
+  });
+  save('fiscal',      fiscalSemImg);
+  save('finalidades', DB.finalidades||[]);
+  save('leads',       DB.leads||[]);
+  save('cicloAcoes',  DB.cicloAcoes||{});
 }
 
 function salvarNuvemM(){
-  if(!fbRefM) return;
+  if(!fbRefM){ setSyncStatusM('offline'); return; }
   setSyncStatusM('sincronizando');
   DB._ts = Date.now();
   var cfg = loadCfg();
