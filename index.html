@@ -2653,6 +2653,753 @@ function init(){
   renderM();
 }
 
+async function buscarProximosM(){
+  var status = document.getElementById('proximos-status');
+  var lista = document.getElementById('proximos-lista');
+  if(!status||!lista) return;
+
+  status.innerHTML='<i class="ti ti-loader"></i> Obtendo sua localização...';
+  lista.innerHTML='';
+
+  if(!navigator.geolocation){
+    status.innerHTML='❌ Geolocalização não disponível neste dispositivo.'; return;
+  }
+
+  navigator.geolocation.getCurrentPosition(async function(pos){
+    _minhaLocM = {lat: pos.coords.latitude, lng: pos.coords.longitude};
+    status.innerHTML='📍 Localização obtida! Identificando sua cidade...';
+
+    try{
+      // Reverse geocode para descobrir cidade atual
+      var r = await fetch(
+        'https://nominatim.openstreetmap.org/reverse?format=json&lat='+_minhaLocM.lat+'&lon='+_minhaLocM.lng+'&zoom=10',
+        {headers:{'User-Agent':'RepCRM-Mobile/1.0'}}
+      );
+      var d = await r.json();
+      var cidadeOriginal = d.address?.city || d.address?.town || d.address?.municipality || d.address?.county || '';
+      var cidadeAtual = normalizar(cidadeOriginal);
+
+      if(!cidadeAtual){
+        status.innerHTML='❌ Não foi possível identificar sua cidade atual.'; return;
+      }
+
+      // Filtra clientes da mesma cidade
+      var clisCidade = DB.clientes.filter(function(c){
+        if(c.encerrado) return false;
+        var cidCli = normalizar(c.cid||'');
+        return cidCli===cidadeAtual ||
+               cidCli.includes(cidadeAtual) ||
+               cidadeAtual.includes(cidCli);
+      });
+
+      status.innerHTML = '📍 Você está em <b>'+cidadeOriginal+'</b> · '+
+        '<b>'+clisCidade.length+'</b> cliente(s) nesta cidade'+
+        (clisCidade.length?
+          ' <button onclick="abrirTodosMapaM()" class="btn bs" style="font-size:10px;padding:2px 8px;margin-left:6px"><i class="ti ti-map"></i> Ver todos</button>':'');
+
+      if(!clisCidade.length){
+        lista.innerHTML='<div style="color:var(--t3);font-size:13px;padding:20px;text-align:center">Nenhum cliente cadastrado em '+cidadeOriginal+'.</div>';
+        return;
+      }
+
+      // Guarda para abrir todos no mapa
+      window._proximosResultados = clisCidade;
+
+      lista.innerHTML = clisCidade.map(function(c){
+        var e = DB.empresas.find(function(emp){return emp.id===c.empId;});
+        var endCompleto = [c.end, c.cid, c.uf].filter(Boolean).join(', ');
+        var endMapa = encodeURIComponent(endCompleto||c.cid||c.rs);
+        return '<div class="list-item">'+
+          
+          '<div class="list-body" onclick="abrirClienteM(\''+c.id+'\')" style="cursor:pointer">'+
+            '<div class="list-name">'+c.rs+'</div>'+
+            '<div class="list-sub" style="color:var(--t2)">'+(c.end||'Sem endereço cadastrado')+'</div>'+
+            (c.comp?'<div class="list-sub">'+c.comp+'</div>':'')+
+          '</div>'+
+          '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">'+
+            '<button onclick="window.open(\'https://www.google.com/maps/search/?api=1&query='+endMapa+'\',\'_blank\')" '+
+              'style="background:none;border:1px solid var(--acc);border-radius:6px;padding:4px 10px;font-size:10px;color:var(--acc);cursor:pointer">'+
+              '<i class="ti ti-map-pin"></i> Mapa</button>'+
+            (c.cel||c.fone?
+              '<button onclick="wppM(\''+((c.cel||c.fone)||'')+'\''+')" '+
+              'style="background:none;border:1px solid #25d366;border-radius:6px;padding:4px 10px;font-size:10px;color:#25d366;cursor:pointer">'+
+              '<i class="ti ti-brand-whatsapp"></i></button>':'')+ 
+          '</div>'+
+        '</div>';
+      }).join('');
+
+    }catch(err){
+      status.innerHTML='❌ Erro ao identificar cidade: '+err.message;
+    }
+
+  }, function(err){
+    var msgs={1:'Permissão negada. Toque em Permitir.',2:'Localização indisponível.',3:'Tempo esgotado.'};
+    status.innerHTML='❌ '+(msgs[err.code]||'Erro ao obter localização.');
+  },{timeout:15000, maximumAge:60000});
+}
+
+function abrirTodosMapaM(){
+  if(!window._proximosResultados||!window._proximosResultados.length) return;
+  window._proximosResultados.slice(0,9).forEach(function(c,i){
+    setTimeout(function(){
+      var end = encodeURIComponent([c.end,c.cid,c.uf].filter(Boolean).join(', ')||c.rs);
+      window.open('https://www.google.com/maps/search/?api=1&query='+end,'_blank');
+    },i*700);
+  });
+}
+// ── Fim Clientes Próximos ────────────────────────────────
+// ══ FIREBASE SYNC ══
+// ╔══════════════════════════════════════════════════════╗
+// ║         CONFIGURAÇÃO FIREBASE — PREENCHA AQUI        ║
+// ║  Ao atualizar o sistema, copie este bloco para       ║
+// ║  o arquivo novo e o sync funcionará automaticamente. ║
+// ╚══════════════════════════════════════════════════════╝
+var FB_CONFIG_PADRAO_M = {
+  "apiKey": "AIzaSyCn0sVoLm5aWG6gfcdUxXI6Sh1qrSjggbc",
+  "authDomain": "fnreprescrm.firebaseapp.com",
+  "databaseURL": "https://fnreprescrm-default-rtdb.firebaseio.com",
+  "projectId": "fnreprescrm",
+  "storageBucket": "fnreprescrm.firebasestorage.app",
+  "messagingSenderId": "1090178885977",
+  "appId": "1:1090178885977:web:3dd6febd872a1a522d4448"
+};
+var FB_CHAVE_PADRAO_M = ""; // ex: minha-empresa-2024
+// ══════════════════════════════════════════════════════
+var fbAppM = null;
+
+function parseFbConfig(raw){
+  var s = raw.trim()
+    .replace(/^\s*(const|var|let)\s+\w+\s*=\s*/,'')
+    .replace(/;\s*$/,'')
+    .trim();
+  return Function('return (' + s + ')')();
+}
+var fbDBM  = null;
+var fbRefM = null;
+var fbRefImgsM = null;
+var fbEscutandoM = false;
+
+function fbChaveM(){ return localStorage.getItem('fb_chave')||'repcrm'; }
+
+// Aplica no app uma foto de NF que chegou de outro aparelho (via Firebase)
+function aplicarImagemFiscalRemotaM(id, dados){
+  if(!id || !dados || !dados.b64) return;
+  try{
+    var atual=localStorage.getItem('repcm_nf_img_'+id);
+    if(atual){ var p=JSON.parse(atual); if(p.b64===dados.b64) return; }
+  }catch(e){}
+  try{ localStorage.setItem('repcm_nf_img_'+id, JSON.stringify({b64:dados.b64, mime:dados.mime||'image/jpeg'})); }catch(e){}
+  var n=(DB.fiscal||[]).find(function(x){ return x.id===id; });
+  if(n){ n.imgB64=dados.b64; n.imgMime=dados.mime||'image/jpeg'; }
+  if(paginaAtual==='fiscal') renderFiscalM();
+}
+// Remove localmente a foto de uma NF quando ela é apagada em outro aparelho
+function removerImagemFiscalLocalM(id){
+  if(!id) return;
+  try{ localStorage.removeItem('repcm_nf_img_'+id); }catch(e){}
+  var n=(DB.fiscal||[]).find(function(x){ return x.id===id; });
+  if(n){ delete n.imgB64; delete n.imgMime; }
+  if(paginaAtual==='fiscal') renderFiscalM();
+}
+
+function setSyncStatusM(status){
+  var btn = document.getElementById('btn-nuvem-m');
+  var sub = document.getElementById('sub-nuvem-mais');
+  var mapa = {
+    conectado:    {ic:'color:var(--grn)', sub:'🟢 Conectado'},
+    sincronizando:{ic:'color:var(--org)', sub:'🔄 Sincronizando...'},
+    erro:         {ic:'color:var(--red)', sub:'⚠️ Erro de conexão'},
+    offline:      {ic:'color:var(--t3)', sub:'Configurar Firebase'},
+  };
+  var m = mapa[status]||mapa['offline'];
+  if(btn) btn.querySelector('i').style.color = m.ic.split(':')[1];
+  if(sub) sub.textContent = m.sub;
+}
+
+function initFirebaseM(){
+  var raw = localStorage.getItem('fb_config');
+  if(!raw && FB_CONFIG_PADRAO_M.apiKey){
+    raw = JSON.stringify(FB_CONFIG_PADRAO_M);
+    if(FB_CHAVE_PADRAO_M) localStorage.setItem('fb_chave', FB_CHAVE_PADRAO_M);
+  }
+  if(!raw) return;
+  try {
+    var cfg = parseFbConfig(raw);
+    if(!firebase.apps.length) fbAppM = firebase.initializeApp(cfg);
+    else fbAppM = firebase.app();
+    fbDBM = firebase.database();
+    fbRefM = fbDBM.ref(fbChaveM()+'/db');
+    fbRefImgsM = fbDBM.ref(fbChaveM()+'/fiscalImgs');
+    firebase.database().ref('.info/connected').on('value', function(snap){
+      setSyncStatusM(snap.val() ? 'conectado' : 'offline');
+    });
+    if(!fbEscutandoM){
+      fbEscutandoM = true;
+      // Fotos das NFs sincronizam à parte (não junto do resto do CRM), pra não
+      // deixar toda sincronização pesada — cada foto vai e vem sozinha.
+      fbRefImgsM.on('child_added',   function(snap){ aplicarImagemFiscalRemotaM(snap.key, snap.val()); });
+      fbRefImgsM.on('child_changed', function(snap){ aplicarImagemFiscalRemotaM(snap.key, snap.val()); });
+      fbRefImgsM.on('child_removed', function(snap){ removerImagemFiscalLocalM(snap.key); });
+      fbRefM.on('value', function(snap){
+        var remoto = snap.val();
+        if(!remoto) return;
+        if(remoto._ts && DB._ts && remoto._ts <= DB._ts) return;
+        DB.empresas    = remoto.empresas    || [];
+        DB.clientes    = remoto.clientes    || [];
+        DB.pedidos     = remoto.pedidos     || [];
+        DB.tarefas     = remoto.tarefas     || [];
+        DB.eventos     = remoto.eventos     || [];
+        DB.fiscal      = remoto.fiscal      || [];
+        DB.finalidades = remoto.finalidades || [];
+        DB.leads       = remoto.leads       || [];
+        DB.cicloAcoes  = remoto.cicloAcoes  || {};
+        DB._ts         = remoto._ts;
+        // Re-renderiza fiscal se estiver na página
+        if(paginaAtual==='fiscal') renderFiscalM();
+        // Restaura config e foto da nuvem
+        if(remoto._cfg){
+          var cfgLocal = loadCfg();
+          if(remoto._cfg.iakey&&!cfgLocal.iakey)    cfgLocal.iakey=remoto._cfg.iakey;
+          if(remoto._cfg.placesKey&&!cfgLocal.placesKey) cfgLocal.placesKey=remoto._cfg.placesKey;
+          if(remoto._cfg.nomeAmora) cfgLocal.nomeAmora=remoto._cfg.nomeAmora;
+          saveCfg(cfgLocal);
+          if(remoto._cfg.fotoAmora&&!localStorage.getItem('repcrm_amora_foto'))
+            localStorage.setItem('repcrm_amora_foto', remoto._cfg.fotoAmora);
+          setTimeout(atualizarBotaoAmora, 500);
+        }
+        salvarLocal_M();
+        renderM();
+      }, function(){ setSyncStatusM('erro'); });
+    }
+  } catch(e){ setSyncStatusM('erro'); }
+}
+
+function salvarLocal_M(){
+  save('empresas', DB.empresas);
+  save('clientes', DB.clientes);
+  save('pedidos',  DB.pedidos);
+  save('tarefas',  DB.tarefas);
+  save('eventos',  DB.eventos);
+  // Salva fiscal sem as imagens no localStorage (imagens ficam em chave separada)
+  var fiscalSemImg=(DB.fiscal||[]).map(function(n){
+    var copia=Object.assign({},n);
+    if(copia.imgB64){
+      try{ localStorage.setItem('repcm_nf_img_'+n.id, JSON.stringify({b64:n.imgB64,mime:n.imgMime||'image/jpeg'})); }catch(e){}
+      delete copia.imgB64; delete copia.imgMime;
+    }
+    return copia;
+  });
+  save('fiscal',      fiscalSemImg);
+  save('finalidades', DB.finalidades||[]);
+  save('leads',       DB.leads||[]);
+  save('cicloAcoes',  DB.cicloAcoes||{});
+}
+
+function salvarNuvemM(){
+  if(!fbRefM){ setSyncStatusM('offline'); return; }
+  setSyncStatusM('sincronizando');
+  DB._ts = Date.now();
+  var cfg = loadCfg();
+  fbRefM.set({
+    empresas:    DB.empresas,
+    clientes:    DB.clientes,
+    pedidos:     DB.pedidos,
+    tarefas:     DB.tarefas,
+    eventos:     DB.eventos,
+    // Envia fiscal sem imagens para o Firebase (imagens ficam no dispositivo)
+    fiscal:      (DB.fiscal||[]).map(function(n){var c=Object.assign({},n);delete c.imgB64;delete c.imgMime;return c;}),
+    finalidades: DB.finalidades || [],
+    leads:       DB.leads       || [],
+    cicloAcoes:  DB.cicloAcoes  || {},
+    _ts:         DB._ts,
+    _cfg:{
+      iakey:     cfg.iakey||'',
+      placesKey: cfg.placesKey||'',
+      nomeAmora: cfg.nomeAmora||'Amora',
+      fotoAmora: localStorage.getItem('repcrm_amora_foto')||''
+    }
+  }).then(function(){ setSyncStatusM('conectado'); })
+    .catch(function(){ setSyncStatusM('erro'); });
+}
+
+function abrirModalNuvemM(){
+  document.getElementById('nuvem-cfg-m').value = localStorage.getItem('fb_config')||'';
+  document.getElementById('nuvem-chave-m').value = fbChaveM();
+  var s = document.getElementById('nuvem-status-m');
+  s.textContent = fbDBM ? '🟢 Conectado ao Firebase' : '⚪ Não conectado';
+  s.style.color = fbDBM ? 'var(--grn)' : 'var(--t3)';
+  abrirModal('mNuvemM');
+}
+
+function salvarCfgNuvemM(){
+  var raw = document.getElementById('nuvem-cfg-m').value.trim() || localStorage.getItem('fb_config') || '';
+  if(!raw && typeof FB_CONFIG_PADRAO_M!=='undefined' && FB_CONFIG_PADRAO_M && FB_CONFIG_PADRAO_M.apiKey){
+    raw = JSON.stringify(FB_CONFIG_PADRAO_M);
+  }
+  var chave = document.getElementById('nuvem-chave-m').value.trim()||'repcrm';
+  var s = document.getElementById('nuvem-status-m');
+  try { var cfg = parseFbConfig(raw); raw = JSON.stringify(cfg); } catch(e){ s.textContent='❌ JSON inválido'; s.style.color='var(--red)'; return; }
+  localStorage.setItem('fb_config', raw);
+  localStorage.setItem('fb_chave', chave);
+  fbEscutandoM = false;
+  if(fbAppM){ try{ fbAppM.delete(); }catch(e){} fbAppM=null; fbDBM=null; fbRefM=null; }
+  s.textContent='🔄 Conectando...'; s.style.color='var(--org)';
+  setTimeout(function(){
+    initFirebaseM();
+    if(fbDBM){ s.textContent='🟢 Conectado!'; s.style.color='var(--grn)'; salvarNuvemM(); }
+    else { s.textContent='❌ Falha — verifique as credenciais'; s.style.color='var(--red)'; }
+  }, 800);
+}
+
+function desconectarNuvemM(){
+  if(fbAppM){ try{ fbAppM.delete(); }catch(e){} }
+  fbAppM=null; fbDBM=null; fbRefM=null; fbEscutandoM=false;
+  localStorage.removeItem('fb_config');
+  setSyncStatusM('offline');
+  var s = document.getElementById('nuvem-status-m');
+  if(s){ s.textContent='⚪ Desconectado'; s.style.color='var(--t3)'; }
+}
+// ══ FIM FIREBASE SYNC ══
+
+// ── Amora — Assistente Virtual ───────────────────────────
+var vozAtiva = false;
+var reconhecimento = null;
+var _ultimaResposta = '';
+var _vozSintetizador = window.speechSynthesis;
+var _vozAmora = null;
+
+function carregarVozAmora(){
+  var vozes = _vozSintetizador.getVoices();
+  _vozAmora = vozes.find(function(v){return v.lang==='pt-BR'&&v.name.toLowerCase().includes('female');})
+    ||vozes.find(function(v){return v.lang==='pt-BR'&&(v.name.includes('Google')||v.name.includes('Microsoft'));})
+    ||vozes.find(function(v){return v.lang==='pt-BR';})
+    ||vozes.find(function(v){return v.lang.startsWith('pt');})
+    ||null;
+}
+if(_vozSintetizador){ _vozSintetizador.onvoiceschanged=carregarVozAmora; carregarVozAmora(); }
+
+function falarAmora(texto){
+  // Síntese de voz desativada — resposta apenas em texto
+  _ultimaResposta=texto;
+  var el=document.getElementById('btn-falar');
+  if(el) el.style.display='none';
+}
+
+function falarUltima(){ if(_ultimaResposta) falarAmora(_ultimaResposta); }
+
+function previewFotoAmora(input){
+  if(!input.files||!input.files[0]) return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var base64=e.target.result;
+    // Preview no settings
+    var prev=document.getElementById('preview-amora-foto');
+    if(prev){ prev.innerHTML='<img src="'+base64+'" style="width:100%;height:100%;object-fit:cover">'; }
+    // Salva no localStorage
+    localStorage.setItem('repcrm_amora_foto', base64);
+    // Atualiza botão flutuante
+    atualizarBotaoAmora();
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+function removerFotoAmora(){
+  localStorage.removeItem('repcrm_amora_foto');
+  var prev=document.getElementById('preview-amora-foto');
+  var cfg=loadCfg();
+  var nome=(cfg.nomeAmora||'Amora')[0].toUpperCase();
+  if(prev) prev.innerHTML='<span style="color:#fff;font-size:20px;font-weight:700">'+nome+'</span>';
+  atualizarBotaoAmora();
+}
+
+function atualizarBotaoAmora(){
+  var btn=document.getElementById('btn-voz');
+  if(!btn) return;
+  var foto=localStorage.getItem('repcrm_amora_foto');
+  var cfg=loadCfg();
+  var nome=(cfg.nomeAmora||'Amora');
+  if(foto){
+    btn.innerHTML='<img src="'+foto+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%"><span style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);font-size:7px;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.5);letter-spacing:0.5px">'+nome.toUpperCase()+'</span>';
+    btn.style.padding='0';
+    btn.style.overflow='hidden';
+    btn.style.position='fixed'; // manter position
+  } else {
+    var letra=nome[0].toUpperCase();
+    btn.innerHTML='<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="13" r="8" fill="#fde68a"/><path d="M8 13 Q8 5 16 5 Q24 5 24 13 Q22 8 16 8 Q10 8 8 13Z" fill="#92400e"/><path d="M8 13 Q6 18 8 22 Q8 16 8 13Z" fill="#92400e"/><path d="M24 13 Q26 18 24 22 Q24 16 24 13Z" fill="#92400e"/><circle cx="13" cy="13" r="1.2" fill="#1e293b"/><circle cx="19" cy="13" r="1.2" fill="#1e293b"/><path d="M13 17 Q16 20 19 17" stroke="#e11d48" stroke-width="1.2" fill="none" stroke-linecap="round"/><path d="M10 24 Q10 20 16 20 Q22 20 22 24 L22 32 L10 32Z" fill="#7c3aed"/><path d="M8 12 Q8 6 16 6 Q24 6 24 12" stroke="#92400e" stroke-width="1.5" fill="none"/><rect x="6.5" y="11" width="2.5" height="4" rx="1" fill="#92400e"/><rect x="23" y="11" width="2.5" height="4" rx="1" fill="#92400e"/></svg><span id="btn-voz-label" style="font-size:7px;font-weight:700;letter-spacing:0.5px;margin-top:1px">'+nome.toUpperCase()+'</span>';
+  }
+}
+
+function carregarFotoAmoraSettings(){
+  var foto=localStorage.getItem('repcrm_amora_foto');
+  var prev=document.getElementById('preview-amora-foto');
+  var cfg=loadCfg();
+  if(foto && prev){
+    prev.innerHTML='<img src="'+foto+'" style="width:100%;height:100%;object-fit:cover">';
+  } else if(prev){
+    var letra=(cfg.nomeAmora||'Amora')[0].toUpperCase();
+    document.getElementById('preview-amora-letra').textContent=letra;
+  }
+}
+
+
+function getNomeAmora(){ var cfg=loadCfg(); return (cfg.nomeAmora||'Amora').toLowerCase(); }
+
+function toggleVoz(){
+  if(vozAtiva) pararVoz();
+  else iniciarVoz();
+}
+
+function iniciarVoz(){
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ toastM('Reconhecimento de voz não suportado. Use o Chrome.'); return; }
+  document.getElementById('painel-voz').style.display='block';
+  var _fraseAcumulada = '';
+  var _pausaTimer = null;
+  var _aguardandoComando = false;
+
+  reconhecimento=new SR();
+  reconhecimento.lang='pt-BR';
+  reconhecimento.continuous=false;
+  reconhecimento.interimResults=true;
+  reconhecimento.maxAlternatives=1;
+
+  reconhecimento.onstart=function(){
+    vozAtiva=true;
+    document.getElementById('btn-voz').style.boxShadow='0 0 0 4px rgba(219,39,119,.4),0 4px 20px rgba(124,58,237,.5)';
+    document.getElementById('voz-status-dot').style.background='#db2777';
+    document.getElementById('voz-status-txt').textContent='Ouvindo... diga "'+getNomeAmora()+'"';
+    if(!_aguardandoComando) document.getElementById('voz-transcricao').textContent='';
+  };
+
+  reconhecimento.onresult=function(event){
+    var txt='';
+    for(var i=0;i<event.results.length;i++) txt+=event.results[i][0].transcript;
+    txt=txt.trim();
+    document.getElementById('voz-transcricao').textContent='🎤 "'+txt+'"';
+
+    if(event.results[event.results.length-1].isFinal){
+      _fraseAcumulada=(_fraseAcumulada+' '+txt).trim();
+      var txLower=_fraseAcumulada.toLowerCase();
+      var nome=getNomeAmora();
+
+      // Detectou o nome — aguarda o resto do comando
+      if(txLower.includes(nome)){
+        _aguardandoComando=true;
+        clearTimeout(_pausaTimer);
+        var comando=txLower.replace(new RegExp(nome,'gi'),'').trim();
+        if(comando.length>2){
+          // Tem comando junto com o nome — processa com delay para capturar mais
+          _pausaTimer=setTimeout(function(){
+            document.getElementById('voz-status-txt').textContent='Amora processando...';
+            document.getElementById('voz-resposta').innerHTML='<span style="color:#7c3aed">⏳ Analisando...</span>';
+            processarComandoVoz(_fraseAcumulada.replace(new RegExp(nome,'gi'),'').trim());
+            _fraseAcumulada=''; _aguardandoComando=false;
+          },1200);
+        } else {
+          // Só o nome — responde e fica ouvindo o comando
+          var saud='Olá! Como posso ajudar?';
+          document.getElementById('voz-resposta').innerHTML='<span style="color:#7c3aed">👋 '+saud+'</span>';
+          falarAmora(saud);
+          document.getElementById('voz-status-txt').textContent='Ouvindo seu comando...';
+        }
+      } else if(_aguardandoComando && _fraseAcumulada.length>2){
+        // Já ouviu o nome antes, agora recebeu o comando
+        clearTimeout(_pausaTimer);
+        _pausaTimer=setTimeout(function(){
+          var fraseCompleta=_fraseAcumulada.toLowerCase();
+          var nome2=getNomeAmora();
+          var cmd=fraseCompleta.replace(new RegExp(nome2,'gi'),'').trim();
+          if(cmd.length>2){
+            document.getElementById('voz-status-txt').textContent='Amora processando...';
+            document.getElementById('voz-resposta').innerHTML='<span style="color:#7c3aed">⏳ Analisando...</span>';
+            processarComandoVoz(cmd);
+          }
+          _fraseAcumulada=''; _aguardandoComando=false;
+        },800);
+      }
+    }
+  };
+
+  reconhecimento.onerror=function(e){
+    var msgs={'not-allowed':'Permissão de microfone negada.','network':'Erro de rede.'};
+    if(msgs[e.error]) document.getElementById('voz-resposta').innerHTML='❌ '+msgs[e.error];
+    if(e.error==='not-allowed'||e.error==='network') pararVoz();
+  };
+
+  reconhecimento.onend=function(){
+    // Reinicia automaticamente enquanto ativo
+    if(vozAtiva){
+      setTimeout(function(){
+        try{ reconhecimento.start(); }catch(e){}
+      },200);
+    }
+  };
+
+  reconhecimento.start();
+}
+
+function pararVoz(){
+  vozAtiva=false;
+  if(reconhecimento){ try{ reconhecimento.stop(); }catch(e){} }
+  if(_vozSintetizador) _vozSintetizador.cancel();
+  document.getElementById('btn-voz').style.boxShadow='0 4px 20px rgba(124,58,237,.5)';
+  document.getElementById('voz-status-dot').style.background='var(--t3)';
+  document.getElementById('voz-status-txt').textContent='Diga "'+getNomeAmora()+'" para ativar';
+}
+
+async function processarComandoVoz(texto){
+  document.getElementById('voz-status-txt').textContent='Processando...';
+  document.getElementById('voz-resposta').innerHTML='⏳ Analisando...';
+
+  function norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
+  var txNorm = norm(texto);
+
+  // Resposta com voz para qualquer resultado
+  function responderAmora(texto){
+    document.getElementById('voz-resposta').innerHTML=texto.replace(/\n/g,'<br>');
+    document.getElementById('voz-status-txt').textContent='Ouvindo... diga "'+getNomeAmora()+'"';
+    falarAmora(texto.replace(/<[^>]+>/g,''));
+  }
+
+  // ── Detecção LOCAL de intenção (sem IA) ──────────────
+  var ehBuscaCli = /buscar|abrir|ver|mostrar|cliente|procurar/.test(txNorm);
+  var ehLembrete = /visita|reuniao|reunião|lembrete|marcar|agenda|agendar|ligar|ligação/.test(txNorm);
+  var ehMapa = /mapa|rota|localizar|onde fica|endereço/.test(txNorm);
+  var ehWpp = /whatsapp|zap|mensagem/.test(txNorm);
+  var ehProx = /proximos|próximos|perto|nearby|aqui/.test(txNorm);
+  var ehAnalise = /analise|análise|últimos pedidos|ultimo pedido|histórico|resumo|antes da visita|preparar visita/.test(txNorm);
+
+  // Busca cliente no texto
+  var cliMatch = null;
+  var palavras = txNorm.split(' ').filter(function(w){ return w.length>3; });
+  DB.clientes.forEach(function(c){
+    if(!c.rs) return;
+    var nNorm = norm(c.rs);
+    if(palavras.some(function(w){ return nNorm.includes(w); })){
+      if(!cliMatch || norm(c.rs).length < norm(cliMatch.rs).length) cliMatch = c;
+    }
+  });
+
+  if(ehProx){
+    navM('proximos'); buscarProximosM();
+    responderAmora('Buscando clientes próximos à sua localização!');
+    return;
+  }
+  if(ehMapa && cliMatch){
+    var end=[cliMatch.end,cliMatch.cid,cliMatch.uf].filter(Boolean).join(', ')||cliMatch.rs;
+    window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(end),'_blank');
+    responderAmora('Abrindo o mapa para '+cliMatch.rs+'!');
+    return;
+  }
+  if(ehWpp && cliMatch && (cliMatch.cel||cliMatch.fone)){
+    wppM(cliMatch.cel||cliMatch.fone);
+    responderAmora('Abrindo WhatsApp de '+cliMatch.rs+'!');
+    return;
+  }
+  if(ehBuscaCli && !ehAnalise && cliMatch){
+    responderAmora('Abrindo o cadastro de '+cliMatch.rs+'!');
+    setTimeout(function(){ navM('clientes'); setTimeout(function(){ abrirClienteM(cliMatch.id); },300); },800);
+    return;
+  }
+  if(ehLembrete){
+    var dataMatch=texto.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
+    var dtTar=new Date().toISOString().split('T')[0];
+    if(dataMatch){
+      var dia=dataMatch[1].padStart(2,'0'); var mes=dataMatch[2].padStart(2,'0');
+      var ano=dataMatch[3]?(dataMatch[3].length===2?'20'+dataMatch[3]:dataMatch[3]):new Date().getFullYear();
+      dtTar=ano+'-'+mes+'-'+dia;
+    }
+    var horaMatch=texto.match(/(\d{1,2})h(\d{0,2})/);
+    var hora=horaMatch?horaMatch[1].padStart(2,'0')+':'+(horaMatch[2]||'00').padStart(2,'0'):'';
+    var desc=texto.replace(/buscar|abrir|ver|mostrar|cliente|procurar|marcar|agendar|lembrete|visita|reunião|reuniao/gi,'').replace(/\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/g,'').replace(/\d{1,2}h\d{0,2}/g,'').trim();
+    if(hora) desc=hora+' - '+desc;
+    if(cliMatch) desc=desc+' - '+cliMatch.rs;
+    desc=desc.trim()||texto;
+    DB.tarefas=DB.tarefas||[];
+    DB.tarefas.push({id:'t'+Date.now(),desc:desc,dt:dtTar,done:false,cliId:cliMatch?cliMatch.id:'',empId:cliMatch?cliMatch.empId:''});
+    salvarDB();
+    var dtFmt=dtTar.split('-').reverse().join('/');
+    responderAmora('Lembrete criado! '+desc+' para o dia '+dtFmt+(cliMatch?', cliente '+cliMatch.rs:'')+'.');
+    return;
+  }
+
+  // ── Chama Gemini para análise avançada ──────────────
+  var cfg=loadCfg(); var key=(cfg.iakey||'').trim();
+  if(!key){
+    responderAmora('Preciso de uma chave do Gemini para análises avançadas. Configure em Configurações.');
+    return;
+  }
+
+  // Contexto rico do cliente para análise
+  var contextoCliente = '';
+  if(cliMatch){
+    var pedsCli=DB.pedidos.filter(function(p){return p.cliId===cliMatch.id&&!p.cancelado;}).sort(function(a,b){return b.dt>a.dt?1:-1;}).slice(0,5);
+    var empsCli=[...new Set(pedsCli.map(function(p){return p.empId;}))].map(function(eid){var e=DB.empresas.find(function(x){return x.id===eid;}); return e?e.nome:'';}).filter(Boolean);
+    contextoCliente='Cliente: '+cliMatch.rs+'\nCidade: '+(cliMatch.cid||'')+'\nSegmento: '+(cliMatch.seg||'')+'\nÚltimos pedidos:\n'+
+      pedsCli.map(function(p){
+        var e=DB.empresas.find(function(x){return x.id===p.empId;});
+        return '- '+(p.dt||'')+(e?' ('+e.nome+')':'')+' R$ '+(p.val||0).toLocaleString('pt-BR');
+      }).join('\n');
+  }
+
+  // Sem cliente específico identificado: usa o contexto completo do CRM (mesmo
+  // resumo rico usado na caixa "Perguntar à IA" do dashboard), não só os nomes.
+  var contextoGeral = contextoCliente || JSON.stringify(iaContextoCompletoM());
+  var prompt='Você é a Amora, assistente virtual de CRM. Responda de forma natural e fluida para ser lida em voz alta. Máximo 3 frases curtas.\n\n'+contextoGeral+'\n\nPergunta: '+texto;
+
+  try{
+    // Endpoint generateContent (não /v1beta/interactions) + gemini-3.6-flash +
+    // thinkingConfig.thinkingLevel, mesmo padrão corrigido no restante do app.
+    var url='https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent';
+    var r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},
+      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:200,thinkingConfig:{thinkingLevel:'low'}}})});
+    var d=await r.json();
+    if(d.error) throw new Error(d.error.message);
+    var resp=d.candidates?.[0]?.content?.parts?.[0]?.text||'Não consegui processar a solicitação.';
+    responderAmora(resp);
+  }catch(e){
+    responderAmora('Desculpe, ocorreu um erro: '+e.message);
+  }
+}
+
+function executarRespostaVoz(resp){
+  // Normaliza e procura padrão ACAO em qualquer formato
+  var texto = resp.trim();
+  
+  // Tenta encontrar linha com ACAO (aceita com ou sem acento)
+  var linhaAcao = '';
+  texto.split('\n').forEach(function(l){
+    var lt = l.trim().toUpperCase();
+    if(lt.startsWith('ACAO:') || lt.startsWith('AÇÃO:') || lt.startsWith('ACA')) linhaAcao = l.trim();
+  });
+
+  // Se não achou linha específica mas resposta começa com ACAO
+  if(!linhaAcao && texto.toUpperCase().startsWith('ACA')) linhaAcao = texto.split('\n')[0].trim();
+
+  if(linhaAcao){
+    // Normaliza separador
+    linhaAcao = linhaAcao.replace(/^AÇ[AÃ]O:/i,'ACAO:').replace(/^ACAO\s*:/i,'ACAO:');
+    var partes = linhaAcao.split(':');
+    var tipo = (partes[1]||'').trim().toUpperCase();
+    var dados = partes.slice(2).join(':').trim().replace(/['"`,]/g,'').trim();
+    var exp = texto.split('\n').filter(function(l){ return !l.trim().toUpperCase().startsWith('ACA'); }).join(' ').trim();
+
+    document.getElementById('voz-resposta').innerHTML='⏳ Executando: '+tipo+(dados?' - '+dados:'')+'...';
+
+    function norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
+    var dadosNorm = norm(dados);
+
+    if(tipo==='MAPA'){
+      setTimeout(function(){ window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(dados),'_blank'); },500);
+      document.getElementById('voz-resposta').innerHTML='✅ Abrindo mapa: '+dados;
+    }
+    else if(tipo==='WHATSAPP'){
+      var cw=DB.clientes.find(function(c){ return norm(c.rs).includes(dadosNorm.slice(0,8)); });
+      if(cw&&(cw.cel||cw.fone)){ setTimeout(function(){ wppM(cw.cel||cw.fone); },500); document.getElementById('voz-resposta').innerHTML='✅ Abrindo WhatsApp: '+cw.rs; }
+      else document.getElementById('voz-resposta').innerHTML='⚠️ Cliente "'+dados+'" não encontrado ou sem telefone.';
+    }
+    else if(tipo==='CLIENTE'){
+      var cli=DB.clientes.find(function(c){ return norm(c.rs)===dadosNorm; })
+        ||DB.clientes.find(function(c){ return norm(c.rs).includes(dadosNorm); })
+        ||DB.clientes.find(function(c){ return dadosNorm.split(' ').some(function(w){ return w.length>3&&norm(c.rs).includes(w); }); });
+      if(cli){
+        document.getElementById('voz-resposta').innerHTML='✅ Abrindo: '+cli.rs;
+        setTimeout(function(){ navM('clientes'); setTimeout(function(){ abrirClienteM(cli.id); },300); },500);
+      } else {
+        document.getElementById('voz-resposta').innerHTML='⚠️ Cliente "'+dados+'" não encontrado.';
+      }
+    }
+    else if(tipo==='AGENDA'){ setTimeout(function(){ navM('agenda'); },500); document.getElementById('voz-resposta').innerHTML='✅ Abrindo agenda'; }
+    else if(tipo==='PROXIMOS'){ setTimeout(function(){ navM('proximos'); buscarProximosM(); },500); document.getElementById('voz-resposta').innerHTML='✅ Buscando clientes próximos...'; }
+    else if(tipo==='LEMBRETE'||tipo==='AGENDA_ITEM'){
+      try{
+        var dataMatch=dados.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
+        var dtTar=new Date().toISOString().split('T')[0];
+        if(dataMatch){
+          var dia=dataMatch[1].padStart(2,'0');
+          var mes=dataMatch[2].padStart(2,'0');
+          var ano=dataMatch[3]?(dataMatch[3].length===2?'20'+dataMatch[3]:dataMatch[3]):new Date().getFullYear();
+          dtTar=ano+'-'+mes+'-'+dia;
+        }
+        var horaMatch=dados.match(/(\d{1,2})h(\d{0,2})|(\d{1,2}):(\d{2})/);
+        var hora=horaMatch?(horaMatch[1]||horaMatch[3]).padStart(2,'0')+':'+(horaMatch[2]||horaMatch[4]||'00'):'';
+        var cliEncontrado=null;
+        try{
+          cliEncontrado=DB.clientes.find(function(c){
+            if(!c.rs) return false;
+            return dadosNorm.split(' ').filter(function(w){return w.length>3;}).some(function(w){return norm(c.rs).includes(w);});
+          });
+        }catch(e2){}
+        var desc=dados.replace(/\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/g,'').replace(/\d{1,2}h\d{0,2}/g,'').trim()||dados;
+        if(hora) desc=hora+' - '+desc;
+        if(cliEncontrado) desc=desc+' - '+cliEncontrado.rs;
+        desc=desc.trim();
+        DB.tarefas=DB.tarefas||[];
+        DB.tarefas.push({id:'t'+Date.now(),desc:desc,dt:dtTar,done:false,
+          cliId:cliEncontrado?cliEncontrado.id:'',empId:cliEncontrado?cliEncontrado.empId:''});
+        salvarDB();
+        document.getElementById('voz-resposta').innerHTML='✅ Agendado: <b>'+desc+'</b><br>📅 '+fmtDM(dtTar)+(cliEncontrado?'<br>👤 '+cliEncontrado.rs:'');
+        toastM('Lembrete criado!');
+      }catch(e3){
+        document.getElementById('voz-resposta').innerHTML='❌ Erro ao criar lembrete: '+e3.message;
+      }
+    }
+  } else {
+    document.getElementById('voz-resposta').innerHTML=texto.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<b>$1</b>');
+  }
+  document.getElementById('voz-status-txt').textContent='Toque para falar novamente';
+}
+// ── Fim Voz ──────────────────────────────────────────────
+function fmtDM(dt){ if(!dt) return ''; var p=dt.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+
+function wppM(tel){
+  var num = tel.replace(/\D/g,'');
+  if(!num){ toastM('Telefone não cadastrado'); return; }
+  if(!num.startsWith('55')) num='55'+num;
+  window.open('https://wa.me/'+num);
+}
+
+function mapsCliM(id){
+  var c=DB.clientes.find(x=>x.id===id); if(!c) return;
+  var end=c.end&&c.end.trim()?c.end.trim()+', '+(c.cid||''):c.rs+', '+(c.cid||'');
+  window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(end),'_blank');
+}
+function selTodosCli(cb){ document.querySelectorAll('.cli-cb-m').forEach(x=>x.checked=cb.checked); }
+function rotaLoteCli(){
+  var ids=[...document.querySelectorAll('.cli-cb-m:checked')].map(x=>x.dataset.cliid);
+  if(!ids.length){toastM('Selecione clientes primeiro');return;}
+  if(ids.length>23){toastM('Máximo 23 clientes por rota');return;}
+  var cls=ids.map(id=>DB.clientes.find(x=>x.id===id)).filter(Boolean);
+  var ends=cls.map(c=>encodeURIComponent(c.end&&c.end.trim()?c.end.trim()+', '+(c.cid||''):c.rs+', '+(c.cid||'')));
+  var dest=ends.pop();
+  var url=ends.length
+    ?'https://www.google.com/maps/dir/?api=1&destination='+dest+'&waypoints='+ends.join('|')
+    :'https://www.google.com/maps/search/?api=1&query='+dest;
+  toastM('Abrindo rota com '+cls.length+' cliente(s)...');
+  window.open(url,'_blank');
+}
+function sacPedM(pedId){ sacCliM(pedId); }
+function sacCliM(pedId){
+  var p=DB.pedidos.find(x=>x.id===pedId); if(!p) return;
+  var c=DB.clientes.find(x=>x.id===p.cliId);
+  var e=DB.empresas.find(x=>x.id===p.empId);
+  if(!e?.sac){toastM('E-mail SAC não cadastrado na empresa');return;}
+  var nf=p.nf||p.num||'(sem NF)'; var razao=c?.rs||'—';
+  var assunto=encodeURIComponent('Chamado SAC ('+nf+') - ('+razao+')');
+  var corpo=encodeURIComponent('Olá! Referente a NF '+nf+' - Cliente '+razao+', segue item para análise.');
+  var cc=c?.email?'&cc='+encodeURIComponent(c.email):'';
+  var mailto='mailto:'+e.sac+'?subject='+assunto+'&body='+corpo+cc;
+  var a=document.createElement('a'); a.href=mailto; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+// ── Init ─────────────────────────────────────────────────
+function init(){
+  carregarDB();
+  if(DB.empresas.length) empAtualM = DB.empresas[0].id;
+  atualizarBadgeAgendaM();
+  renderM();
+}
+
 window.addEventListener('load', function(){
   init();
   initFirebaseM();
