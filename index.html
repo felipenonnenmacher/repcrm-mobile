@@ -2310,32 +2310,32 @@ function salvarCfgM(){
 
 
 // ── Busca lojas por segmento (Google Places API v1) ──────
-var MAPA_SEGMENTO_PLACES = {
-  'Papelaria':'papelaria',
-  'Presente':'loja de presentes',
-  'Gamer':'games eletrônicos',
-  'Varejo':'loja varejo',
-  'Atacado':'atacado distribuidor',
-  'Tabacaria':'tabacaria',
-  'Farmácia':'farmácia',
-  'Móveis':'loja de móveis',
-  'Vestuário':'loja de roupas',
-  'Calçados':'loja de calçados',
-  'Brinquedos':'loja de brinquedos',
-  'Esporte':'artigos esportivos',
-  'Pet':'petshop',
-  'Cosméticos':'loja de cosméticos',
-  'Alimentício':'supermercado mercado',
-  'Escolar':'material escolar',
-  'Distribuidora':'distribuidora',
-  'Livraria':'livraria',
-  'Eletrônicos':'loja de eletrônicos',
-  'Informática':'loja de informática',
-  'Decoração':'loja de decoração',
-  'Bazar':'bazar',
-  'Mercado':'mercado supermercado',
-  'Confeitaria':'confeitaria doces',
-  'Papelão':'papelão embalagem'
+var MAPA_SEGMENTO_OSM = {
+  'Papelaria':    [{shop:'stationery'},{shop:'art'}],
+  'Presente':     [{shop:'gift'}],
+  'Gamer':        [{shop:'video_games'},{shop:'electronics'}],
+  'Varejo':       [{shop:'general'},{shop:'variety_store'}],
+  'Atacado':      [{shop:'wholesale'}],
+  'Tabacaria':    [{shop:'tobacco'}],
+  'Farmácia':     [{amenity:'pharmacy'}],
+  'Móveis':       [{shop:'furniture'}],
+  'Vestuário':    [{shop:'clothes'}],
+  'Calçados':     [{shop:'shoes'}],
+  'Brinquedos':   [{shop:'toys'}],
+  'Esporte':      [{shop:'sports'}],
+  'Pet':          [{shop:'pet'}],
+  'Cosméticos':   [{shop:'beauty'},{shop:'cosmetics'}],
+  'Alimentício':  [{shop:'supermarket'},{shop:'grocery'}],
+  'Escolar':      [{shop:'stationery'},{shop:'books'}],
+  'Distribuidora':[{shop:'wholesale'}],
+  'Livraria':     [{shop:'books'}],
+  'Eletrônicos':  [{shop:'electronics'}],
+  'Informática':  [{shop:'computer'}],
+  'Decoração':    [{shop:'interior_decoration'},{shop:'furniture'}],
+  'Bazar':        [{shop:'general'},{shop:'second_hand'}],
+  'Mercado':      [{shop:'supermarket'},{shop:'convenience'}],
+  'Confeitaria':  [{shop:'confectionery'},{shop:'pastry'}],
+  'Papelão':      [{shop:'stationery'}]
 }
 
 function _mapaEstaticoErro(el){
@@ -2346,13 +2346,6 @@ async function buscarLojasPorSeg(escopo){
   var lista=document.getElementById('seg-busca-lista');
   if(!status||!lista) return;
 
-  var cfg=loadCfg();
-  var placesKey=cfg.placesKey||'';
-  if(!placesKey){
-    status.innerHTML='⚠️ Configure a Google Places API Key em <b>Configurações</b> para usar esta função.';
-    return;
-  }
-
   status.innerHTML='⏳ Obtendo localização...';
   lista.innerHTML='';
 
@@ -2360,655 +2353,112 @@ async function buscarLojasPorSeg(escopo){
 
   navigator.geolocation.getCurrentPosition(async function(pos){
     var lat=pos.coords.latitude; var lng=pos.coords.longitude;
-    var raio=escopo==='bairro'?1500:5000; // 1.5km bairro / 5km cidade
-    status.innerHTML='🔍 Buscando lojas ('+(escopo==='bairro'?'bairro':'cidade')+')...';
-
+    var raio=escopo==='bairro'?1500:5000;
     var segSel=document.getElementById('seg-busca-prox')?.value||'';
     var segs=segSel?[segSel]:[...new Set(DB.clientes.filter(c=>c.seg&&!c.encerrado).map(c=>c.seg))];
-    var keywords=[...new Set(segs.map(s=>MAPA_SEGMENTO_PLACES[s]||s).filter(Boolean))].slice(0,5);
 
-    if(!keywords.length){
-      status.innerHTML='⚠️ Nenhum segmento de cliente cadastrado. Selecione um segmento acima.';
-      return;
-    }
-
-    status.innerHTML='🔍 Buscando '+(escopo==='bairro'?'no bairro (1,5km)':'na cidade (5km)')+': '+keywords.join(', ')+'...';
-    var nomesExist=new Set(DB.clientes.map(c=>norm(c.rs).slice(0,8)));
-
-    var resultados=[];
-    var erros=[];
-    for(var ki=0;ki<keywords.length;ki++){
-      try{
-        // Google Places API (New) - Text Search
-        // Campos pedidos no FieldMask ficam restritos ao que a lista realmente usa
-        // (displayName/formattedAddress/location). nationalPhoneNumber e websiteUri
-        // foram removidos: são campos do nível Enterprise e, se a chave/projeto não
-        // tiver esse SKU habilitado, o Google rejeita a requisição inteira (e o catch
-        // abaixo escondia esse erro, fazendo a busca parecer simplesmente "não achou nada").
-        var r=await fetch('https://places.googleapis.com/v1/places:searchText',{
-          method:'POST',
-          headers:{
-            'Content-Type':'application/json',
-            'X-Goog-Api-Key':placesKey,
-            'X-Goog-FieldMask':'places.displayName,places.formattedAddress,places.location'
-          },
-          body:JSON.stringify({
-            textQuery: keywords[ki],
-            locationRestriction:{circle:{center:{latitude:lat,longitude:lng},radius:raio}},
-            pageSize:20,
-            languageCode:'pt-BR'
-          })
-        });
-        var d=await r.json();
-        if(!r.ok || d.error){
-          erros.push((d.error&&(d.error.message||d.error.status))||('HTTP '+r.status));
-          continue;
-        }
-        if(d.places) resultados.push(...d.places.map(p=>({...p,_kw:keywords[ki]})));
-      }catch(e){ console.error(e); erros.push(e.message||String(e)); }
-    }
-
-    // Deduplica por nome
-    var uniq={}; resultados.forEach(p=>{uniq[p.displayName?.text||p.formattedAddress]=p;});
-    resultados=Object.values(uniq);
-
-    if(!resultados.length){
-      if(erros.length){
-        status.innerHTML='❌ Erro na busca: '+erros[0]+(erros.length>1?' (+'+(erros.length-1)+' erro(s))':'');
-      } else if(!keywords.length){
-        status.innerHTML='Nenhum segmento de cliente cadastrado para basear a busca. Selecione um segmento acima.';
-      } else {
-        status.innerHTML='Nenhuma loja encontrada. Tente ampliar o raio ou outro segmento.';
-      }
-      return;
-    }
-
-    status.innerHTML='<b>'+resultados.length+'</b> loja(s) encontrada(s) num raio de '+(raio/1000)+'km';
-
-    // Letras (A, B, C...) para identificar cada loja no mapa e na lista - até 25 pinos
-    var LETRAS_MAPA='ABCDEFGHIJKLMNOPQRSTUVWXY';
-    var qtdLetra=0;
-    resultados.forEach(function(p){
-      var plat=p.location?.latitude, plng=p.location?.longitude;
-      if(plat!=null && plng!=null && qtdLetra<LETRAS_MAPA.length){
-        p._letra=LETRAS_MAPA[qtdLetra];
-        qtdLetra++;
-      }
+    // Mapeia segmentos para tags do OpenStreetMap
+    var osmTags=[];
+    segs.forEach(function(s){
+      var tags=MAPA_SEGMENTO_OSM[s];
+      if(tags) osmTags.push(...tags);
+      else osmTags.push({shop:s.toLowerCase()});
     });
+    // Deduplica
+    var tagStrings=[...new Set(osmTags.map(t=>JSON.stringify(t)))].map(s=>JSON.parse(s)).slice(0,6);
 
-    // Mapa estático do Google (Maps Static API) com todas as lojas encontradas juntas, sem rota
-    var mapaHtml='';
-    if(qtdLetra>0){
-      var mapUrl='https://maps.googleapis.com/maps/api/staticmap?size=640x360&scale=2&maptype=roadmap&key='+encodeURIComponent(placesKey);
-      mapUrl+='&markers=color:0x1976d2%7Clabel:V%7C'+lat+','+lng; // V = onde você está
-      resultados.forEach(function(p){
-        if(!p._letra) return;
-        var nomeNorm=norm(p.displayName?.text||'').slice(0,8);
-        var cor=nomesExist.has(nomeNorm)?'0x2e7d32':'0xd32f2f';
-        mapUrl+='&markers=color:'+cor+'%7Clabel:'+p._letra+'%7C'+p.location.latitude+','+p.location.longitude;
-      });
-      mapaHtml='<div style="margin-bottom:10px">'+
-        '<img src="'+mapUrl+'" style="width:100%;border-radius:8px;display:block" onerror="_mapaEstaticoErro(this)">'+
-        '<div style="font-size:10px;color:var(--t3);margin-top:3px">🔵 V = você · 🟢 já cliente · 🔴 prospecto novo · toque num item da lista abaixo para abrir aquela loja no Google Maps</div>'+
-      '</div>';
+    if(!tagStrings.length){
+      status.innerHTML='⚠️ Nenhum segmento cadastrado para buscar.';
+      return;
     }
 
-    lista.innerHTML=mapaHtml+resultados.map(function(p){
-      var nome=p.displayName?.text||'—';
-      var end=p.formattedAddress||'';
-      var nomeNorm=norm(nome).slice(0,8);
-      var jaCli=nomesExist.has(nomeNorm);
-      var plat=p.location?.latitude; var plng=p.location?.longitude;
-      var mapsUrl=plat?'https://www.google.com/maps/search/?api=1&query='+plat+','+plng:'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(nome+' '+end);
-      return '<div class="list-item">'+
-        '<div class="list-body" style="cursor:pointer" onclick="window.open(\''+mapsUrl+'\',\'_blank\')">'+
-          '<div class="list-name">'+(p._letra?'<b style="color:var(--acc)">'+p._letra+'</b> · ':'')+nome+(jaCli?' <span style="font-size:9px;background:var(--grn)22;color:var(--grn);padding:1px 5px;border-radius:8px">já cliente</span>':'')+'</div>'+
-          '<div class="list-sub">'+end+'</div>'+
-        '</div>'+
-        '<button style="background:none;border:1px solid var(--acc);border-radius:6px;padding:4px 10px;font-size:11px;color:var(--acc);cursor:pointer;flex-shrink:0" onclick="window.open(\''+mapsUrl+'\',\'_blank\')"><i class="ti ti-map-pin"></i></button>'+
-      '</div>';
-    }).join('');
+    status.innerHTML='🔍 Buscando '+(escopo==='bairro'?'no bairro (1,5km)':'na cidade (5km)')+'...';
 
+    try{
+      // Monta query Overpass — gratuita, sem API key
+      var conditions=tagStrings.map(function(t){
+        var key=Object.keys(t)[0]; var val=t[key];
+        return 'node["'+key+'"="'+val+'"](around:'+raio+','+lat+','+lng+'); way["'+key+'"="'+val+'"](around:'+raio+','+lat+','+lng+');';
+      }).join(' ');
+
+      var query='[out:json][timeout:20];('+conditions+')out center;';
+
+      var r=await fetch('https://overpass-api.de/api/interpreter',{
+        method:'POST',
+        body:'data='+encodeURIComponent(query)
+      });
+      if(!r.ok) throw new Error('Overpass HTTP '+r.status);
+      var d=await r.json();
+      var elements=d.elements||[];
+
+      if(!elements.length){
+        status.innerHTML='Nenhum estabelecimento encontrado num raio de '+(raio/1000)+'km. Tente ampliar ou outro segmento.';
+        return;
+      }
+
+      function norm2(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
+      var nomesExist=new Set(DB.clientes.map(function(c){return norm2(c.rs||'').slice(0,8);}));
+
+      var resultados=elements.map(function(el){
+        var elat=el.lat||(el.center&&el.center.lat);
+        var elng=el.lon||(el.center&&el.center.lon);
+        var nome=(el.tags&&(el.tags.name||el.tags['name:pt']))||'';
+        if(!nome) return null;
+        var end2=el.tags&&el.tags['addr:street']?(el.tags['addr:street']+(el.tags['addr:housenumber']?' '+el.tags['addr:housenumber']:'')):'';
+        var prospect=!nomesExist.has(norm2(nome).slice(0,8));
+        return {nome:nome,end2:end2,lat:elat,lng:elng,prospect:prospect};
+      }).filter(function(p){return p&&p.lat&&p.lng;});
+
+      var uniq={}; resultados.forEach(function(p){uniq[norm2(p.nome)]=p;}); resultados=Object.values(uniq);
+      var prospects=resultados.filter(function(p){return p.prospect;});
+      var jaClientes=resultados.filter(function(p){return !p.prospect;});
+
+      // Mapa estático Google (opcional - se tiver placesKey)
+      var cfg2=loadCfg(); var placesKey=cfg2.placesKey||'';
+      var mapaHtml='';
+      if(placesKey && resultados.length){
+        var LETRAS='ABCDEFGHIJKLMNOPQRSTUVWXY';
+        var mapUrl='https://maps.googleapis.com/maps/api/staticmap?size=640x340&scale=2&maptype=roadmap&key='+encodeURIComponent(placesKey);
+        mapUrl+='&markers=color:blue%7Clabel:V%7C'+lat+','+lng;
+        resultados.slice(0,25).forEach(function(p,i){
+          p._letra=LETRAS[i];
+          var cor=p.prospect?'red':'green';
+          mapUrl+='&markers=color:'+cor+'%7Clabel:'+p._letra+'%7C'+p.lat+','+p.lng;
+        });
+        mapaHtml='<img src="'+mapUrl+'" style="width:100%;border-radius:8px;display:block;margin-bottom:6px" onerror="_mapaEstaticoErro(this)">'
+          +'<div style="font-size:10px;color:var(--t3);margin-bottom:8px">🔵 V = você · 🟢 já cliente · 🔴 prospecto</div>';
+      }
+
+      status.innerHTML='<b>'+resultados.length+'</b> local(is) · <span style="color:var(--red)">'+prospects.length+' prospecto(s)</span>'+(jaClientes.length?' · <span style="color:var(--grn)">'+jaClientes.length+' já cliente(s)</span>':'');
+
+      lista.innerHTML=mapaHtml+resultados.map(function(p,i){
+        var cor=p.prospect?'var(--red)':'var(--grn)';
+        var ico=p.prospect?'ti-star':'ti-user-check';
+        var mapsLink='https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lng;
+        return '<div style="padding:8px 0;border-bottom:1px solid var(--s3);display:flex;align-items:flex-start;gap:8px">'
+          +(p._letra?'<span style="background:'+cor+';color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:2px">'+p._letra+'</span>':'')
+          +'<div style="flex:1">'
+            +'<div style="font-weight:600;font-size:13px;color:var(--t1)">'+p.nome+'</div>'
+            +(p.end2?'<div style="font-size:11px;color:var(--t3)">'+p.end2+'</div>':'')
+            +'<div style="display:flex;gap:6px;margin-top:4px">'
+              +'<span style="font-size:10px;color:'+cor+';font-weight:600"><i class="ti '+ico+'"></i> '+(p.prospect?'Prospecto':'Já cliente')+'</span>'
+              +'<a href="'+mapsLink+'" target="_blank" style="font-size:10px;color:var(--acc);text-decoration:none"><i class="ti ti-navigation"></i> Rota</a>'
+            +'</div>'
+          +'</div>'
+        +'</div>';
+      }).join('');
+
+    }catch(e){
+      console.error(e);
+      status.innerHTML='❌ Erro na busca: '+e.message;
+    }
   }, function(err){
-    var msgs={1:'Permissão negada.',2:'Localização indisponível.',3:'Tempo esgotado.'};
-    status.innerHTML='❌ '+(msgs[err.code]||'Erro.');
-  },{timeout:15000});
+    status.innerHTML='❌ Localização negada: '+err.message;
+  });
 }
 
 function buscarLojasPorSegBairro(){ buscarLojasPorSeg('bairro'); }
 function buscarLojasPorSegCidade(){ buscarLojasPorSeg('cidade'); }
-var _geocacheM = {};
-var _minhaLocM = null;
-
-function normalizar(str){
-  return str.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
-}
-
-function renderProximosM(){
-  var cont = document.getElementById('main-content');
-  var segs = [...new Set(DB.clientes.filter(c=>c.seg&&!c.encerrado).map(c=>c.seg))].sort();
-  cont.innerHTML = `
-  <div class="section">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div style="font-size:15px;font-weight:700;color:var(--t1)"><i class="ti ti-map-pin" style="color:var(--acc)"></i> Próximos</div>
-      <button class="btn bp" style="font-size:11px;padding:5px 12px" onclick="buscarProximosM()"><i class="ti ti-current-location"></i> Meus clientes</button>
-    </div>
-
-    <!-- Buscar lojas por segmento -->
-    <div class="card" style="margin-bottom:12px">
-      <div class="card-title"><i class="ti ti-search" style="color:var(--acc2)"></i>Buscar lojas por segmento</div>
-      <select class="fi" id="seg-busca-prox" style="margin-bottom:8px">
-        <option value="">Todos os segmentos cadastrados</option>
-        ${segs.map(s=>`<option value="${s}">${s}</option>`).join('')}
-      </select>
-      <div style="display:flex;gap:8px">
-        <button class="btn bs" style="flex:1;font-size:11px" onclick="buscarLojasPorSegBairro()"><i class="ti ti-building-store"></i> No bairro</button>
-        <button class="btn bp" style="flex:1;font-size:11px" onclick="buscarLojasPorSegCidade()"><i class="ti ti-building-community"></i> Na cidade</button>
-      </div>
-      <div id="seg-busca-status" style="font-size:11px;color:var(--t3);margin-top:8px;text-align:center"></div>
-      <div id="seg-busca-lista"></div>
-    </div>
-
-    <div id="proximos-status" style="text-align:center;color:var(--t3);font-size:13px;padding:12px">
-      Toque em <b>Meus clientes</b> para ver clientes da sua cidade.
-    </div>
-    <div id="proximos-lista"></div>
-  </div>`;
-}
-
-async function buscarProximosM(){
-  var status = document.getElementById('proximos-status');
-  var lista = document.getElementById('proximos-lista');
-  if(!status||!lista) return;
-
-  status.innerHTML='<i class="ti ti-loader"></i> Obtendo sua localização...';
-  lista.innerHTML='';
-
-  if(!navigator.geolocation){
-    status.innerHTML='❌ Geolocalização não disponível neste dispositivo.'; return;
-  }
-
-  navigator.geolocation.getCurrentPosition(async function(pos){
-    _minhaLocM = {lat: pos.coords.latitude, lng: pos.coords.longitude};
-    status.innerHTML='📍 Localização obtida! Identificando sua cidade...';
-
-    try{
-      // Reverse geocode para descobrir cidade atual
-      var r = await fetch(
-        'https://nominatim.openstreetmap.org/reverse?format=json&lat='+_minhaLocM.lat+'&lon='+_minhaLocM.lng+'&zoom=10',
-        {headers:{'User-Agent':'RepCRM-Mobile/1.0'}}
-      );
-      var d = await r.json();
-      var cidadeOriginal = d.address?.city || d.address?.town || d.address?.municipality || d.address?.county || '';
-      var cidadeAtual = normalizar(cidadeOriginal);
-
-      if(!cidadeAtual){
-        status.innerHTML='❌ Não foi possível identificar sua cidade atual.'; return;
-      }
-
-      // Filtra clientes da mesma cidade
-      var clisCidade = DB.clientes.filter(function(c){
-        if(c.encerrado) return false;
-        var cidCli = normalizar(c.cid||'');
-        return cidCli===cidadeAtual ||
-               cidCli.includes(cidadeAtual) ||
-               cidadeAtual.includes(cidCli);
-      });
-
-      status.innerHTML = '📍 Você está em <b>'+cidadeOriginal+'</b> · '+
-        '<b>'+clisCidade.length+'</b> cliente(s) nesta cidade'+
-        (clisCidade.length?
-          ' <button onclick="abrirTodosMapaM()" class="btn bs" style="font-size:10px;padding:2px 8px;margin-left:6px"><i class="ti ti-map"></i> Ver todos</button>':'');
-
-      if(!clisCidade.length){
-        lista.innerHTML='<div style="color:var(--t3);font-size:13px;padding:20px;text-align:center">Nenhum cliente cadastrado em '+cidadeOriginal+'.</div>';
-        return;
-      }
-
-      // Guarda para abrir todos no mapa
-      window._proximosResultados = clisCidade;
-
-      lista.innerHTML = clisCidade.map(function(c){
-        var e = DB.empresas.find(function(emp){return emp.id===c.empId;});
-        var endCompleto = [c.end, c.cid, c.uf].filter(Boolean).join(', ');
-        var endMapa = encodeURIComponent(endCompleto||c.cid||c.rs);
-        return '<div class="list-item">'+
-          
-          '<div class="list-body" onclick="abrirClienteM(\''+c.id+'\')" style="cursor:pointer">'+
-            '<div class="list-name">'+c.rs+'</div>'+
-            '<div class="list-sub" style="color:var(--t2)">'+(c.end||'Sem endereço cadastrado')+'</div>'+
-            (c.comp?'<div class="list-sub">'+c.comp+'</div>':'')+
-          '</div>'+
-          '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">'+
-            '<button onclick="window.open(\'https://www.google.com/maps/search/?api=1&query='+endMapa+'\',\'_blank\')" '+
-              'style="background:none;border:1px solid var(--acc);border-radius:6px;padding:4px 10px;font-size:10px;color:var(--acc);cursor:pointer">'+
-              '<i class="ti ti-map-pin"></i> Mapa</button>'+
-            (c.cel||c.fone?
-              '<button onclick="wppM(\''+((c.cel||c.fone)||'')+'\''+')" '+
-              'style="background:none;border:1px solid #25d366;border-radius:6px;padding:4px 10px;font-size:10px;color:#25d366;cursor:pointer">'+
-              '<i class="ti ti-brand-whatsapp"></i></button>':'')+ 
-          '</div>'+
-        '</div>';
-      }).join('');
-
-    }catch(err){
-      status.innerHTML='❌ Erro ao identificar cidade: '+err.message;
-    }
-
-  }, function(err){
-    var msgs={1:'Permissão negada. Toque em Permitir.',2:'Localização indisponível.',3:'Tempo esgotado.'};
-    status.innerHTML='❌ '+(msgs[err.code]||'Erro ao obter localização.');
-  },{timeout:15000, maximumAge:60000});
-}
-
-function abrirTodosMapaM(){
-  if(!window._proximosResultados||!window._proximosResultados.length) return;
-  window._proximosResultados.slice(0,9).forEach(function(c,i){
-    setTimeout(function(){
-      var end = encodeURIComponent([c.end,c.cid,c.uf].filter(Boolean).join(', ')||c.rs);
-      window.open('https://www.google.com/maps/search/?api=1&query='+end,'_blank');
-    },i*700);
-  });
-}
-// ── Fim Clientes Próximos ────────────────────────────────
-// ══ FIREBASE SYNC ══
-// ╔══════════════════════════════════════════════════════╗
-// ║         CONFIGURAÇÃO FIREBASE — PREENCHA AQUI        ║
-// ║  Ao atualizar o sistema, copie este bloco para       ║
-// ║  o arquivo novo e o sync funcionará automaticamente. ║
-// ╚══════════════════════════════════════════════════════╝
-var FB_CONFIG_PADRAO_M = {
-  "apiKey": "AIzaSyCn0sVoLm5aWG6gfcdUxXI6Sh1qrSjggbc",
-  "authDomain": "fnreprescrm.firebaseapp.com",
-  "databaseURL": "https://fnreprescrm-default-rtdb.firebaseio.com",
-  "projectId": "fnreprescrm",
-  "storageBucket": "fnreprescrm.firebasestorage.app",
-  "messagingSenderId": "1090178885977",
-  "appId": "1:1090178885977:web:3dd6febd872a1a522d4448"
-};
-var FB_CHAVE_PADRAO_M = ""; // ex: minha-empresa-2024
-// ══════════════════════════════════════════════════════
-var fbAppM = null;
-
-function parseFbConfig(raw){
-  var s = raw.trim()
-    .replace(/^\s*(const|var|let)\s+\w+\s*=\s*/,'')
-    .replace(/;\s*$/,'')
-    .trim();
-  return Function('return (' + s + ')')();
-}
-var fbDBM  = null;
-var fbRefM = null;
-var fbRefImgsM = null;
-var fbEscutandoM = false;
-
-function fbChaveM(){ return localStorage.getItem('fb_chave')||'repcrm'; }
-
-// Aplica no app uma foto de NF que chegou de outro aparelho (via Firebase)
-function aplicarImagemFiscalRemotaM(id, dados){
-  if(!id || !dados || !dados.b64) return;
-  try{
-    var atual=localStorage.getItem('repcm_nf_img_'+id);
-    if(atual){ var p=JSON.parse(atual); if(p.b64===dados.b64) return; }
-  }catch(e){}
-  try{ localStorage.setItem('repcm_nf_img_'+id, JSON.stringify({b64:dados.b64, mime:dados.mime||'image/jpeg'})); }catch(e){}
-  var n=(DB.fiscal||[]).find(function(x){ return x.id===id; });
-  if(n){ n.imgB64=dados.b64; n.imgMime=dados.mime||'image/jpeg'; }
-  if(paginaAtual==='fiscal') renderFiscalM();
-}
-// Remove localmente a foto de uma NF quando ela é apagada em outro aparelho
-function removerImagemFiscalLocalM(id){
-  if(!id) return;
-  try{ localStorage.removeItem('repcm_nf_img_'+id); }catch(e){}
-  var n=(DB.fiscal||[]).find(function(x){ return x.id===id; });
-  if(n){ delete n.imgB64; delete n.imgMime; }
-  if(paginaAtual==='fiscal') renderFiscalM();
-}
-
-function setSyncStatusM(status){
-  var btn = document.getElementById('btn-nuvem-m');
-  var sub = document.getElementById('sub-nuvem-mais');
-  var mapa = {
-    conectado:    {ic:'color:var(--grn)', sub:'🟢 Conectado'},
-    sincronizando:{ic:'color:var(--org)', sub:'🔄 Sincronizando...'},
-    erro:         {ic:'color:var(--red)', sub:'⚠️ Erro de conexão'},
-    offline:      {ic:'color:var(--t3)', sub:'Configurar Firebase'},
-  };
-  var m = mapa[status]||mapa['offline'];
-  if(btn) btn.querySelector('i').style.color = m.ic.split(':')[1];
-  if(sub) sub.textContent = m.sub;
-}
-
-function initFirebaseM(){
-  var raw = localStorage.getItem('fb_config');
-  if(!raw && FB_CONFIG_PADRAO_M.apiKey){
-    raw = JSON.stringify(FB_CONFIG_PADRAO_M);
-    if(FB_CHAVE_PADRAO_M) localStorage.setItem('fb_chave', FB_CHAVE_PADRAO_M);
-  }
-  if(!raw) return;
-  try {
-    var cfg = parseFbConfig(raw);
-    if(!firebase.apps.length) fbAppM = firebase.initializeApp(cfg);
-    else fbAppM = firebase.app();
-    fbDBM = firebase.database();
-    fbRefM = fbDBM.ref(fbChaveM()+'/db');
-    fbRefImgsM = fbDBM.ref(fbChaveM()+'/fiscalImgs');
-    firebase.database().ref('.info/connected').on('value', function(snap){
-      setSyncStatusM(snap.val() ? 'conectado' : 'offline');
-    });
-    if(!fbEscutandoM){
-      fbEscutandoM = true;
-      // Fotos das NFs sincronizam à parte (não junto do resto do CRM), pra não
-      // deixar toda sincronização pesada — cada foto vai e vem sozinha.
-      fbRefImgsM.on('child_added',   function(snap){ aplicarImagemFiscalRemotaM(snap.key, snap.val()); });
-      fbRefImgsM.on('child_changed', function(snap){ aplicarImagemFiscalRemotaM(snap.key, snap.val()); });
-      fbRefImgsM.on('child_removed', function(snap){ removerImagemFiscalLocalM(snap.key); });
-      fbRefM.on('value', function(snap){
-        var remoto = snap.val();
-        if(!remoto) return;
-        if(remoto._ts && DB._ts && remoto._ts <= DB._ts) return;
-        DB.empresas    = remoto.empresas    || [];
-        DB.clientes    = remoto.clientes    || [];
-        DB.pedidos     = remoto.pedidos     || [];
-        DB.tarefas     = remoto.tarefas     || [];
-        DB.eventos     = remoto.eventos     || [];
-        DB.fiscal      = remoto.fiscal      || [];
-        DB.finalidades = remoto.finalidades || [];
-        DB.leads       = remoto.leads       || [];
-        DB.cicloAcoes  = remoto.cicloAcoes  || {};
-        DB._ts         = remoto._ts;
-        // Re-renderiza fiscal se estiver na página
-        if(paginaAtual==='fiscal') renderFiscalM();
-        // Restaura config e foto da nuvem
-        if(remoto._cfg){
-          var cfgLocal = loadCfg();
-          if(remoto._cfg.iakey&&!cfgLocal.iakey)    cfgLocal.iakey=remoto._cfg.iakey;
-          if(remoto._cfg.placesKey&&!cfgLocal.placesKey) cfgLocal.placesKey=remoto._cfg.placesKey;
-          if(remoto._cfg.nomeAmora) cfgLocal.nomeAmora=remoto._cfg.nomeAmora;
-          saveCfg(cfgLocal);
-          if(remoto._cfg.fotoAmora&&!localStorage.getItem('repcrm_amora_foto'))
-            localStorage.setItem('repcrm_amora_foto', remoto._cfg.fotoAmora);
-          setTimeout(atualizarBotaoAmora, 500);
-        }
-        salvarLocal_M();
-        renderM();
-      }, function(){ setSyncStatusM('erro'); });
-    }
-  } catch(e){ setSyncStatusM('erro'); }
-}
-
-function salvarLocal_M(){
-  save('empresas', DB.empresas);
-  save('clientes', DB.clientes);
-  save('pedidos',  DB.pedidos);
-  save('tarefas',  DB.tarefas);
-  save('eventos',  DB.eventos);
-  // Salva fiscal sem as imagens no localStorage (imagens ficam em chave separada)
-  var fiscalSemImg=(DB.fiscal||[]).map(function(n){
-    var copia=Object.assign({},n);
-    if(copia.imgB64){
-      try{ localStorage.setItem('repcm_nf_img_'+n.id, JSON.stringify({b64:n.imgB64,mime:n.imgMime||'image/jpeg'})); }catch(e){}
-      delete copia.imgB64; delete copia.imgMime;
-    }
-    return copia;
-  });
-  save('fiscal',      fiscalSemImg);
-  save('finalidades', DB.finalidades||[]);
-  save('leads',       DB.leads||[]);
-  save('cicloAcoes',  DB.cicloAcoes||{});
-}
-
-function salvarNuvemM(){
-  if(!fbRefM){ setSyncStatusM('offline'); return; }
-  setSyncStatusM('sincronizando');
-  DB._ts = Date.now();
-  var cfg = loadCfg();
-  fbRefM.set({
-    empresas:    DB.empresas,
-    clientes:    DB.clientes,
-    pedidos:     DB.pedidos,
-    tarefas:     DB.tarefas,
-    eventos:     DB.eventos,
-    // Envia fiscal sem imagens para o Firebase (imagens ficam no dispositivo)
-    fiscal:      (DB.fiscal||[]).map(function(n){var c=Object.assign({},n);delete c.imgB64;delete c.imgMime;return c;}),
-    finalidades: DB.finalidades || [],
-    leads:       DB.leads       || [],
-    cicloAcoes:  DB.cicloAcoes  || {},
-    _ts:         DB._ts,
-    _cfg:{
-      iakey:     cfg.iakey||'',
-      placesKey: cfg.placesKey||'',
-      nomeAmora: cfg.nomeAmora||'Amora',
-      fotoAmora: localStorage.getItem('repcrm_amora_foto')||''
-    }
-  }).then(function(){ setSyncStatusM('conectado'); })
-    .catch(function(){ setSyncStatusM('erro'); });
-}
-
-function abrirModalNuvemM(){
-  document.getElementById('nuvem-cfg-m').value = localStorage.getItem('fb_config')||'';
-  document.getElementById('nuvem-chave-m').value = fbChaveM();
-  var s = document.getElementById('nuvem-status-m');
-  s.textContent = fbDBM ? '🟢 Conectado ao Firebase' : '⚪ Não conectado';
-  s.style.color = fbDBM ? 'var(--grn)' : 'var(--t3)';
-  abrirModal('mNuvemM');
-}
-
-function salvarCfgNuvemM(){
-  var raw = document.getElementById('nuvem-cfg-m').value.trim() || localStorage.getItem('fb_config') || '';
-  if(!raw && typeof FB_CONFIG_PADRAO_M!=='undefined' && FB_CONFIG_PADRAO_M && FB_CONFIG_PADRAO_M.apiKey){
-    raw = JSON.stringify(FB_CONFIG_PADRAO_M);
-  }
-  var chave = document.getElementById('nuvem-chave-m').value.trim()||'repcrm';
-  var s = document.getElementById('nuvem-status-m');
-  try { var cfg = parseFbConfig(raw); raw = JSON.stringify(cfg); } catch(e){ s.textContent='❌ JSON inválido'; s.style.color='var(--red)'; return; }
-  localStorage.setItem('fb_config', raw);
-  localStorage.setItem('fb_chave', chave);
-  fbEscutandoM = false;
-  if(fbAppM){ try{ fbAppM.delete(); }catch(e){} fbAppM=null; fbDBM=null; fbRefM=null; }
-  s.textContent='🔄 Conectando...'; s.style.color='var(--org)';
-  setTimeout(function(){
-    initFirebaseM();
-    if(fbDBM){ s.textContent='🟢 Conectado!'; s.style.color='var(--grn)'; salvarNuvemM(); }
-    else { s.textContent='❌ Falha — verifique as credenciais'; s.style.color='var(--red)'; }
-  }, 800);
-}
-
-function desconectarNuvemM(){
-  if(fbAppM){ try{ fbAppM.delete(); }catch(e){} }
-  fbAppM=null; fbDBM=null; fbRefM=null; fbEscutandoM=false;
-  localStorage.removeItem('fb_config');
-  setSyncStatusM('offline');
-  var s = document.getElementById('nuvem-status-m');
-  if(s){ s.textContent='⚪ Desconectado'; s.style.color='var(--t3)'; }
-}
-// ══ FIM FIREBASE SYNC ══
-
-// ── Amora — Assistente Virtual ───────────────────────────
-var vozAtiva = false;
-var reconhecimento = null;
-var _ultimaResposta = '';
-var _vozSintetizador = window.speechSynthesis;
-var _vozAmora = null;
-
-function carregarVozAmora(){
-  var vozes = _vozSintetizador.getVoices();
-  _vozAmora = vozes.find(function(v){return v.lang==='pt-BR'&&v.name.toLowerCase().includes('female');})
-    ||vozes.find(function(v){return v.lang==='pt-BR'&&(v.name.includes('Google')||v.name.includes('Microsoft'));})
-    ||vozes.find(function(v){return v.lang==='pt-BR';})
-    ||vozes.find(function(v){return v.lang.startsWith('pt');})
-    ||null;
-}
-if(_vozSintetizador){ _vozSintetizador.onvoiceschanged=carregarVozAmora; carregarVozAmora(); }
-
-function falarAmora(texto){
-  // Síntese de voz desativada — resposta apenas em texto
-  _ultimaResposta=texto;
-  var el=document.getElementById('btn-falar');
-  if(el) el.style.display='none';
-}
-
-function falarUltima(){ if(_ultimaResposta) falarAmora(_ultimaResposta); }
-
-function previewFotoAmora(input){
-  if(!input.files||!input.files[0]) return;
-  var reader=new FileReader();
-  reader.onload=function(e){
-    var base64=e.target.result;
-    // Preview no settings
-    var prev=document.getElementById('preview-amora-foto');
-    if(prev){ prev.innerHTML='<img src="'+base64+'" style="width:100%;height:100%;object-fit:cover">'; }
-    // Salva no localStorage
-    localStorage.setItem('repcrm_amora_foto', base64);
-    // Atualiza botão flutuante
-    atualizarBotaoAmora();
-  };
-  reader.readAsDataURL(input.files[0]);
-}
-
-function removerFotoAmora(){
-  localStorage.removeItem('repcrm_amora_foto');
-  var prev=document.getElementById('preview-amora-foto');
-  var cfg=loadCfg();
-  var nome=(cfg.nomeAmora||'Amora')[0].toUpperCase();
-  if(prev) prev.innerHTML='<span style="color:#fff;font-size:20px;font-weight:700">'+nome+'</span>';
-  atualizarBotaoAmora();
-}
-
-function atualizarBotaoAmora(){
-  var btn=document.getElementById('btn-voz');
-  if(!btn) return;
-  var foto=localStorage.getItem('repcrm_amora_foto');
-  var cfg=loadCfg();
-  var nome=(cfg.nomeAmora||'Amora');
-  if(foto){
-    btn.innerHTML='<img src="'+foto+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%"><span style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);font-size:7px;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.5);letter-spacing:0.5px">'+nome.toUpperCase()+'</span>';
-    btn.style.padding='0';
-    btn.style.overflow='hidden';
-    btn.style.position='fixed'; // manter position
-  } else {
-    var letra=nome[0].toUpperCase();
-    btn.innerHTML='<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="13" r="8" fill="#fde68a"/><path d="M8 13 Q8 5 16 5 Q24 5 24 13 Q22 8 16 8 Q10 8 8 13Z" fill="#92400e"/><path d="M8 13 Q6 18 8 22 Q8 16 8 13Z" fill="#92400e"/><path d="M24 13 Q26 18 24 22 Q24 16 24 13Z" fill="#92400e"/><circle cx="13" cy="13" r="1.2" fill="#1e293b"/><circle cx="19" cy="13" r="1.2" fill="#1e293b"/><path d="M13 17 Q16 20 19 17" stroke="#e11d48" stroke-width="1.2" fill="none" stroke-linecap="round"/><path d="M10 24 Q10 20 16 20 Q22 20 22 24 L22 32 L10 32Z" fill="#7c3aed"/><path d="M8 12 Q8 6 16 6 Q24 6 24 12" stroke="#92400e" stroke-width="1.5" fill="none"/><rect x="6.5" y="11" width="2.5" height="4" rx="1" fill="#92400e"/><rect x="23" y="11" width="2.5" height="4" rx="1" fill="#92400e"/></svg><span id="btn-voz-label" style="font-size:7px;font-weight:700;letter-spacing:0.5px;margin-top:1px">'+nome.toUpperCase()+'</span>';
-  }
-}
-
-function carregarFotoAmoraSettings(){
-  var foto=localStorage.getItem('repcrm_amora_foto');
-  var prev=document.getElementById('preview-amora-foto');
-  var cfg=loadCfg();
-  if(foto && prev){
-    prev.innerHTML='<img src="'+foto+'" style="width:100%;height:100%;object-fit:cover">';
-  } else if(prev){
-    var letra=(cfg.nomeAmora||'Amora')[0].toUpperCase();
-    document.getElementById('preview-amora-letra').textContent=letra;
-  }
-}
-
-
-function getNomeAmora(){ var cfg=loadCfg(); return (cfg.nomeAmora||'Amora').toLowerCase(); }
-
-function toggleVoz(){
-  if(vozAtiva) pararVoz();
-  else iniciarVoz();
-}
-
-function iniciarVoz(){
-  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){ toastM('Reconhecimento de voz não suportado. Use o Chrome.'); return; }
-  document.getElementById('painel-voz').style.display='block';
-  var _fraseAcumulada = '';
-  var _pausaTimer = null;
-  var _aguardandoComando = false;
-
-  reconhecimento=new SR();
-  reconhecimento.lang='pt-BR';
-  reconhecimento.continuous=false;
-  reconhecimento.interimResults=true;
-  reconhecimento.maxAlternatives=1;
-
-  reconhecimento.onstart=function(){
-    vozAtiva=true;
-    document.getElementById('btn-voz').style.boxShadow='0 0 0 4px rgba(219,39,119,.4),0 4px 20px rgba(124,58,237,.5)';
-    document.getElementById('voz-status-dot').style.background='#db2777';
-    document.getElementById('voz-status-txt').textContent='Ouvindo... diga "'+getNomeAmora()+'"';
-    if(!_aguardandoComando) document.getElementById('voz-transcricao').textContent='';
-  };
-
-  reconhecimento.onresult=function(event){
-    var txt='';
-    for(var i=0;i<event.results.length;i++) txt+=event.results[i][0].transcript;
-    txt=txt.trim();
-    document.getElementById('voz-transcricao').textContent='🎤 "'+txt+'"';
-
-    if(event.results[event.results.length-1].isFinal){
-      _fraseAcumulada=(_fraseAcumulada+' '+txt).trim();
-      var txLower=_fraseAcumulada.toLowerCase();
-      var nome=getNomeAmora();
-
-      // Detectou o nome — aguarda o resto do comando
-      if(txLower.includes(nome)){
-        _aguardandoComando=true;
-        clearTimeout(_pausaTimer);
-        var comando=txLower.replace(new RegExp(nome,'gi'),'').trim();
-        if(comando.length>2){
-          // Tem comando junto com o nome — processa com delay para capturar mais
-          _pausaTimer=setTimeout(function(){
-            document.getElementById('voz-status-txt').textContent='Amora processando...';
-            document.getElementById('voz-resposta').innerHTML='<span style="color:#7c3aed">⏳ Analisando...</span>';
-            processarComandoVoz(_fraseAcumulada.replace(new RegExp(nome,'gi'),'').trim());
-            _fraseAcumulada=''; _aguardandoComando=false;
-          },1200);
-        } else {
-          // Só o nome — responde e fica ouvindo o comando
-          var saud='Olá! Como posso ajudar?';
-          document.getElementById('voz-resposta').innerHTML='<span style="color:#7c3aed">👋 '+saud+'</span>';
-          falarAmora(saud);
-          document.getElementById('voz-status-txt').textContent='Ouvindo seu comando...';
-        }
-      } else if(_aguardandoComando && _fraseAcumulada.length>2){
-        // Já ouviu o nome antes, agora recebeu o comando
-        clearTimeout(_pausaTimer);
-        _pausaTimer=setTimeout(function(){
-          var fraseCompleta=_fraseAcumulada.toLowerCase();
-          var nome2=getNomeAmora();
-          var cmd=fraseCompleta.replace(new RegExp(nome2,'gi'),'').trim();
-          if(cmd.length>2){
-            document.getElementById('voz-status-txt').textContent='Amora processando...';
-            document.getElementById('voz-resposta').innerHTML='<span style="color:#7c3aed">⏳ Analisando...</span>';
-            processarComandoVoz(cmd);
-          }
-          _fraseAcumulada=''; _aguardandoComando=false;
-        },800);
-      }
-    }
-  };
-
-  reconhecimento.onerror=function(e){
-    var msgs={'not-allowed':'Permissão de microfone negada.','network':'Erro de rede.'};
-    if(msgs[e.error]) document.getElementById('voz-resposta').innerHTML='❌ '+msgs[e.error];
-    if(e.error==='not-allowed'||e.error==='network') pararVoz();
-  };
-
-  reconhecimento.onend=function(){
-    // Reinicia automaticamente enquanto ativo
-    if(vozAtiva){
-      setTimeout(function(){
-        try{ reconhecimento.start(); }catch(e){}
-      },200);
-    }
-  };
-
-  reconhecimento.start();
-}
-
-function pararVoz(){
-  vozAtiva=false;
-  if(reconhecimento){ try{ reconhecimento.stop(); }catch(e){} }
-  if(_vozSintetizador) _vozSintetizador.cancel();
-  document.getElementById('btn-voz').style.boxShadow='0 4px 20px rgba(124,58,237,.5)';
-  document.getElementById('voz-status-dot').style.background='var(--t3)';
-  document.getElementById('voz-status-txt').textContent='Diga "'+getNomeAmora()+'" para ativar';
-}
 
 async function processarComandoVoz(texto){
   document.getElementById('voz-status-txt').textContent='Processando...';
@@ -3017,22 +2467,19 @@ async function processarComandoVoz(texto){
   function norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
   var txNorm = norm(texto);
 
-  // Resposta com voz para qualquer resultado
   function responderAmora(texto){
     document.getElementById('voz-resposta').innerHTML=texto.replace(/\n/g,'<br>');
     document.getElementById('voz-status-txt').textContent='Ouvindo... diga "'+getNomeAmora()+'"';
     falarAmora(texto.replace(/<[^>]+>/g,''));
   }
 
-  // ── Detecção LOCAL de intenção (sem IA) ──────────────
   var ehBuscaCli = /buscar|abrir|ver|mostrar|cliente|procurar/.test(txNorm);
-  var ehLembrete = /visita|reuniao|reunião|lembrete|marcar|agenda|agendar|ligar|ligação/.test(txNorm);
-  var ehMapa = /mapa|rota|localizar|onde fica|endereço/.test(txNorm);
-  var ehWpp = /whatsapp|zap|mensagem/.test(txNorm);
-  var ehProx = /proximos|próximos|perto|nearby|aqui/.test(txNorm);
-  var ehAnalise = /analise|análise|últimos pedidos|ultimo pedido|histórico|resumo|antes da visita|preparar visita/.test(txNorm);
+  var ehLembrete = /visita|reuniao|reunião|lembrete|marcar|agenda|agendar|ligar/.test(txNorm);
+  var ehMapa     = /mapa|rota|localizar|onde fica|endereço/.test(txNorm);
+  var ehWpp      = /whatsapp|zap|mensagem/.test(txNorm);
+  var ehProx     = /proximos|próximos|perto|nearby|aqui/.test(txNorm);
+  var ehAnalise  = /analise|análise|último pedido|histórico|resumo|antes da visita/.test(txNorm);
 
-  // Busca cliente no texto
   var cliMatch = null;
   var palavras = txNorm.split(' ').filter(function(w){ return w.length>3; });
   DB.clientes.forEach(function(c){
@@ -3043,67 +2490,10 @@ async function processarComandoVoz(texto){
     }
   });
 
-  if(ehProx){
-    navM('proximos'); buscarProximosM();
-    responderAmora('Buscando clientes próximos à sua localização!');
-    return;
-  }
-  if(ehMapa && cliMatch){
-    var end=[cliMatch.end,cliMatch.cid,cliMatch.uf].filter(Boolean).join(', ')||cliMatch.rs;
-    window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(end),'_blank');
-    responderAmora('Abrindo o mapa para '+cliMatch.rs+'!');
-    return;
-  }
-  if(ehWpp && cliMatch && (cliMatch.cel||cliMatch.fone)){
-    wppM(cliMatch.cel||cliMatch.fone);
-    responderAmora('Abrindo WhatsApp de '+cliMatch.rs+'!');
-    return;
-  }
-  if(ehBuscaCli && !ehAnalise && cliMatch){
-    responderAmora('Abrindo o cadastro de '+cliMatch.rs+'!');
-    setTimeout(function(){ navM('clientes'); setTimeout(function(){ abrirClienteM(cliMatch.id); },300); },800);
-    return;
-  }
-  if(ehLembrete){
-    var dataMatch=texto.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
-    var dtTar=new Date().toISOString().split('T')[0];
-    if(dataMatch){
-      var dia=dataMatch[1].padStart(2,'0'); var mes=dataMatch[2].padStart(2,'0');
-      var ano=dataMatch[3]?(dataMatch[3].length===2?'20'+dataMatch[3]:dataMatch[3]):new Date().getFullYear();
-      dtTar=ano+'-'+mes+'-'+dia;
-    }
-    var horaMatch=texto.match(/(\d{1,2})h(\d{0,2})/);
-    var hora=horaMatch?horaMatch[1].padStart(2,'0')+':'+(horaMatch[2]||'00').padStart(2,'0'):'';
-    var desc=texto.replace(/buscar|abrir|ver|mostrar|cliente|procurar|marcar|agendar|lembrete|visita|reunião|reuniao/gi,'').replace(/\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/g,'').replace(/\d{1,2}h\d{0,2}/g,'').trim();
-    if(hora) desc=hora+' - '+desc;
-    if(cliMatch) desc=desc+' - '+cliMatch.rs;
-    desc=desc.trim()||texto;
-    DB.tarefas=DB.tarefas||[];
-    DB.tarefas.push({id:'t'+Date.now(),desc:desc,dt:dtTar,done:false,cliId:cliMatch?cliMatch.id:'',empId:cliMatch?cliMatch.empId:''});
-    salvarDB();
-    var dtFmt=dtTar.split('-').reverse().join('/');
-    responderAmora('Lembrete criado! '+desc+' para o dia '+dtFmt+(cliMatch?', cliente '+cliMatch.rs:'')+'.');
-    return;
-  }
-
-  // ── Chama Gemini para análise avançada ──────────────
-  var cfg=loadCfg(); var key=(cfg.iakey||'').trim();
-  if(!key){
-    responderAmora('Preciso de uma chave do Gemini para análises avançadas. Configure em Configurações.');
-    return;
-  }
-
-  // Contexto rico do cliente para análise
-  var contextoCliente = '';
-  if(cliMatch){
-    var pedsCli=DB.pedidos.filter(function(p){return p.cliId===cliMatch.id&&!p.cancelado;}).sort(function(a,b){return b.dt>a.dt?1:-1;}).slice(0,5);
-    var empsCli=[...new Set(pedsCli.map(function(p){return p.empId;}))].map(function(eid){var e=DB.empresas.find(function(x){return x.id===eid;}); return e?e.nome:'';}).filter(Boolean);
-    contextoCliente='Cliente: '+cliMatch.rs+'\nCidade: '+(cliMatch.cid||'')+'\nSegmento: '+(cliMatch.seg||'')+'\nÚltimos pedidos:\n'+
-      pedsCli.map(function(p){
-        var e=DB.empresas.find(function(x){return x.id===p.empId;});
-        return '- '+(p.dt||'')+(e?' ('+e.nome+')':'')+' R$ '+(p.val||0).toLocaleString('pt-BR');
-      }).join('\n');
-  }
+  if(ehProx){ navM('proximos'); buscarProximosM(); responderAmora('Buscando clientes próximos!'); return; }
+  if(ehMapa&&cliMatch){ var end=[cliMatch.end,cliMatch.cid,cliMatch.uf].filter(Boolean).join(', ')||cliMatch.rs; window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(end),'_blank'); responderAmora('Abrindo mapa para '+cliMatch.rs+'!'); return; }
+  if(ehWpp&&cliMatch&&(cliMatch.cel||cliMatch.fone)){ wppM(cliMatch.cel||cliMatch.fone); responderAmora('Abrindo WhatsApp de '+cliMatch.rs+'!'); return; }
+  if(ehBuscaCli&&!ehAnalise&&cliMatch){ responderAmora('Abrindo cadastro de '+cliMatch.rs+'!'); setTimeout(function(){ navM('clientes'); setTimeout(function(){ abrirClienteM(cliMatch.id); },300); },800); return; }
 
   // Sem cliente específico identificado: usa o contexto completo do CRM (mesmo
   // resumo rico usado na caixa "Perguntar à IA" do dashboard), não só os nomes.
