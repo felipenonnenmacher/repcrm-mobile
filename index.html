@@ -2653,6 +2653,38 @@ function init(){
   renderM();
 }
 
+function renderProximosM(){
+  var cont = document.getElementById('main-content');
+  var segs = [...new Set(DB.clientes.filter(c=>c.seg&&!c.encerrado).map(c=>c.seg))].sort();
+  cont.innerHTML = `
+  <div class="section">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:15px;font-weight:700;color:var(--t1)"><i class="ti ti-map-pin" style="color:var(--acc)"></i> Próximos</div>
+      <button class="btn bp" style="font-size:11px;padding:5px 12px" onclick="buscarProximosM()"><i class="ti ti-current-location"></i> Meus clientes</button>
+    </div>
+
+    <!-- Buscar lojas por segmento -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title"><i class="ti ti-search" style="color:var(--acc2)"></i>Buscar lojas por segmento</div>
+      <select class="fi" id="seg-busca-prox" style="margin-bottom:8px">
+        <option value="">Todos os segmentos cadastrados</option>
+        ${segs.map(s=>`<option value="${s}">${s}</option>`).join('')}
+      </select>
+      <div style="display:flex;gap:8px">
+        <button class="btn bs" style="flex:1;font-size:11px" onclick="buscarLojasPorSegBairro()"><i class="ti ti-building-store"></i> No bairro</button>
+        <button class="btn bp" style="flex:1;font-size:11px" onclick="buscarLojasPorSegCidade()"><i class="ti ti-building-community"></i> Na cidade</button>
+      </div>
+      <div id="seg-busca-status" style="font-size:11px;color:var(--t3);margin-top:8px;text-align:center"></div>
+      <div id="seg-busca-lista"></div>
+    </div>
+
+    <div id="proximos-status" style="text-align:center;color:var(--t3);font-size:13px;padding:12px">
+      Toque em <b>Meus clientes</b> para ver clientes da sua cidade.
+    </div>
+    <div id="proximos-lista"></div>
+  </div>`;
+}
+
 async function buscarProximosM(){
   var status = document.getElementById('proximos-status');
   var lista = document.getElementById('proximos-lista');
