@@ -2310,223 +2310,215 @@ function salvarCfgM(){
 
 
 // ── Busca lojas por segmento (Google Places API v1) ──────
-var MAPA_SEGMENTO_OSM = {
-  'Papelaria':    [{shop:'stationery'},{shop:'art'}],
-  'Presente':     [{shop:'gift'}],
-  'Gamer':        [{shop:'video_games'},{shop:'electronics'}],
-  'Varejo':       [{shop:'general'},{shop:'variety_store'}],
-  'Atacado':      [{shop:'wholesale'}],
-  'Tabacaria':    [{shop:'tobacco'}],
-  'Farmácia':     [{amenity:'pharmacy'}],
-  'Móveis':       [{shop:'furniture'}],
-  'Vestuário':    [{shop:'clothes'}],
-  'Calçados':     [{shop:'shoes'}],
-  'Brinquedos':   [{shop:'toys'}],
-  'Esporte':      [{shop:'sports'}],
-  'Pet':          [{shop:'pet'}],
-  'Cosméticos':   [{shop:'beauty'},{shop:'cosmetics'}],
-  'Alimentício':  [{shop:'supermarket'},{shop:'grocery'}],
-  'Escolar':      [{shop:'stationery'},{shop:'books'}],
-  'Distribuidora':[{shop:'wholesale'}],
-  'Livraria':     [{shop:'books'}],
-  'Eletrônicos':  [{shop:'electronics'}],
-  'Informática':  [{shop:'computer'}],
-  'Decoração':    [{shop:'interior_decoration'},{shop:'furniture'}],
-  'Bazar':        [{shop:'general'},{shop:'second_hand'}],
-  'Mercado':      [{shop:'supermarket'},{shop:'convenience'}],
-  'Confeitaria':  [{shop:'confectionery'},{shop:'pastry'}],
-  'Papelão':      [{shop:'stationery'}]
-}
+
 
 function _mapaEstaticoErro(el){
-  el.outerHTML='<div style="font-size:10px;color:var(--t3);padding:6px 2px;border:1px dashed var(--bdr);border-radius:6px">Não foi possível carregar o mapa com todas as lojas. Confirme se a "Maps Static API" está habilitada no mesmo projeto/chave do Google Places (em Configurações).</div>';
+  el.outerHTML='<div style="font-size:10px;color:var(--t3);padding:6px;border:1px dashed var(--bdr);border-radius:6px;margin-bottom:6px">Mapa indisponível — habilite a "Maps Static API" no Google Cloud Console com a mesma chave do Places.</div>';
 }
+
+// ── KW segmento → busca Google Places ────────────────────
+var KW_SEG={
+  'Papelaria':'papelaria','Presente':'loja de presentes','Gamer':'games video game loja',
+  'Varejo':'loja varejo','Atacado':'atacado distribuidor','Tabacaria':'tabacaria',
+  'Farmácia':'farmácia','Móveis':'loja de móveis','Vestuário':'loja de roupas moda',
+  'Calçados':'loja de calçados','Brinquedos':'loja de brinquedos','Esporte':'artigos esportivos',
+  'Pet':'petshop pet','Cosméticos':'loja cosméticos beleza','Alimentício':'mercado supermercado',
+  'Escolar':'material escolar','Distribuidora':'distribuidora atacado','Livraria':'livraria',
+  'Eletrônicos':'loja eletrônicos','Informática':'loja informática computadores',
+  'Decoração':'loja decoração utilidades','Bazar':'bazar','Mercado':'mercado mercearia',
+  'Confeitaria':'confeitaria doces'
+};
+
+// Multi-select state
+var _segsSelecionados = new Set();
+
+function toggleSegBusca(seg, el){
+  if(_segsSelecionados.has(seg)){ _segsSelecionados.delete(seg); el.style.background='var(--s2)'; el.style.color='var(--t2)'; el.style.borderColor='var(--bdr)'; }
+  else { _segsSelecionados.add(seg); el.style.background='var(--acc)'; el.style.color='#fff'; el.style.borderColor='var(--acc)'; }
+  var todos = document.getElementById('seg-todos-btn');
+  if(todos){ var ativo=_segsSelecionados.size===0; todos.style.background=ativo?'var(--acc2)':'var(--s2)'; todos.style.color=ativo?'#fff':'var(--t2)'; }
+}
+
+function renderProximosM(){
+  _segsSelecionados.clear();
+  var cont=document.getElementById('main-content');
+  var segs=[...new Set(DB.clientes.filter(c=>c.seg&&!c.encerrado).map(c=>c.seg))].sort();
+  var cfg=loadCfg(); var temKey=!!(cfg.placesKey||'').trim();
+
+  cont.innerHTML=`
+  <div class="section">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="font-size:15px;font-weight:700;color:var(--t1)"><i class="ti ti-map-pin" style="color:var(--acc)"></i> Próximos</div>
+      <button class="btn bp" style="font-size:11px;padding:5px 12px" onclick="buscarProximosM()"><i class="ti ti-current-location"></i> Meus clientes</button>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title" style="margin-bottom:10px"><i class="ti ti-building-store" style="color:var(--acc2)"></i> Buscar lojas por segmento</div>
+
+      <!-- Multi-select segmentos -->
+      <div style="font-size:11px;color:var(--t3);margin-bottom:6px">Selecione os segmentos que deseja buscar:</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+        <button id="seg-todos-btn" onclick="segTodosToggle()" style="padding:5px 12px;border-radius:20px;border:1px solid var(--acc2);background:var(--acc2);color:#fff;font-size:11px;font-weight:600;cursor:pointer">Todos</button>
+        ${segs.map(s=>`<button onclick="toggleSegBusca('${s}',this)" style="padding:5px 12px;border-radius:20px;border:1px solid var(--bdr);background:var(--s2);color:var(--t2);font-size:11px;cursor:pointer;transition:.15s">${s}</button>`).join('')}
+      </div>
+
+      <!-- Campo cidade -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <i class="ti ti-map-2" style="color:var(--t3);font-size:16px;flex-shrink:0"></i>
+        <input class="fi" id="busca-cidade-manual" placeholder="Cidade (opcional — usa GPS se vazio)" style="flex:1;font-size:12px">
+      </div>
+
+      <!-- Botões busca -->
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="btn bs" style="flex:1;font-size:12px;padding:9px" onclick="buscarLojasPorSegBairro()"><i class="ti ti-building-store"></i> No bairro</button>
+        <button class="btn bp" style="flex:1;font-size:12px;padding:9px" onclick="buscarLojasPorSegCidade()"><i class="ti ti-building-community"></i> Na cidade</button>
+      </div>
+
+      ${!temKey?`<div style="font-size:10px;color:var(--org);text-align:center;padding:4px"><i class="ti ti-alert-triangle"></i> Configure a Google Places API Key em Configurações</div>`:''}
+      <div id="seg-busca-status" style="font-size:12px;color:var(--t3);margin-top:8px;text-align:center;min-height:20px"></div>
+      <div id="seg-busca-lista" style="margin-top:4px"></div>
+    </div>
+
+    <div id="proximos-status" style="text-align:center;color:var(--t3);font-size:13px;padding:12px">Toque em <b>Meus clientes</b> para ver clientes da sua cidade.</div>
+    <div id="proximos-lista"></div>
+  </div>`;
+}
+
+function segTodosToggle(){
+  _segsSelecionados.clear();
+  document.querySelectorAll('#seg-busca-lista ~ * button[onclick*="toggleSegBusca"], .section button[onclick*="toggleSegBusca"]').forEach(function(b){
+    b.style.background='var(--s2)'; b.style.color='var(--t2)'; b.style.borderColor='var(--bdr)';
+  });
+  // Simpler: just deselect all segment buttons
+  var cont=document.getElementById('main-content');
+  if(cont) cont.querySelectorAll('button[onclick*="toggleSegBusca"]').forEach(function(b){
+    b.style.background='var(--s2)'; b.style.color='var(--t2)'; b.style.borderColor='var(--bdr)';
+  });
+  var todos=document.getElementById('seg-todos-btn');
+  if(todos){todos.style.background='var(--acc2)';todos.style.color='#fff';}
+}
+
+function buscarLojasPorSegBairro(){ buscarLojasPorSeg('bairro'); }
+function buscarLojasPorSegCidade(){ buscarLojasPorSeg('cidade'); }
+
 async function buscarLojasPorSeg(escopo){
   var status=document.getElementById('seg-busca-status');
   var lista=document.getElementById('seg-busca-lista');
   if(!status||!lista) return;
 
-  status.innerHTML='⏳ Iniciando busca...';
-  lista.innerHTML='';
-
   var cfg=loadCfg(); var placesKey=(cfg.placesKey||'').trim();
+  if(!placesKey){ status.innerHTML='⚠️ Configure a Google Places API Key em Configurações.'; return; }
+
   var cidadeManual=(document.getElementById('busca-cidade-manual')?.value||'').trim();
-  var segSel=document.getElementById('seg-busca-prox')?.value||'';
-  var segs=segSel?[segSel]:[...new Set(DB.clientes.filter(c=>c.seg&&!c.encerrado).map(c=>c.seg))];
   var raio=escopo==='bairro'?1500:5000;
 
-  // Palavras-chave de busca por segmento
-  var KW_SEGMENTO={
-    'Papelaria':'papelaria','Presente':'loja de presentes','Gamer':'games eletrônicos',
-    'Varejo':'loja varejo','Atacado':'atacado distribuidor','Tabacaria':'tabacaria',
-    'Farmácia':'farmácia','Móveis':'loja de móveis','Vestuário':'loja de roupas',
-    'Calçados':'loja de calçados','Brinquedos':'loja de brinquedos',
-    'Esporte':'artigos esportivos','Pet':'petshop','Cosméticos':'loja de cosméticos',
-    'Alimentício':'mercado supermercado','Escolar':'material escolar',
-    'Distribuidora':'distribuidora atacado','Livraria':'livraria','Eletrônicos':'loja eletrônicos',
-    'Informática':'loja informática','Decoração':'loja decoração','Bazar':'bazar',
-    'Mercado':'mercado','Confeitaria':'confeitaria'
-  };
-  var keywords=[...new Set(segs.map(function(s){return KW_SEGMENTO[s]||s;}))].slice(0,4);
+  // Segmentos selecionados
+  var segsAtivos=_segsSelecionados.size>0
+    ?[..._segsSelecionados]
+    :[...new Set(DB.clientes.filter(c=>c.seg&&!c.encerrado).map(c=>c.seg))];
 
-  if(!keywords.length){
-    status.innerHTML='⚠️ Nenhum segmento cadastrado.'; return;
-  }
+  var keywords=[...new Set(segsAtivos.map(function(s){return KW_SEG[s]||s;}).filter(Boolean))].slice(0,5);
+  if(!keywords.length){ status.innerHTML='⚠️ Nenhum segmento disponível.'; return; }
 
-  // Se digitou cidade manual, usa geocoding; senão usa GPS
+  status.innerHTML='⏳ '+(cidadeManual?'Localizando "'+cidadeManual+'"...':'Obtendo GPS...');
+  lista.innerHTML='';
+
+  // Obtém coordenadas
+  var lat,lng;
   if(cidadeManual){
-    status.innerHTML='📍 Localizando "'+cidadeManual+'"...';
-    var geoUrl='https://maps.googleapis.com/maps/api/geocode/json?address='+encodeURIComponent(cidadeManual+', Brasil')+'&key='+encodeURIComponent(placesKey||'');
-    if(!placesKey){
-      // Usa Nominatim (OpenStreetMap geocoding, gratuito)
-      geoUrl='https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(cidadeManual+', Brasil')+'&format=json&limit=1';
-    }
-    fetch(geoUrl)
-      .then(function(r){return r.json();})
-      .then(function(d){
-        var lat,lng;
-        if(placesKey&&d.results&&d.results[0]){
-          lat=d.results[0].geometry.location.lat;
-          lng=d.results[0].geometry.location.lng;
-        } else if(!placesKey&&d[0]){
-          lat=parseFloat(d[0].lat); lng=parseFloat(d[0].lon);
-        }
-        if(!lat){ status.innerHTML='❌ Cidade não encontrada. Verifique o nome.'; return; }
-        _buscarComCoordenadas(lat,lng,raio,keywords,placesKey,status,lista,escopo,cidadeManual);
-      }).catch(function(e){ status.innerHTML='❌ Erro ao localizar cidade: '+e.message; });
-  } else {
-    if(!navigator.geolocation){ status.innerHTML='❌ Geolocalização não disponível.'; return; }
-    status.innerHTML='📡 Obtendo localização via GPS...';
-    navigator.geolocation.getCurrentPosition(
-      function(pos){ _buscarComCoordenadas(pos.coords.latitude,pos.coords.longitude,raio,keywords,placesKey,status,lista,escopo,''); },
-      function(err){ status.innerHTML='❌ GPS negado: '+err.message+'. Digite uma cidade acima.'; }
-    );
-  }
-}
-
-async function _buscarComCoordenadas(lat,lng,raio,keywords,placesKey,status,lista,escopo,cidadeLabel){
-  var localDesc=cidadeLabel||(escopo==='bairro'?'bairro (1,5km)':'cidade (5km)');
-  status.innerHTML='🔍 Buscando em '+localDesc+': '+keywords.join(', ')+'...';
-
-  function norm2(s){return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
-  var nomesExist=new Set(DB.clientes.map(function(c){return norm2(c.rs||'').slice(0,8);}));
-
-  var resultados=[];
-
-  if(placesKey){
-    // ── Google Places Text Search (API antiga, aceita key, melhor cobertura no BR) ──
-    for(var ki=0;ki<keywords.length;ki++){
-      try{
-        var query=keywords[ki]+(cidadeLabel?' em '+cidadeLabel:'');
-        var url='https://maps.googleapis.com/maps/api/place/textsearch/json'
-          +'?query='+encodeURIComponent(query)
-          +'&location='+lat+','+lng
-          +'&radius='+raio
-          +'&language=pt-BR'
-          +'&key='+encodeURIComponent(placesKey);
-        var r=await fetch(url);
-        if(!r.ok) continue;
-        var d=await r.json();
-        if(d.status==='OK'&&d.results){
-          d.results.forEach(function(p){
-            resultados.push({
-              nome:p.name,
-              end2:p.formatted_address||'',
-              lat:p.geometry.location.lat,
-              lng:p.geometry.location.lng,
-              prospect:!nomesExist.has(norm2(p.name).slice(0,8))
-            });
-          });
-        }
-      }catch(e){}
-    }
-  }
-
-  // ── Fallback: Overpass (OSM) se sem key ou sem resultados ──
-  if(!resultados.length){
     try{
-      var osmTags=[];
-      keywords.forEach(function(kw){
-        var t=MAPA_SEGMENTO_OSM&&Object.values(MAPA_SEGMENTO_OSM).find(function(v){
-          return Array.isArray(v)&&v.some&&v[0]&&(kw.toLowerCase().includes(Object.values(v[0])[0])||false);
-        });
-        if(!t) osmTags.push({name:kw});
-      });
-      // Busca genérica por nome
-      var parts=keywords.map(function(kw){
-        return 'node["name"~"'+kw.split(' ')[0]+'",i](around:'+raio+','+lat+','+lng+');'
-              +'way["name"~"'+kw.split(' ')[0]+'",i](around:'+raio+','+lat+','+lng+');';
-      });
-      var query='[out:json][timeout:25];('+parts.join('')+');out center;';
-      var servers=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
-      var resp=null;
-      for(var si=0;si<servers.length;si++){
-        try{
-          resp=await fetch(servers[si],{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(query)});
-          if(resp.ok) break; resp=null;
-        }catch(fe){resp=null;}
-      }
-      if(resp){
-        var od=await resp.json();
-        (od.elements||[]).forEach(function(el){
-          var nome=(el.tags&&(el.tags.name||el.tags['name:pt']))||'';
-          if(!nome) return;
-          var elat=el.lat||(el.center&&el.center.lat);
-          var elng=el.lon||(el.center&&el.center.lon);
-          if(!elat||!elng) return;
-          resultados.push({nome:nome,end2:'',lat:elat,lng:elng,prospect:!nomesExist.has(norm2(nome).slice(0,8))});
-        });
-      }
-    }catch(e2){}
+      var geoResp=await fetch('https://maps.googleapis.com/maps/api/geocode/json?address='+encodeURIComponent(cidadeManual+' Brasil')+'&key='+encodeURIComponent(placesKey)+'&language=pt-BR');
+      var geoData=await geoResp.json();
+      if(geoData.status!=='OK'||!geoData.results[0]) throw new Error('Cidade não encontrada');
+      lat=geoData.results[0].geometry.location.lat;
+      lng=geoData.results[0].geometry.location.lng;
+      status.innerHTML='📍 Buscando em '+geoData.results[0].formatted_address+'...';
+    }catch(e){ status.innerHTML='❌ '+e.message; return; }
+  } else {
+    try{
+      var pos=await new Promise(function(res,rej){ navigator.geolocation.getCurrentPosition(res,rej,{timeout:8000}); });
+      lat=pos.coords.latitude; lng=pos.coords.longitude;
+    }catch(e){ status.innerHTML='❌ GPS negado. Digite uma cidade acima.'; return; }
   }
 
-  if(!resultados.length){
-    status.innerHTML='Nenhum resultado em '+localDesc+'. '+(placesKey?'':'Configure a chave Google Places para melhores resultados.');
-    return;
+  status.innerHTML='🔍 Buscando em '+(escopo==='bairro'?'bairro (1,5km)':'cidade (5km)')+': '+segsAtivos.slice(0,3).join(', ')+(segsAtivos.length>3?' +'+( segsAtivos.length-3):'')+'...';
+
+  function norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
+  var nomesExist=new Set(DB.clientes.map(function(c){return norm(c.rs||'').slice(0,8);}));
+
+  var resultados=[]; var erros=[];
+
+  // Google Places Text Search (endpoint antigo — aceita API key, melhor cobertura BR)
+  for(var ki=0;ki<keywords.length;ki++){
+    try{
+      var q=keywords[ki]+(cidadeManual?' em '+cidadeManual:'');
+      var url='https://maps.googleapis.com/maps/api/place/textsearch/json'
+        +'?query='+encodeURIComponent(q)
+        +'&location='+lat+','+lng
+        +'&radius='+raio
+        +'&language=pt-BR'
+        +'&key='+encodeURIComponent(placesKey);
+      var r=await fetch(url);
+      var d=await r.json();
+      if(d.status==='OK'&&d.results){
+        d.results.forEach(function(p){
+          if(!p.name) return;
+          resultados.push({
+            nome:p.name,
+            end2:p.formatted_address||'',
+            lat:p.geometry.location.lat,
+            lng:p.geometry.location.lng,
+            prospect:!nomesExist.has(norm(p.name).slice(0,8))
+          });
+        });
+      } else if(d.status&&d.status!=='ZERO_RESULTS'){
+        erros.push(d.status+(d.error_message?' — '+d.error_message:''));
+      }
+    }catch(e){ erros.push(e.message); }
   }
 
-  // Deduplica
-  var uniq={}; resultados.forEach(function(p){uniq[norm2(p.nome)]=p;}); resultados=Object.values(uniq);
+  // Deduplica por nome normalizado
+  var uniq={}; resultados.forEach(function(p){uniq[norm(p.nome)]=p;}); resultados=Object.values(uniq);
   var prospects=resultados.filter(function(p){return p.prospect;});
   var jaClientes=resultados.filter(function(p){return !p.prospect;});
 
-  // Mapa estático Google
-  var mapaHtml='';
-  if(placesKey&&resultados.length){
-    var LETRAS='ABCDEFGHIJKLMNOPQRSTUVWXY';
-    var mapUrl='https://maps.googleapis.com/maps/api/staticmap?size=640x300&scale=2&maptype=roadmap&key='+encodeURIComponent(placesKey);
-    mapUrl+='&markers=color:blue%7Clabel:V%7C'+lat+','+lng;
-    resultados.slice(0,24).forEach(function(p,i){
-      p._letra=LETRAS[i];
-      mapUrl+='&markers=color:'+(p.prospect?'red':'green')+'%7Clabel:'+p._letra+'%7C'+p.lat+','+p.lng;
-    });
-    mapaHtml='<img src="'+mapUrl+'" style="width:100%;border-radius:8px;display:block;margin-bottom:6px" onerror="_mapaEstaticoErro(this)">'
-      +'<div style="font-size:10px;color:var(--t3);margin-bottom:8px">🔵 V=você · 🟢 já cliente · 🔴 prospecto</div>';
+  if(!resultados.length){
+    status.innerHTML=erros.length?'❌ Erro: '+erros[0]:'Nenhum resultado encontrado. Tente outro segmento ou amplie o raio.';
+    return;
   }
 
-  status.innerHTML='<b>'+resultados.length+'</b> local(is) em '+localDesc
-    +' · <span style="color:var(--red)">'+prospects.length+' prospecto(s)</span>'
-    +(jaClientes.length?' · <span style="color:var(--grn)">'+jaClientes.length+' já cliente(s)</span>':'')
-    +(placesKey?'':' <span style="color:var(--t3)">(via OSM)</span>');
+  // Mapa estático Google
+  var LETRAS='ABCDEFGHIJKLMNOPQRSTUVWXY';
+  var mapUrl='https://maps.googleapis.com/maps/api/staticmap?size=640x300&scale=2&maptype=roadmap&key='+encodeURIComponent(placesKey);
+  mapUrl+='&markers=color:blue%7Clabel:V%7C'+lat+','+lng;
+  resultados.slice(0,24).forEach(function(p,i){
+    p._letra=LETRAS[i];
+    mapUrl+='&markers=color:'+(p.prospect?'red':'green')+'%7Clabel:'+p._letra+'%7C'+p.lat+','+p.lng;
+  });
 
-  lista.innerHTML=mapaHtml+resultados.map(function(p){
-    var cor=p.prospect?'var(--red)':'var(--grn)';
-    var mapsLink='https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lng;
-    return '<div style="padding:8px 0;border-bottom:1px solid var(--s3);display:flex;align-items:flex-start;gap:8px">'
-      +(p._letra?'<span style="background:'+cor+';color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:2px">'+p._letra+'</span>':'<span style="width:8px;height:8px;border-radius:50%;background:'+cor+';flex-shrink:0;margin-top:5px"></span>')
-      +'<div style="flex:1">'
-        +'<div style="font-weight:600;font-size:13px;color:var(--t1)">'+p.nome+'</div>'
-        +(p.end2?'<div style="font-size:10px;color:var(--t3)">'+p.end2+'</div>':'')
-        +'<div style="display:flex;gap:8px;margin-top:3px">'
-          +'<span style="font-size:10px;color:'+cor+';font-weight:600">'+(p.prospect?'⭐ Prospecto':'✓ Já cliente')+'</span>'
-          +'<a href="'+mapsLink+'" target="_blank" style="font-size:10px;color:var(--acc)"><i class="ti ti-navigation"></i> Rota</a>'
+  status.innerHTML='<b>'+resultados.length+'</b> local(is) · <span style="color:var(--red)">'+prospects.length+' prospecto(s)</span>'+(jaClientes.length?' · <span style="color:var(--grn)">'+jaClientes.length+' já cliente(s)</span>':'');
+
+  lista.innerHTML='<img src="'+mapUrl+'" style="width:100%;border-radius:8px;display:block;margin-bottom:4px" onerror="_mapaEstaticoErro(this)">'
+    +'<div style="font-size:10px;color:var(--t3);margin-bottom:10px">🔵 V=você · 🟢 já cliente · 🔴 prospecto</div>'
+    +resultados.map(function(p){
+      var cor=p.prospect?'var(--red)':'var(--grn)';
+      var mapsLink='https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lng;
+      var wppCli=DB.clientes.find(function(c){return !p.prospect&&norm(c.rs||'').slice(0,8)===norm(p.nome).slice(0,8);});
+      return '<div style="padding:9px 0;border-bottom:1px solid var(--s3);display:flex;align-items:flex-start;gap:10px">'
+        +'<span style="background:'+cor+';color:#fff;border-radius:50%;width:22px;height:22px;min-width:22px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;margin-top:2px">'+(p._letra||'•')+'</span>'
+        +'<div style="flex:1;min-width:0">'
+          +'<div style="font-weight:600;font-size:13px;color:var(--t1);word-break:break-word">'+p.nome+'</div>'
+          +(p.end2?'<div style="font-size:10px;color:var(--t3);margin-top:1px;word-break:break-word">'+p.end2+'</div>':'')
+          +'<div style="display:flex;gap:10px;margin-top:5px;flex-wrap:wrap">'
+            +'<span style="font-size:11px;color:'+cor+';font-weight:600">'+(p.prospect?'⭐ Prospecto':'✓ Já cliente')+'</span>'
+            +'<a href="'+mapsLink+'" target="_blank" style="font-size:11px;color:var(--acc);text-decoration:none;font-weight:500"><i class="ti ti-navigation"></i> Rota</a>'
+            +(wppCli&&(wppCli.cel||wppCli.fone)?'<a href="https://wa.me/55'+(wppCli.cel||wppCli.fone).replace(/\D/g,'')+'" target="_blank" style="font-size:11px;color:#25D366;text-decoration:none;font-weight:500"><i class="ti ti-brand-whatsapp"></i> WhatsApp</a>':'')
+          +'</div>'
         +'</div>'
-      +'</div>'
-    +'</div>';
-  }).join('');
+      +'</div>';
+    }).join('');
 }
-function buscarLojasPorSegBairro(){ buscarLojasPorSeg('bairro'); }
-function buscarLojasPorSegCidade(){ buscarLojasPorSeg('cidade'); }
+
 
 async function processarComandoVoz(texto){
   document.getElementById('voz-status-txt').textContent='Processando...';
@@ -2725,43 +2717,6 @@ function normalizar(str){
   return str.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
 }
 
-function renderProximosM(){
-  var cont = document.getElementById('main-content');
-  var segs = [...new Set(DB.clientes.filter(c=>c.seg&&!c.encerrado).map(c=>c.seg))].sort();
-  var cfg = loadCfg(); var temPlaces = !!(cfg.placesKey||'').trim();
-  cont.innerHTML = `
-  <div class="section">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div style="font-size:15px;font-weight:700;color:var(--t1)"><i class="ti ti-map-pin" style="color:var(--acc)"></i> Próximos</div>
-      <button class="btn bp" style="font-size:11px;padding:5px 12px" onclick="buscarProximosM()"><i class="ti ti-current-location"></i> Meus clientes</button>
-    </div>
-
-    <!-- Buscar lojas por segmento -->
-    <div class="card" style="margin-bottom:12px">
-      <div class="card-title"><i class="ti ti-search" style="color:var(--acc2)"></i>Buscar lojas por segmento</div>
-      <select class="fi" id="seg-busca-prox" style="margin-bottom:8px">
-        <option value="">Todos os segmentos cadastrados</option>
-        ${segs.map(s=>`<option value="${s}">${s}</option>`).join('')}
-      </select>
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-        <i class="ti ti-map-2" style="color:var(--t3);font-size:14px;flex-shrink:0"></i>
-        <input class="fi" id="busca-cidade-manual" placeholder="Cidade (opcional — usa GPS se vazio)" style="flex:1;font-size:12px">
-      </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn bs" style="flex:1;font-size:11px" onclick="buscarLojasPorSegBairro()"><i class="ti ti-building-store"></i> No bairro</button>
-        <button class="btn bp" style="flex:1;font-size:11px" onclick="buscarLojasPorSegCidade()"><i class="ti ti-building-community"></i> Na cidade</button>
-      </div>
-      ${!temPlaces?'<div style="font-size:10px;color:var(--org);margin-top:6px;text-align:center"><i class="ti ti-alert-triangle"></i> Configure a chave Google Places em Configurações para melhores resultados</div>':''}
-      <div id="seg-busca-status" style="font-size:11px;color:var(--t3);margin-top:8px;text-align:center"></div>
-      <div id="seg-busca-lista"></div>
-    </div>
-
-    <div id="proximos-status" style="text-align:center;color:var(--t3);font-size:13px;padding:12px">
-      Toque em <b>Meus clientes</b> para ver clientes da sua cidade.
-    </div>
-    <div id="proximos-lista"></div>
-  </div>`;
-}
 
 async function buscarProximosM(){
   var status = document.getElementById('proximos-status');
