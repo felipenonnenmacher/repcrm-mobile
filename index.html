@@ -2433,6 +2433,161 @@ function atualizarLabelSegs(){
 }
 
 
+function normalizar(str){
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
+}
+
+var KW_SEG={
+  'Papelaria':'papelaria','Presente':'loja de presentes','Gamer':'games video game loja',
+  'Varejo':'loja varejo','Atacado':'atacado distribuidor','Tabacaria':'tabacaria',
+  'Farmácia':'farmácia','Móveis':'loja de móveis','Vestuário':'loja de roupas moda',
+  'Calçados':'loja de calçados','Brinquedos':'loja de brinquedos','Esporte':'artigos esportivos',
+  'Pet':'petshop pet','Cosméticos':'loja cosméticos beleza','Alimentício':'mercado supermercado',
+  'Escolar':'material escolar','Distribuidora':'distribuidora atacado','Livraria':'livraria',
+  'Eletrônicos':'loja eletrônicos','Informática':'loja informática',
+  'Decoração':'loja decoração','Bazar':'bazar','Mercado':'mercado','Confeitaria':'confeitaria'
+};
+
+// Carrega SDK Google Maps JS dinamicamente (resolve CORS)
+var _gmapsLoaded=false; var _gmapsCallbacks=[];
+function _onGmapsReady(){ _gmapsLoaded=true; _gmapsCallbacks.forEach(function(cb){cb();}); _gmapsCallbacks=[]; }
+window._gmapsReadyCb=_onGmapsReady;
+function carregarGoogleMaps(key,cb){
+  if(_gmapsLoaded){cb();return;}
+  _gmapsCallbacks.push(cb);
+  if(document.querySelector('script[data-gmaps]')) return;
+  var s=document.createElement('script');
+  s.dataset.gmaps='1';
+  s.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(key)+'&libraries=places&callback=_gmapsReadyCb&language=pt-BR';
+  s.async=true; s.defer=true;
+  document.head.appendChild(s);
+}
+
+function buscarLojasPorSegBairro(){ buscarLojasPorSeg('bairro'); }
+function buscarLojasPorSegCidade(){ buscarLojasPorSeg('cidade'); }
+
+async function buscarLojasPorSeg(escopo){
+  var status=document.getElementById('seg-busca-status');
+  var lista=document.getElementById('seg-busca-lista');
+  if(!status||!lista) return;
+
+  var cfg=loadCfg(); var placesKey=(cfg.placesKey||'').trim();
+  if(!placesKey){ status.innerHTML='⚠️ Configure a Google Places API Key em Configurações.'; return; }
+
+  var cidadeManual=(document.getElementById('busca-cidade-manual')?.value||'').trim();
+  var raio=escopo==='bairro'?1500:5000;
+
+  var segsAtivos=_segsSelecionados.size>0
+    ?[..._segsSelecionados]
+    :[...new Set(DB.clientes.filter(function(c){return c.seg&&!c.encerrado;}).map(function(c){return c.seg;}))];
+
+  var keywords=[...new Set(segsAtivos.map(function(s){return KW_SEG[s]||s;}).filter(Boolean))].slice(0,5);
+  if(!keywords.length){ status.innerHTML='⚠️ Nenhum segmento disponível.'; return; }
+
+  status.innerHTML='⏳ Carregando Google Maps...';
+  lista.innerHTML='';
+
+  carregarGoogleMaps(placesKey, async function(){
+    var lat, lng;
+    if(cidadeManual){
+      status.innerHTML='📍 Localizando "'+cidadeManual+'"...';
+      try{
+        var geo=await new Promise(function(res,rej){
+          new google.maps.Geocoder().geocode({address:cidadeManual+' Brasil',language:'pt-BR'},function(results,gstatus){
+            if(gstatus==='OK'&&results[0]) res(results[0].geometry.location);
+            else rej(new Error('Cidade não encontrada: '+gstatus));
+          });
+        });
+        lat=geo.lat(); lng=geo.lng();
+      }catch(e){ status.innerHTML='❌ '+e.message; return; }
+    } else {
+      try{
+        var pos=await new Promise(function(res,rej){ navigator.geolocation.getCurrentPosition(res,rej,{timeout:8000}); });
+        lat=pos.coords.latitude; lng=pos.coords.longitude;
+      }catch(e){ status.innerHTML='❌ GPS negado. Digite uma cidade acima.'; return; }
+    }
+
+    status.innerHTML='🔍 Buscando '+(escopo==='bairro'?'no bairro (1,5km)':'na cidade (5km)')+': '+segsAtivos.slice(0,3).join(', ')+(segsAtivos.length>3?' +'+(segsAtivos.length-3):'')+'...';
+
+    function norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
+    var nomesExist=new Set(DB.clientes.map(function(c){return norm(c.rs||'').slice(0,8);}));
+
+    var mapDiv=document.createElement('div');
+    var map=new google.maps.Map(mapDiv,{center:{lat:lat,lng:lng},zoom:14});
+    var svc=new google.maps.places.PlacesService(map);
+    var center=new google.maps.LatLng(lat,lng);
+    var resultados=[]; var pending=keywords.length;
+
+    keywords.forEach(function(kw){
+      svc.textSearch({
+        query:kw+(cidadeManual?' '+cidadeManual:''),
+        location:center, radius:raio, language:'pt-BR'
+      }, function(res,pstatus){
+        if(pstatus===google.maps.places.PlacesServiceStatus.OK&&res){
+          res.forEach(function(p){
+            if(!p.name) return;
+            resultados.push({
+              nome:p.name,
+              end2:p.formatted_address||'',
+              lat:p.geometry.location.lat(),
+              lng:p.geometry.location.lng(),
+              placeId:p.place_id||'',
+              prospect:!nomesExist.has(norm(p.name).slice(0,8))
+            });
+          });
+        }
+        if(--pending===0) _exibirResultadosProximos(resultados,lat,lng,placesKey,status,lista);
+      });
+    });
+  });
+}
+
+function _exibirResultadosProximos(resultados,lat,lng,placesKey,status,lista){
+  function norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
+  var uniq={}; resultados.forEach(function(p){uniq[norm(p.nome)]=p;}); resultados=Object.values(uniq);
+  resultados.sort(function(a,b){return (b.prospect?1:0)-(a.prospect?1:0);});
+  var prospects=resultados.filter(function(p){return p.prospect;});
+  var jaClientes=resultados.filter(function(p){return !p.prospect;});
+
+  if(!resultados.length){ status.innerHTML='Nenhum resultado. Tente outro segmento ou cidade.'; return; }
+
+  var LETRAS='ABCDEFGHIJKLMNOPQRSTUVWXY';
+  var mapUrl='https://maps.googleapis.com/maps/api/staticmap?size=640x280&scale=2&maptype=roadmap&key='+encodeURIComponent(placesKey);
+  mapUrl+='&markers=color:blue%7Clabel:V%7C'+lat+','+lng;
+  resultados.slice(0,24).forEach(function(p,i){
+    p._letra=LETRAS[i];
+    mapUrl+='&markers=color:'+(p.prospect?'red':'green')+'%7Clabel:'+p._letra+'%7C'+p.lat+','+p.lng;
+  });
+
+  status.innerHTML='<b>'+resultados.length+'</b> local(is) · <span style="color:var(--red)">'+prospects.length+' prospecto(s)</span>'+(jaClientes.length?' · <span style="color:var(--grn)">'+jaClientes.length+' já cliente(s)</span>':'');
+
+  lista.innerHTML='<img src="'+mapUrl+'" style="width:100%;border-radius:8px;display:block;margin-bottom:4px" onerror="_mapaEstaticoErro(this)">'
+    +'<div style="font-size:10px;color:var(--t3);margin-bottom:10px">🔵 V=você · 🟢 já cliente · 🔴 prospecto</div>'
+    +resultados.map(function(p){
+      var cor=p.prospect?'var(--red)':'var(--grn)';
+      var mapsLink='https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lng+(p.placeId?'&destination_place_id='+p.placeId:'');
+      var norm2=function(s){return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();};
+      var wppCli=DB.clientes.find(function(c){return !p.prospect&&norm2(c.rs||'').slice(0,8)===norm2(p.nome).slice(0,8);});
+      return '<div style="padding:9px 0;border-bottom:1px solid var(--s3);display:flex;align-items:flex-start;gap:10px">'
+        +'<span style="background:'+cor+';color:#fff;border-radius:50%;width:22px;height:22px;min-width:22px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;margin-top:2px">'+(p._letra||'•')+'</span>'
+        +'<div style="flex:1;min-width:0">'
+          +'<div style="font-weight:600;font-size:13px;color:var(--t1);word-break:break-word">'+p.nome+'</div>'
+          +(p.end2?'<div style="font-size:10px;color:var(--t3);margin-top:1px;word-break:break-word">'+p.end2+'</div>':'')
+          +'<div style="display:flex;gap:10px;margin-top:5px;flex-wrap:wrap">'
+            +'<span style="font-size:11px;color:'+cor+';font-weight:600">'+(p.prospect?'⭐ Prospecto':'✓ Já cliente')+'</span>'
+            +'<a href="'+mapsLink+'" target="_blank" style="font-size:11px;color:var(--acc);text-decoration:none;font-weight:500"><i class="ti ti-navigation"></i> Rota</a>'
+            +(wppCli&&(wppCli.cel||wppCli.fone)?'<a href="https://wa.me/55'+(wppCli.cel||wppCli.fone).replace(/\D/g,'')+'" target="_blank" style="font-size:11px;color:#25D366;text-decoration:none;font-weight:500"><i class="ti ti-brand-whatsapp"></i> WhatsApp</a>':'')
+          +'</div>'
+        +'</div>'
+      +'</div>';
+    }).join('');
+}
+
+function _mapaEstaticoErro(el){
+  el.outerHTML='<div style="font-size:10px;color:var(--t3);padding:6px;border:1px dashed var(--bdr);border-radius:6px;margin-bottom:6px">Mapa indisponível — habilite a Maps Static API no Google Cloud Console.</div>';
+}
+
+
 async function buscarProximosM(){
   var status = document.getElementById('proximos-status');
   var lista = document.getElementById('proximos-lista');
