@@ -2481,66 +2481,106 @@ async function buscarLojasPorSeg(escopo){
     ?[..._segsSelecionados]
     :[...new Set(DB.clientes.filter(function(c){return c.seg&&!c.encerrado;}).map(function(c){return c.seg;}))];
 
-  var keywords=[...new Set(segsAtivos.map(function(s){return KW_SEG[s]||s;}).filter(Boolean))].slice(0,5);
+  var keywords=[...new Set(segsAtivos.map(function(s){return KW_SEG[s]||s;}).filter(Boolean))].slice(0,4);
   if(!keywords.length){ status.innerHTML='⚠️ Nenhum segmento disponível.'; return; }
 
-  status.innerHTML='⏳ Carregando Google Maps...';
+  status.innerHTML='⏳ Carregando Google Maps API...';
   lista.innerHTML='';
 
+  // Carrega SDK e executa busca
   carregarGoogleMaps(placesKey, async function(){
+    // Verifica se API carregou corretamente
+    if(!window.google||!window.google.maps||!window.google.maps.places){
+      status.innerHTML='❌ Google Maps API não carregou. Verifique se a Maps JavaScript API está habilitada na sua chave.';
+      return;
+    }
+
+    // Obtém coordenadas
     var lat, lng;
     if(cidadeManual){
       status.innerHTML='📍 Localizando "'+cidadeManual+'"...';
       try{
-        var geo=await new Promise(function(res,rej){
-          new google.maps.Geocoder().geocode({address:cidadeManual+' Brasil',language:'pt-BR'},function(results,gstatus){
-            if(gstatus==='OK'&&results[0]) res(results[0].geometry.location);
-            else rej(new Error('Cidade não encontrada: '+gstatus));
+        var geoResult=await new Promise(function(res,rej){
+          var geo=new google.maps.Geocoder();
+          geo.geocode({address:cidadeManual+' Brasil',language:'pt-BR'},function(results,st){
+            if(st==='OK'&&results&&results[0]) res(results[0].geometry.location);
+            else rej(new Error('Geocoding falhou: '+st));
           });
         });
-        lat=geo.lat(); lng=geo.lng();
+        lat=geoResult.lat(); lng=geoResult.lng();
       }catch(e){ status.innerHTML='❌ '+e.message; return; }
     } else {
+      status.innerHTML='📡 Obtendo GPS...';
       try{
-        var pos=await new Promise(function(res,rej){ navigator.geolocation.getCurrentPosition(res,rej,{timeout:8000}); });
+        var pos=await new Promise(function(res,rej){
+          navigator.geolocation.getCurrentPosition(res,function(e){rej(new Error('GPS negado: '+e.message));},{timeout:10000});
+        });
         lat=pos.coords.latitude; lng=pos.coords.longitude;
-      }catch(e){ status.innerHTML='❌ GPS negado. Digite uma cidade acima.'; return; }
+      }catch(e){ status.innerHTML='❌ '+e.message+'. Digite uma cidade acima.'; return; }
     }
 
-    status.innerHTML='🔍 Buscando '+(escopo==='bairro'?'no bairro (1,5km)':'na cidade (5km)')+': '+segsAtivos.slice(0,3).join(', ')+(segsAtivos.length>3?' +'+(segsAtivos.length-3):'')+'...';
+    status.innerHTML='🔍 Buscando '+(escopo==='bairro'?'bairro 1,5km':'cidade 5km')+' — '+segsAtivos.slice(0,3).join(', ')+(segsAtivos.length>3?' +'+(segsAtivos.length-3):'')+'...';
+
+    // Inicializa PlacesService num div oculto
+    var mapDiv=document.createElement('div');
+    mapDiv.style.cssText='width:1px;height:1px;position:absolute;top:-9999px';
+    document.body.appendChild(mapDiv);
+    var map=new google.maps.Map(mapDiv,{center:{lat:lat,lng:lng},zoom:14});
+    var svc=new google.maps.places.PlacesService(map);
+    var center=new google.maps.LatLng(lat,lng);
 
     function norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
     var nomesExist=new Set(DB.clientes.map(function(c){return norm(c.rs||'').slice(0,8);}));
 
-    var mapDiv=document.createElement('div');
-    var map=new google.maps.Map(mapDiv,{center:{lat:lat,lng:lng},zoom:14});
-    var svc=new google.maps.places.PlacesService(map);
-    var center=new google.maps.LatLng(lat,lng);
-    var resultados=[]; var pending=keywords.length;
+    var resultados=[]; var erros=[]; var pending=keywords.length;
+
+    function onDone(){
+      document.body.removeChild(mapDiv);
+      _exibirResultadosProximos(resultados,lat,lng,placesKey,status,lista);
+    }
+
+    // Timeout de segurança — 15s
+    var timeout=setTimeout(function(){
+      if(pending>0){
+        pending=0;
+        status.innerHTML=erros.length?'❌ '+erros[0]:'⚠️ Tempo esgotado. Verifique se a Places API está habilitada na chave.';
+        try{document.body.removeChild(mapDiv);}catch(e){}
+      }
+    },15000);
 
     keywords.forEach(function(kw){
-      svc.textSearch({
-        query:kw+(cidadeManual?' '+cidadeManual:''),
-        location:center, radius:raio, language:'pt-BR'
-      }, function(res,pstatus){
-        if(pstatus===google.maps.places.PlacesServiceStatus.OK&&res){
-          res.forEach(function(p){
-            if(!p.name) return;
-            resultados.push({
-              nome:p.name,
-              end2:p.formatted_address||'',
-              lat:p.geometry.location.lat(),
-              lng:p.geometry.location.lng(),
-              placeId:p.place_id||'',
-              prospect:!nomesExist.has(norm(p.name).slice(0,8))
+      try{
+        svc.textSearch({
+          query: kw+(cidadeManual?' '+cidadeManual:''),
+          location: center,
+          radius: raio,
+          language: 'pt-BR'
+        }, function(res, pstatus){
+          if(pstatus===google.maps.places.PlacesServiceStatus.OK&&res){
+            res.forEach(function(p){
+              if(!p.name||!p.geometry) return;
+              resultados.push({
+                nome:p.name,
+                end2:p.formatted_address||'',
+                lat:p.geometry.location.lat(),
+                lng:p.geometry.location.lng(),
+                placeId:p.place_id||'',
+                prospect:!nomesExist.has(norm(p.name).slice(0,8))
+              });
             });
-          });
-        }
-        if(--pending===0) _exibirResultadosProximos(resultados,lat,lng,placesKey,status,lista);
-      });
+          } else if(pstatus!==google.maps.places.PlacesServiceStatus.ZERO_RESULTS){
+            erros.push(kw+': '+pstatus);
+          }
+          if(--pending===0){ clearTimeout(timeout); onDone(); }
+        });
+      }catch(e){
+        erros.push(kw+': '+e.message);
+        if(--pending===0){ clearTimeout(timeout); onDone(); }
+      }
     });
   });
 }
+
 
 function _exibirResultadosProximos(resultados,lat,lng,placesKey,status,lista){
   function norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
