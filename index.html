@@ -2346,117 +2346,185 @@ async function buscarLojasPorSeg(escopo){
   var lista=document.getElementById('seg-busca-lista');
   if(!status||!lista) return;
 
-  status.innerHTML='⏳ Obtendo localização...';
+  status.innerHTML='⏳ Iniciando busca...';
   lista.innerHTML='';
 
-  if(!navigator.geolocation){ status.innerHTML='❌ Geolocalização não disponível.'; return; }
+  var cfg=loadCfg(); var placesKey=(cfg.placesKey||'').trim();
+  var cidadeManual=(document.getElementById('busca-cidade-manual')?.value||'').trim();
+  var segSel=document.getElementById('seg-busca-prox')?.value||'';
+  var segs=segSel?[segSel]:[...new Set(DB.clientes.filter(c=>c.seg&&!c.encerrado).map(c=>c.seg))];
+  var raio=escopo==='bairro'?1500:5000;
 
-  navigator.geolocation.getCurrentPosition(async function(pos){
-    var lat=pos.coords.latitude; var lng=pos.coords.longitude;
-    var raio=escopo==='bairro'?1500:5000;
-    var segSel=document.getElementById('seg-busca-prox')?.value||'';
-    var segs=segSel?[segSel]:[...new Set(DB.clientes.filter(c=>c.seg&&!c.encerrado).map(c=>c.seg))];
+  // Palavras-chave de busca por segmento
+  var KW_SEGMENTO={
+    'Papelaria':'papelaria','Presente':'loja de presentes','Gamer':'games eletrônicos',
+    'Varejo':'loja varejo','Atacado':'atacado distribuidor','Tabacaria':'tabacaria',
+    'Farmácia':'farmácia','Móveis':'loja de móveis','Vestuário':'loja de roupas',
+    'Calçados':'loja de calçados','Brinquedos':'loja de brinquedos',
+    'Esporte':'artigos esportivos','Pet':'petshop','Cosméticos':'loja de cosméticos',
+    'Alimentício':'mercado supermercado','Escolar':'material escolar',
+    'Distribuidora':'distribuidora atacado','Livraria':'livraria','Eletrônicos':'loja eletrônicos',
+    'Informática':'loja informática','Decoração':'loja decoração','Bazar':'bazar',
+    'Mercado':'mercado','Confeitaria':'confeitaria'
+  };
+  var keywords=[...new Set(segs.map(function(s){return KW_SEGMENTO[s]||s;}))].slice(0,4);
 
-    // Mapeia segmentos para tags do OpenStreetMap
-    var osmTags=[];
-    segs.forEach(function(s){
-      var tags=MAPA_SEGMENTO_OSM[s];
-      if(tags) osmTags.push(...tags);
-      else osmTags.push({shop:s.toLowerCase()});
-    });
-    // Deduplica
-    var tagStrings=[...new Set(osmTags.map(t=>JSON.stringify(t)))].map(s=>JSON.parse(s)).slice(0,6);
+  if(!keywords.length){
+    status.innerHTML='⚠️ Nenhum segmento cadastrado.'; return;
+  }
 
-    if(!tagStrings.length){
-      status.innerHTML='⚠️ Nenhum segmento cadastrado para buscar.';
-      return;
+  // Se digitou cidade manual, usa geocoding; senão usa GPS
+  if(cidadeManual){
+    status.innerHTML='📍 Localizando "'+cidadeManual+'"...';
+    var geoUrl='https://maps.googleapis.com/maps/api/geocode/json?address='+encodeURIComponent(cidadeManual+', Brasil')+'&key='+encodeURIComponent(placesKey||'');
+    if(!placesKey){
+      // Usa Nominatim (OpenStreetMap geocoding, gratuito)
+      geoUrl='https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(cidadeManual+', Brasil')+'&format=json&limit=1';
     }
-
-    status.innerHTML='🔍 Buscando '+(escopo==='bairro'?'no bairro (1,5km)':'na cidade (5km)')+'...';
-
-    try{
-      // Monta query Overpass — gratuita, sem API key
-      var conditions=tagStrings.map(function(t){
-        var key=Object.keys(t)[0]; var val=t[key];
-        return 'node["'+key+'"="'+val+'"](around:'+raio+','+lat+','+lng+'); way["'+key+'"="'+val+'"](around:'+raio+','+lat+','+lng+');';
-      }).join(' ');
-
-      var query='[out:json][timeout:20];('+conditions+')out center;';
-
-      var r=await fetch('https://overpass-api.de/api/interpreter',{
-        method:'POST',
-        body:'data='+encodeURIComponent(query)
-      });
-      if(!r.ok) throw new Error('Overpass HTTP '+r.status);
-      var d=await r.json();
-      var elements=d.elements||[];
-
-      if(!elements.length){
-        status.innerHTML='Nenhum estabelecimento encontrado num raio de '+(raio/1000)+'km. Tente ampliar ou outro segmento.';
-        return;
-      }
-
-      function norm2(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
-      var nomesExist=new Set(DB.clientes.map(function(c){return norm2(c.rs||'').slice(0,8);}));
-
-      var resultados=elements.map(function(el){
-        var elat=el.lat||(el.center&&el.center.lat);
-        var elng=el.lon||(el.center&&el.center.lon);
-        var nome=(el.tags&&(el.tags.name||el.tags['name:pt']))||'';
-        if(!nome) return null;
-        var end2=el.tags&&el.tags['addr:street']?(el.tags['addr:street']+(el.tags['addr:housenumber']?' '+el.tags['addr:housenumber']:'')):'';
-        var prospect=!nomesExist.has(norm2(nome).slice(0,8));
-        return {nome:nome,end2:end2,lat:elat,lng:elng,prospect:prospect};
-      }).filter(function(p){return p&&p.lat&&p.lng;});
-
-      var uniq={}; resultados.forEach(function(p){uniq[norm2(p.nome)]=p;}); resultados=Object.values(uniq);
-      var prospects=resultados.filter(function(p){return p.prospect;});
-      var jaClientes=resultados.filter(function(p){return !p.prospect;});
-
-      // Mapa estático Google (opcional - se tiver placesKey)
-      var cfg2=loadCfg(); var placesKey=cfg2.placesKey||'';
-      var mapaHtml='';
-      if(placesKey && resultados.length){
-        var LETRAS='ABCDEFGHIJKLMNOPQRSTUVWXY';
-        var mapUrl='https://maps.googleapis.com/maps/api/staticmap?size=640x340&scale=2&maptype=roadmap&key='+encodeURIComponent(placesKey);
-        mapUrl+='&markers=color:blue%7Clabel:V%7C'+lat+','+lng;
-        resultados.slice(0,25).forEach(function(p,i){
-          p._letra=LETRAS[i];
-          var cor=p.prospect?'red':'green';
-          mapUrl+='&markers=color:'+cor+'%7Clabel:'+p._letra+'%7C'+p.lat+','+p.lng;
-        });
-        mapaHtml='<img src="'+mapUrl+'" style="width:100%;border-radius:8px;display:block;margin-bottom:6px" onerror="_mapaEstaticoErro(this)">'
-          +'<div style="font-size:10px;color:var(--t3);margin-bottom:8px">🔵 V = você · 🟢 já cliente · 🔴 prospecto</div>';
-      }
-
-      status.innerHTML='<b>'+resultados.length+'</b> local(is) · <span style="color:var(--red)">'+prospects.length+' prospecto(s)</span>'+(jaClientes.length?' · <span style="color:var(--grn)">'+jaClientes.length+' já cliente(s)</span>':'');
-
-      lista.innerHTML=mapaHtml+resultados.map(function(p,i){
-        var cor=p.prospect?'var(--red)':'var(--grn)';
-        var ico=p.prospect?'ti-star':'ti-user-check';
-        var mapsLink='https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lng;
-        return '<div style="padding:8px 0;border-bottom:1px solid var(--s3);display:flex;align-items:flex-start;gap:8px">'
-          +(p._letra?'<span style="background:'+cor+';color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:2px">'+p._letra+'</span>':'')
-          +'<div style="flex:1">'
-            +'<div style="font-weight:600;font-size:13px;color:var(--t1)">'+p.nome+'</div>'
-            +(p.end2?'<div style="font-size:11px;color:var(--t3)">'+p.end2+'</div>':'')
-            +'<div style="display:flex;gap:6px;margin-top:4px">'
-              +'<span style="font-size:10px;color:'+cor+';font-weight:600"><i class="ti '+ico+'"></i> '+(p.prospect?'Prospecto':'Já cliente')+'</span>'
-              +'<a href="'+mapsLink+'" target="_blank" style="font-size:10px;color:var(--acc);text-decoration:none"><i class="ti ti-navigation"></i> Rota</a>'
-            +'</div>'
-          +'</div>'
-        +'</div>';
-      }).join('');
-
-    }catch(e){
-      console.error(e);
-      status.innerHTML='❌ Erro na busca: '+e.message;
-    }
-  }, function(err){
-    status.innerHTML='❌ Localização negada: '+err.message;
-  });
+    fetch(geoUrl)
+      .then(function(r){return r.json();})
+      .then(function(d){
+        var lat,lng;
+        if(placesKey&&d.results&&d.results[0]){
+          lat=d.results[0].geometry.location.lat;
+          lng=d.results[0].geometry.location.lng;
+        } else if(!placesKey&&d[0]){
+          lat=parseFloat(d[0].lat); lng=parseFloat(d[0].lon);
+        }
+        if(!lat){ status.innerHTML='❌ Cidade não encontrada. Verifique o nome.'; return; }
+        _buscarComCoordenadas(lat,lng,raio,keywords,placesKey,status,lista,escopo,cidadeManual);
+      }).catch(function(e){ status.innerHTML='❌ Erro ao localizar cidade: '+e.message; });
+  } else {
+    if(!navigator.geolocation){ status.innerHTML='❌ Geolocalização não disponível.'; return; }
+    status.innerHTML='📡 Obtendo localização via GPS...';
+    navigator.geolocation.getCurrentPosition(
+      function(pos){ _buscarComCoordenadas(pos.coords.latitude,pos.coords.longitude,raio,keywords,placesKey,status,lista,escopo,''); },
+      function(err){ status.innerHTML='❌ GPS negado: '+err.message+'. Digite uma cidade acima.'; }
+    );
+  }
 }
 
+async function _buscarComCoordenadas(lat,lng,raio,keywords,placesKey,status,lista,escopo,cidadeLabel){
+  var localDesc=cidadeLabel||(escopo==='bairro'?'bairro (1,5km)':'cidade (5km)');
+  status.innerHTML='🔍 Buscando em '+localDesc+': '+keywords.join(', ')+'...';
+
+  function norm2(s){return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
+  var nomesExist=new Set(DB.clientes.map(function(c){return norm2(c.rs||'').slice(0,8);}));
+
+  var resultados=[];
+
+  if(placesKey){
+    // ── Google Places Text Search (API antiga, aceita key, melhor cobertura no BR) ──
+    for(var ki=0;ki<keywords.length;ki++){
+      try{
+        var query=keywords[ki]+(cidadeLabel?' em '+cidadeLabel:'');
+        var url='https://maps.googleapis.com/maps/api/place/textsearch/json'
+          +'?query='+encodeURIComponent(query)
+          +'&location='+lat+','+lng
+          +'&radius='+raio
+          +'&language=pt-BR'
+          +'&key='+encodeURIComponent(placesKey);
+        var r=await fetch(url);
+        if(!r.ok) continue;
+        var d=await r.json();
+        if(d.status==='OK'&&d.results){
+          d.results.forEach(function(p){
+            resultados.push({
+              nome:p.name,
+              end2:p.formatted_address||'',
+              lat:p.geometry.location.lat,
+              lng:p.geometry.location.lng,
+              prospect:!nomesExist.has(norm2(p.name).slice(0,8))
+            });
+          });
+        }
+      }catch(e){}
+    }
+  }
+
+  // ── Fallback: Overpass (OSM) se sem key ou sem resultados ──
+  if(!resultados.length){
+    try{
+      var osmTags=[];
+      keywords.forEach(function(kw){
+        var t=MAPA_SEGMENTO_OSM&&Object.values(MAPA_SEGMENTO_OSM).find(function(v){
+          return Array.isArray(v)&&v.some&&v[0]&&(kw.toLowerCase().includes(Object.values(v[0])[0])||false);
+        });
+        if(!t) osmTags.push({name:kw});
+      });
+      // Busca genérica por nome
+      var parts=keywords.map(function(kw){
+        return 'node["name"~"'+kw.split(' ')[0]+'",i](around:'+raio+','+lat+','+lng+');'
+              +'way["name"~"'+kw.split(' ')[0]+'",i](around:'+raio+','+lat+','+lng+');';
+      });
+      var query='[out:json][timeout:25];('+parts.join('')+');out center;';
+      var servers=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
+      var resp=null;
+      for(var si=0;si<servers.length;si++){
+        try{
+          resp=await fetch(servers[si],{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(query)});
+          if(resp.ok) break; resp=null;
+        }catch(fe){resp=null;}
+      }
+      if(resp){
+        var od=await resp.json();
+        (od.elements||[]).forEach(function(el){
+          var nome=(el.tags&&(el.tags.name||el.tags['name:pt']))||'';
+          if(!nome) return;
+          var elat=el.lat||(el.center&&el.center.lat);
+          var elng=el.lon||(el.center&&el.center.lon);
+          if(!elat||!elng) return;
+          resultados.push({nome:nome,end2:'',lat:elat,lng:elng,prospect:!nomesExist.has(norm2(nome).slice(0,8))});
+        });
+      }
+    }catch(e2){}
+  }
+
+  if(!resultados.length){
+    status.innerHTML='Nenhum resultado em '+localDesc+'. '+(placesKey?'':'Configure a chave Google Places para melhores resultados.');
+    return;
+  }
+
+  // Deduplica
+  var uniq={}; resultados.forEach(function(p){uniq[norm2(p.nome)]=p;}); resultados=Object.values(uniq);
+  var prospects=resultados.filter(function(p){return p.prospect;});
+  var jaClientes=resultados.filter(function(p){return !p.prospect;});
+
+  // Mapa estático Google
+  var mapaHtml='';
+  if(placesKey&&resultados.length){
+    var LETRAS='ABCDEFGHIJKLMNOPQRSTUVWXY';
+    var mapUrl='https://maps.googleapis.com/maps/api/staticmap?size=640x300&scale=2&maptype=roadmap&key='+encodeURIComponent(placesKey);
+    mapUrl+='&markers=color:blue%7Clabel:V%7C'+lat+','+lng;
+    resultados.slice(0,24).forEach(function(p,i){
+      p._letra=LETRAS[i];
+      mapUrl+='&markers=color:'+(p.prospect?'red':'green')+'%7Clabel:'+p._letra+'%7C'+p.lat+','+p.lng;
+    });
+    mapaHtml='<img src="'+mapUrl+'" style="width:100%;border-radius:8px;display:block;margin-bottom:6px" onerror="_mapaEstaticoErro(this)">'
+      +'<div style="font-size:10px;color:var(--t3);margin-bottom:8px">🔵 V=você · 🟢 já cliente · 🔴 prospecto</div>';
+  }
+
+  status.innerHTML='<b>'+resultados.length+'</b> local(is) em '+localDesc
+    +' · <span style="color:var(--red)">'+prospects.length+' prospecto(s)</span>'
+    +(jaClientes.length?' · <span style="color:var(--grn)">'+jaClientes.length+' já cliente(s)</span>':'')
+    +(placesKey?'':' <span style="color:var(--t3)">(via OSM)</span>');
+
+  lista.innerHTML=mapaHtml+resultados.map(function(p){
+    var cor=p.prospect?'var(--red)':'var(--grn)';
+    var mapsLink='https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lng;
+    return '<div style="padding:8px 0;border-bottom:1px solid var(--s3);display:flex;align-items:flex-start;gap:8px">'
+      +(p._letra?'<span style="background:'+cor+';color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:2px">'+p._letra+'</span>':'<span style="width:8px;height:8px;border-radius:50%;background:'+cor+';flex-shrink:0;margin-top:5px"></span>')
+      +'<div style="flex:1">'
+        +'<div style="font-weight:600;font-size:13px;color:var(--t1)">'+p.nome+'</div>'
+        +(p.end2?'<div style="font-size:10px;color:var(--t3)">'+p.end2+'</div>':'')
+        +'<div style="display:flex;gap:8px;margin-top:3px">'
+          +'<span style="font-size:10px;color:'+cor+';font-weight:600">'+(p.prospect?'⭐ Prospecto':'✓ Já cliente')+'</span>'
+          +'<a href="'+mapsLink+'" target="_blank" style="font-size:10px;color:var(--acc)"><i class="ti ti-navigation"></i> Rota</a>'
+        +'</div>'
+      +'</div>'
+    +'</div>';
+  }).join('');
+}
 function buscarLojasPorSegBairro(){ buscarLojasPorSeg('bairro'); }
 function buscarLojasPorSegCidade(){ buscarLojasPorSeg('cidade'); }
 
@@ -2653,9 +2721,14 @@ function init(){
   renderM();
 }
 
+function normalizar(str){
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
+}
+
 function renderProximosM(){
   var cont = document.getElementById('main-content');
   var segs = [...new Set(DB.clientes.filter(c=>c.seg&&!c.encerrado).map(c=>c.seg))].sort();
+  var cfg = loadCfg(); var temPlaces = !!(cfg.placesKey||'').trim();
   cont.innerHTML = `
   <div class="section">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -2670,10 +2743,15 @@ function renderProximosM(){
         <option value="">Todos os segmentos cadastrados</option>
         ${segs.map(s=>`<option value="${s}">${s}</option>`).join('')}
       </select>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+        <i class="ti ti-map-2" style="color:var(--t3);font-size:14px;flex-shrink:0"></i>
+        <input class="fi" id="busca-cidade-manual" placeholder="Cidade (opcional — usa GPS se vazio)" style="flex:1;font-size:12px">
+      </div>
       <div style="display:flex;gap:8px">
         <button class="btn bs" style="flex:1;font-size:11px" onclick="buscarLojasPorSegBairro()"><i class="ti ti-building-store"></i> No bairro</button>
         <button class="btn bp" style="flex:1;font-size:11px" onclick="buscarLojasPorSegCidade()"><i class="ti ti-building-community"></i> Na cidade</button>
       </div>
+      ${!temPlaces?'<div style="font-size:10px;color:var(--org);margin-top:6px;text-align:center"><i class="ti ti-alert-triangle"></i> Configure a chave Google Places em Configurações para melhores resultados</div>':''}
       <div id="seg-busca-status" style="font-size:11px;color:var(--t3);margin-top:8px;text-align:center"></div>
       <div id="seg-busca-lista"></div>
     </div>
