@@ -2342,7 +2342,7 @@ function toggleSegBusca(seg, el){
 function renderProximosM(){
   _segsSelecionados.clear();
   var cont=document.getElementById('main-content');
-  var segs=[...new Set(DB.clientes.filter(c=>c.seg&&!c.encerrado).map(c=>c.seg))].sort();
+  var segs=[...new Set(DB.clientes.filter(function(c){return c.seg&&!c.encerrado;}).map(function(c){return c.seg;}))].sort();
   var cfg=loadCfg(); var temKey=!!(cfg.placesKey||'').trim();
 
   cont.innerHTML=`
@@ -2355,12 +2355,14 @@ function renderProximosM(){
     <div class="card" style="margin-bottom:12px">
       <div class="card-title" style="margin-bottom:10px"><i class="ti ti-building-store" style="color:var(--acc2)"></i> Buscar lojas por segmento</div>
 
-      <!-- Multi-select segmentos -->
-      <div style="font-size:11px;color:var(--t3);margin-bottom:6px">Selecione os segmentos que deseja buscar:</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
-        <button id="seg-todos-btn" onclick="segTodosToggle()" style="padding:5px 12px;border-radius:20px;border:1px solid var(--acc2);background:var(--acc2);color:#fff;font-size:11px;font-weight:600;cursor:pointer">Todos</button>
-        ${segs.map(s=>`<button onclick="toggleSegBusca('${s}',this)" style="padding:5px 12px;border-radius:20px;border:1px solid var(--bdr);background:var(--s2);color:var(--t2);font-size:11px;cursor:pointer;transition:.15s">${s}</button>`).join('')}
-      </div>
+      <!-- Botão compacto de seleção -->
+      <button onclick="abrirModalSegsBusca()" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--bdr);border-radius:10px;background:var(--s2);cursor:pointer;margin-bottom:10px">
+        <span style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t2)">
+          <i class="ti ti-tags" style="color:var(--acc2)"></i>
+          <span id="seg-resumo-label">Todos os segmentos</span>
+        </span>
+        <i class="ti ti-chevron-down" style="color:var(--t3)"></i>
+      </button>
 
       <!-- Campo cidade -->
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
@@ -2368,353 +2370,66 @@ function renderProximosM(){
         <input class="fi" id="busca-cidade-manual" placeholder="Cidade (opcional — usa GPS se vazio)" style="flex:1;font-size:12px">
       </div>
 
-      <!-- Botões busca -->
       <div style="display:flex;gap:8px;margin-bottom:8px">
         <button class="btn bs" style="flex:1;font-size:12px;padding:9px" onclick="buscarLojasPorSegBairro()"><i class="ti ti-building-store"></i> No bairro</button>
         <button class="btn bp" style="flex:1;font-size:12px;padding:9px" onclick="buscarLojasPorSegCidade()"><i class="ti ti-building-community"></i> Na cidade</button>
       </div>
 
-      ${!temKey?`<div style="font-size:10px;color:var(--org);text-align:center;padding:4px"><i class="ti ti-alert-triangle"></i> Configure a Google Places API Key em Configurações</div>`:''}
+      ${!temKey?'<div style="font-size:10px;color:var(--org);text-align:center;padding:4px"><i class="ti ti-alert-triangle"></i> Configure a Google Places API Key em Configurações</div>':''}
       <div id="seg-busca-status" style="font-size:12px;color:var(--t3);margin-top:8px;text-align:center;min-height:20px"></div>
       <div id="seg-busca-lista" style="margin-top:4px"></div>
     </div>
 
     <div id="proximos-status" style="text-align:center;color:var(--t3);font-size:13px;padding:12px">Toque em <b>Meus clientes</b> para ver clientes da sua cidade.</div>
     <div id="proximos-lista"></div>
+  </div>
+
+  <!-- Bottom sheet segmentos -->
+  <div id="modal-segs-busca" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;align-items:flex-end">
+    <div style="background:var(--s1);border-radius:16px 16px 0 0;width:100%;max-height:75vh;overflow-y:auto;padding:16px">
+      <div style="width:36px;height:4px;background:var(--bdr);border-radius:2px;margin:0 auto 14px"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div style="font-size:15px;font-weight:700;color:var(--t1)">Selecionar segmentos</div>
+        <button onclick="fecharModalSegsBusca()" style="background:none;border:none;font-size:22px;color:var(--t3);cursor:pointer">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;background:var(--s2);cursor:pointer">
+          <input type="checkbox" id="seg-check-todos" checked onchange="toggleTodosSegs(this)" style="width:18px;height:18px;accent-color:var(--acc2)">
+          <span style="font-size:13px;font-weight:600;color:var(--t1)">Todos os segmentos</span>
+        </label>
+        ${segs.map(function(s){ return '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;background:var(--s2);cursor:pointer"><input type="checkbox" class="seg-check-item" value="'+s+'" onchange="atualizarSegsM()" style="width:18px;height:18px;accent-color:var(--acc)"><span style="font-size:13px;color:var(--t1)">'+s+'</span></label>'; }).join('')}
+      </div>
+      <button onclick="fecharModalSegsBusca()" class="btn bp" style="width:100%;margin-top:16px;padding:12px;font-size:14px">Confirmar</button>
+    </div>
   </div>`;
 }
 
-function segTodosToggle(){
+function abrirModalSegsBusca(){
+  var m=document.getElementById('modal-segs-busca');
+  if(m){m.style.display='flex';}
+}
+function fecharModalSegsBusca(){
+  var m=document.getElementById('modal-segs-busca');
+  if(m) m.style.display='none';
+}
+function toggleTodosSegs(cb){
+  document.querySelectorAll('.seg-check-item').forEach(function(i){i.checked=false;});
   _segsSelecionados.clear();
-  document.querySelectorAll('#seg-busca-lista ~ * button[onclick*="toggleSegBusca"], .section button[onclick*="toggleSegBusca"]').forEach(function(b){
-    b.style.background='var(--s2)'; b.style.color='var(--t2)'; b.style.borderColor='var(--bdr)';
-  });
-  // Simpler: just deselect all segment buttons
-  var cont=document.getElementById('main-content');
-  if(cont) cont.querySelectorAll('button[onclick*="toggleSegBusca"]').forEach(function(b){
-    b.style.background='var(--s2)'; b.style.color='var(--t2)'; b.style.borderColor='var(--bdr)';
-  });
-  var todos=document.getElementById('seg-todos-btn');
-  if(todos){todos.style.background='var(--acc2)';todos.style.color='#fff';}
+  atualizarLabelSegs();
 }
-
-function buscarLojasPorSegBairro(){ buscarLojasPorSeg('bairro'); }
-function buscarLojasPorSegCidade(){ buscarLojasPorSeg('cidade'); }
-
-async function buscarLojasPorSeg(escopo){
-  var status=document.getElementById('seg-busca-status');
-  var lista=document.getElementById('seg-busca-lista');
-  if(!status||!lista) return;
-
-  var cfg=loadCfg(); var placesKey=(cfg.placesKey||'').trim();
-  if(!placesKey){ status.innerHTML='⚠️ Configure a Google Places API Key em Configurações.'; return; }
-
-  var cidadeManual=(document.getElementById('busca-cidade-manual')?.value||'').trim();
-  var raio=escopo==='bairro'?1500:5000;
-
-  // Segmentos selecionados
-  var segsAtivos=_segsSelecionados.size>0
-    ?[..._segsSelecionados]
-    :[...new Set(DB.clientes.filter(c=>c.seg&&!c.encerrado).map(c=>c.seg))];
-
-  var keywords=[...new Set(segsAtivos.map(function(s){return KW_SEG[s]||s;}).filter(Boolean))].slice(0,5);
-  if(!keywords.length){ status.innerHTML='⚠️ Nenhum segmento disponível.'; return; }
-
-  status.innerHTML='⏳ '+(cidadeManual?'Localizando "'+cidadeManual+'"...':'Obtendo GPS...');
-  lista.innerHTML='';
-
-  // Obtém coordenadas
-  var lat,lng;
-  if(cidadeManual){
-    try{
-      var geoResp=await fetch('https://maps.googleapis.com/maps/api/geocode/json?address='+encodeURIComponent(cidadeManual+' Brasil')+'&key='+encodeURIComponent(placesKey)+'&language=pt-BR');
-      var geoData=await geoResp.json();
-      if(geoData.status!=='OK'||!geoData.results[0]) throw new Error('Cidade não encontrada');
-      lat=geoData.results[0].geometry.location.lat;
-      lng=geoData.results[0].geometry.location.lng;
-      status.innerHTML='📍 Buscando em '+geoData.results[0].formatted_address+'...';
-    }catch(e){ status.innerHTML='❌ '+e.message; return; }
-  } else {
-    try{
-      var pos=await new Promise(function(res,rej){ navigator.geolocation.getCurrentPosition(res,rej,{timeout:8000}); });
-      lat=pos.coords.latitude; lng=pos.coords.longitude;
-    }catch(e){ status.innerHTML='❌ GPS negado. Digite uma cidade acima.'; return; }
-  }
-
-  status.innerHTML='🔍 Buscando em '+(escopo==='bairro'?'bairro (1,5km)':'cidade (5km)')+': '+segsAtivos.slice(0,3).join(', ')+(segsAtivos.length>3?' +'+( segsAtivos.length-3):'')+'...';
-
-  function norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
-  var nomesExist=new Set(DB.clientes.map(function(c){return norm(c.rs||'').slice(0,8);}));
-
-  var resultados=[]; var erros=[];
-
-  // Google Places Text Search (endpoint antigo — aceita API key, melhor cobertura BR)
-  for(var ki=0;ki<keywords.length;ki++){
-    try{
-      var q=keywords[ki]+(cidadeManual?' em '+cidadeManual:'');
-      var url='https://maps.googleapis.com/maps/api/place/textsearch/json'
-        +'?query='+encodeURIComponent(q)
-        +'&location='+lat+','+lng
-        +'&radius='+raio
-        +'&language=pt-BR'
-        +'&key='+encodeURIComponent(placesKey);
-      var r=await fetch(url);
-      var d=await r.json();
-      if(d.status==='OK'&&d.results){
-        d.results.forEach(function(p){
-          if(!p.name) return;
-          resultados.push({
-            nome:p.name,
-            end2:p.formatted_address||'',
-            lat:p.geometry.location.lat,
-            lng:p.geometry.location.lng,
-            prospect:!nomesExist.has(norm(p.name).slice(0,8))
-          });
-        });
-      } else if(d.status&&d.status!=='ZERO_RESULTS'){
-        erros.push(d.status+(d.error_message?' — '+d.error_message:''));
-      }
-    }catch(e){ erros.push(e.message); }
-  }
-
-  // Deduplica por nome normalizado
-  var uniq={}; resultados.forEach(function(p){uniq[norm(p.nome)]=p;}); resultados=Object.values(uniq);
-  var prospects=resultados.filter(function(p){return p.prospect;});
-  var jaClientes=resultados.filter(function(p){return !p.prospect;});
-
-  if(!resultados.length){
-    status.innerHTML=erros.length?'❌ Erro: '+erros[0]:'Nenhum resultado encontrado. Tente outro segmento ou amplie o raio.';
-    return;
-  }
-
-  // Mapa estático Google
-  var LETRAS='ABCDEFGHIJKLMNOPQRSTUVWXY';
-  var mapUrl='https://maps.googleapis.com/maps/api/staticmap?size=640x300&scale=2&maptype=roadmap&key='+encodeURIComponent(placesKey);
-  mapUrl+='&markers=color:blue%7Clabel:V%7C'+lat+','+lng;
-  resultados.slice(0,24).forEach(function(p,i){
-    p._letra=LETRAS[i];
-    mapUrl+='&markers=color:'+(p.prospect?'red':'green')+'%7Clabel:'+p._letra+'%7C'+p.lat+','+p.lng;
-  });
-
-  status.innerHTML='<b>'+resultados.length+'</b> local(is) · <span style="color:var(--red)">'+prospects.length+' prospecto(s)</span>'+(jaClientes.length?' · <span style="color:var(--grn)">'+jaClientes.length+' já cliente(s)</span>':'');
-
-  lista.innerHTML='<img src="'+mapUrl+'" style="width:100%;border-radius:8px;display:block;margin-bottom:4px" onerror="_mapaEstaticoErro(this)">'
-    +'<div style="font-size:10px;color:var(--t3);margin-bottom:10px">🔵 V=você · 🟢 já cliente · 🔴 prospecto</div>'
-    +resultados.map(function(p){
-      var cor=p.prospect?'var(--red)':'var(--grn)';
-      var mapsLink='https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lng;
-      var wppCli=DB.clientes.find(function(c){return !p.prospect&&norm(c.rs||'').slice(0,8)===norm(p.nome).slice(0,8);});
-      return '<div style="padding:9px 0;border-bottom:1px solid var(--s3);display:flex;align-items:flex-start;gap:10px">'
-        +'<span style="background:'+cor+';color:#fff;border-radius:50%;width:22px;height:22px;min-width:22px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;margin-top:2px">'+(p._letra||'•')+'</span>'
-        +'<div style="flex:1;min-width:0">'
-          +'<div style="font-weight:600;font-size:13px;color:var(--t1);word-break:break-word">'+p.nome+'</div>'
-          +(p.end2?'<div style="font-size:10px;color:var(--t3);margin-top:1px;word-break:break-word">'+p.end2+'</div>':'')
-          +'<div style="display:flex;gap:10px;margin-top:5px;flex-wrap:wrap">'
-            +'<span style="font-size:11px;color:'+cor+';font-weight:600">'+(p.prospect?'⭐ Prospecto':'✓ Já cliente')+'</span>'
-            +'<a href="'+mapsLink+'" target="_blank" style="font-size:11px;color:var(--acc);text-decoration:none;font-weight:500"><i class="ti ti-navigation"></i> Rota</a>'
-            +(wppCli&&(wppCli.cel||wppCli.fone)?'<a href="https://wa.me/55'+(wppCli.cel||wppCli.fone).replace(/\D/g,'')+'" target="_blank" style="font-size:11px;color:#25D366;text-decoration:none;font-weight:500"><i class="ti ti-brand-whatsapp"></i> WhatsApp</a>':'')
-          +'</div>'
-        +'</div>'
-      +'</div>';
-    }).join('');
+function atualizarSegsM(){
+  _segsSelecionados.clear();
+  document.querySelectorAll('.seg-check-item:checked').forEach(function(cb){_segsSelecionados.add(cb.value);});
+  var todos=document.getElementById('seg-check-todos');
+  if(todos) todos.checked=_segsSelecionados.size===0;
+  atualizarLabelSegs();
 }
-
-
-async function processarComandoVoz(texto){
-  document.getElementById('voz-status-txt').textContent='Processando...';
-  document.getElementById('voz-resposta').innerHTML='⏳ Analisando...';
-
-  function norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
-  var txNorm = norm(texto);
-
-  function responderAmora(texto){
-    document.getElementById('voz-resposta').innerHTML=texto.replace(/\n/g,'<br>');
-    document.getElementById('voz-status-txt').textContent='Ouvindo... diga "'+getNomeAmora()+'"';
-    falarAmora(texto.replace(/<[^>]+>/g,''));
-  }
-
-  var ehBuscaCli = /buscar|abrir|ver|mostrar|cliente|procurar/.test(txNorm);
-  var ehLembrete = /visita|reuniao|reunião|lembrete|marcar|agenda|agendar|ligar/.test(txNorm);
-  var ehMapa     = /mapa|rota|localizar|onde fica|endereço/.test(txNorm);
-  var ehWpp      = /whatsapp|zap|mensagem/.test(txNorm);
-  var ehProx     = /proximos|próximos|perto|nearby|aqui/.test(txNorm);
-  var ehAnalise  = /analise|análise|último pedido|histórico|resumo|antes da visita/.test(txNorm);
-
-  var cliMatch = null;
-  var palavras = txNorm.split(' ').filter(function(w){ return w.length>3; });
-  DB.clientes.forEach(function(c){
-    if(!c.rs) return;
-    var nNorm = norm(c.rs);
-    if(palavras.some(function(w){ return nNorm.includes(w); })){
-      if(!cliMatch || norm(c.rs).length < norm(cliMatch.rs).length) cliMatch = c;
-    }
-  });
-
-  if(ehProx){ navM('proximos'); buscarProximosM(); responderAmora('Buscando clientes próximos!'); return; }
-  if(ehMapa&&cliMatch){ var end=[cliMatch.end,cliMatch.cid,cliMatch.uf].filter(Boolean).join(', ')||cliMatch.rs; window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(end),'_blank'); responderAmora('Abrindo mapa para '+cliMatch.rs+'!'); return; }
-  if(ehWpp&&cliMatch&&(cliMatch.cel||cliMatch.fone)){ wppM(cliMatch.cel||cliMatch.fone); responderAmora('Abrindo WhatsApp de '+cliMatch.rs+'!'); return; }
-  if(ehBuscaCli&&!ehAnalise&&cliMatch){ responderAmora('Abrindo cadastro de '+cliMatch.rs+'!'); setTimeout(function(){ navM('clientes'); setTimeout(function(){ abrirClienteM(cliMatch.id); },300); },800); return; }
-
-  // Sem cliente específico identificado: usa o contexto completo do CRM (mesmo
-  // resumo rico usado na caixa "Perguntar à IA" do dashboard), não só os nomes.
-  var contextoGeral = contextoCliente || JSON.stringify(iaContextoCompletoM());
-  var prompt='Você é a Amora, assistente virtual de CRM. Responda de forma natural e fluida para ser lida em voz alta. Máximo 3 frases curtas.\n\n'+contextoGeral+'\n\nPergunta: '+texto;
-
-  try{
-    // Endpoint generateContent (não /v1beta/interactions) + gemini-3.6-flash +
-    // thinkingConfig.thinkingLevel, mesmo padrão corrigido no restante do app.
-    var url='https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent';
-    var r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},
-      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:200,thinkingConfig:{thinkingLevel:'low'}}})});
-    var d=await r.json();
-    if(d.error) throw new Error(d.error.message);
-    var resp=d.candidates?.[0]?.content?.parts?.[0]?.text||'Não consegui processar a solicitação.';
-    responderAmora(resp);
-  }catch(e){
-    responderAmora('Desculpe, ocorreu um erro: '+e.message);
-  }
-}
-
-function executarRespostaVoz(resp){
-  // Normaliza e procura padrão ACAO em qualquer formato
-  var texto = resp.trim();
-  
-  // Tenta encontrar linha com ACAO (aceita com ou sem acento)
-  var linhaAcao = '';
-  texto.split('\n').forEach(function(l){
-    var lt = l.trim().toUpperCase();
-    if(lt.startsWith('ACAO:') || lt.startsWith('AÇÃO:') || lt.startsWith('ACA')) linhaAcao = l.trim();
-  });
-
-  // Se não achou linha específica mas resposta começa com ACAO
-  if(!linhaAcao && texto.toUpperCase().startsWith('ACA')) linhaAcao = texto.split('\n')[0].trim();
-
-  if(linhaAcao){
-    // Normaliza separador
-    linhaAcao = linhaAcao.replace(/^AÇ[AÃ]O:/i,'ACAO:').replace(/^ACAO\s*:/i,'ACAO:');
-    var partes = linhaAcao.split(':');
-    var tipo = (partes[1]||'').trim().toUpperCase();
-    var dados = partes.slice(2).join(':').trim().replace(/['"`,]/g,'').trim();
-    var exp = texto.split('\n').filter(function(l){ return !l.trim().toUpperCase().startsWith('ACA'); }).join(' ').trim();
-
-    document.getElementById('voz-resposta').innerHTML='⏳ Executando: '+tipo+(dados?' - '+dados:'')+'...';
-
-    function norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
-    var dadosNorm = norm(dados);
-
-    if(tipo==='MAPA'){
-      setTimeout(function(){ window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(dados),'_blank'); },500);
-      document.getElementById('voz-resposta').innerHTML='✅ Abrindo mapa: '+dados;
-    }
-    else if(tipo==='WHATSAPP'){
-      var cw=DB.clientes.find(function(c){ return norm(c.rs).includes(dadosNorm.slice(0,8)); });
-      if(cw&&(cw.cel||cw.fone)){ setTimeout(function(){ wppM(cw.cel||cw.fone); },500); document.getElementById('voz-resposta').innerHTML='✅ Abrindo WhatsApp: '+cw.rs; }
-      else document.getElementById('voz-resposta').innerHTML='⚠️ Cliente "'+dados+'" não encontrado ou sem telefone.';
-    }
-    else if(tipo==='CLIENTE'){
-      var cli=DB.clientes.find(function(c){ return norm(c.rs)===dadosNorm; })
-        ||DB.clientes.find(function(c){ return norm(c.rs).includes(dadosNorm); })
-        ||DB.clientes.find(function(c){ return dadosNorm.split(' ').some(function(w){ return w.length>3&&norm(c.rs).includes(w); }); });
-      if(cli){
-        document.getElementById('voz-resposta').innerHTML='✅ Abrindo: '+cli.rs;
-        setTimeout(function(){ navM('clientes'); setTimeout(function(){ abrirClienteM(cli.id); },300); },500);
-      } else {
-        document.getElementById('voz-resposta').innerHTML='⚠️ Cliente "'+dados+'" não encontrado.';
-      }
-    }
-    else if(tipo==='AGENDA'){ setTimeout(function(){ navM('agenda'); },500); document.getElementById('voz-resposta').innerHTML='✅ Abrindo agenda'; }
-    else if(tipo==='PROXIMOS'){ setTimeout(function(){ navM('proximos'); buscarProximosM(); },500); document.getElementById('voz-resposta').innerHTML='✅ Buscando clientes próximos...'; }
-    else if(tipo==='LEMBRETE'||tipo==='AGENDA_ITEM'){
-      try{
-        var dataMatch=dados.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
-        var dtTar=new Date().toISOString().split('T')[0];
-        if(dataMatch){
-          var dia=dataMatch[1].padStart(2,'0');
-          var mes=dataMatch[2].padStart(2,'0');
-          var ano=dataMatch[3]?(dataMatch[3].length===2?'20'+dataMatch[3]:dataMatch[3]):new Date().getFullYear();
-          dtTar=ano+'-'+mes+'-'+dia;
-        }
-        var horaMatch=dados.match(/(\d{1,2})h(\d{0,2})|(\d{1,2}):(\d{2})/);
-        var hora=horaMatch?(horaMatch[1]||horaMatch[3]).padStart(2,'0')+':'+(horaMatch[2]||horaMatch[4]||'00'):'';
-        var cliEncontrado=null;
-        try{
-          cliEncontrado=DB.clientes.find(function(c){
-            if(!c.rs) return false;
-            return dadosNorm.split(' ').filter(function(w){return w.length>3;}).some(function(w){return norm(c.rs).includes(w);});
-          });
-        }catch(e2){}
-        var desc=dados.replace(/\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/g,'').replace(/\d{1,2}h\d{0,2}/g,'').trim()||dados;
-        if(hora) desc=hora+' - '+desc;
-        if(cliEncontrado) desc=desc+' - '+cliEncontrado.rs;
-        desc=desc.trim();
-        DB.tarefas=DB.tarefas||[];
-        DB.tarefas.push({id:'t'+Date.now(),desc:desc,dt:dtTar,done:false,
-          cliId:cliEncontrado?cliEncontrado.id:'',empId:cliEncontrado?cliEncontrado.empId:''});
-        salvarDB();
-        document.getElementById('voz-resposta').innerHTML='✅ Agendado: <b>'+desc+'</b><br>📅 '+fmtDM(dtTar)+(cliEncontrado?'<br>👤 '+cliEncontrado.rs:'');
-        toastM('Lembrete criado!');
-      }catch(e3){
-        document.getElementById('voz-resposta').innerHTML='❌ Erro ao criar lembrete: '+e3.message;
-      }
-    }
-  } else {
-    document.getElementById('voz-resposta').innerHTML=texto.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<b>$1</b>');
-  }
-  document.getElementById('voz-status-txt').textContent='Toque para falar novamente';
-}
-// ── Fim Voz ──────────────────────────────────────────────
-function fmtDM(dt){ if(!dt) return ''; var p=dt.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
-
-function wppM(tel){
-  var num = tel.replace(/\D/g,'');
-  if(!num){ toastM('Telefone não cadastrado'); return; }
-  if(!num.startsWith('55')) num='55'+num;
-  window.open('https://wa.me/'+num);
-}
-
-function mapsCliM(id){
-  var c=DB.clientes.find(x=>x.id===id); if(!c) return;
-  var end=c.end&&c.end.trim()?c.end.trim()+', '+(c.cid||''):c.rs+', '+(c.cid||'');
-  window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(end),'_blank');
-}
-function selTodosCli(cb){ document.querySelectorAll('.cli-cb-m').forEach(x=>x.checked=cb.checked); }
-function rotaLoteCli(){
-  var ids=[...document.querySelectorAll('.cli-cb-m:checked')].map(x=>x.dataset.cliid);
-  if(!ids.length){toastM('Selecione clientes primeiro');return;}
-  if(ids.length>23){toastM('Máximo 23 clientes por rota');return;}
-  var cls=ids.map(id=>DB.clientes.find(x=>x.id===id)).filter(Boolean);
-  var ends=cls.map(c=>encodeURIComponent(c.end&&c.end.trim()?c.end.trim()+', '+(c.cid||''):c.rs+', '+(c.cid||'')));
-  var dest=ends.pop();
-  var url=ends.length
-    ?'https://www.google.com/maps/dir/?api=1&destination='+dest+'&waypoints='+ends.join('|')
-    :'https://www.google.com/maps/search/?api=1&query='+dest;
-  toastM('Abrindo rota com '+cls.length+' cliente(s)...');
-  window.open(url,'_blank');
-}
-function sacPedM(pedId){ sacCliM(pedId); }
-function sacCliM(pedId){
-  var p=DB.pedidos.find(x=>x.id===pedId); if(!p) return;
-  var c=DB.clientes.find(x=>x.id===p.cliId);
-  var e=DB.empresas.find(x=>x.id===p.empId);
-  if(!e?.sac){toastM('E-mail SAC não cadastrado na empresa');return;}
-  var nf=p.nf||p.num||'(sem NF)'; var razao=c?.rs||'—';
-  var assunto=encodeURIComponent('Chamado SAC ('+nf+') - ('+razao+')');
-  var corpo=encodeURIComponent('Olá! Referente a NF '+nf+' - Cliente '+razao+', segue item para análise.');
-  var cc=c?.email?'&cc='+encodeURIComponent(c.email):'';
-  var mailto='mailto:'+e.sac+'?subject='+assunto+'&body='+corpo+cc;
-  var a=document.createElement('a'); a.href=mailto; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-}
-
-// ── Init ─────────────────────────────────────────────────
-function init(){
-  carregarDB();
-  if(DB.empresas.length) empAtualM = DB.empresas[0].id;
-  atualizarBadgeAgendaM();
-  renderM();
-}
-
-function normalizar(str){
-  return str.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
+function atualizarLabelSegs(){
+  var label=document.getElementById('seg-resumo-label');
+  if(!label) return;
+  if(_segsSelecionados.size===0) label.textContent='Todos os segmentos';
+  else if(_segsSelecionados.size===1) label.textContent=[..._segsSelecionados][0];
+  else label.textContent=[..._segsSelecionados].slice(0,2).join(', ')+(_segsSelecionados.size>2?' +'+ (_segsSelecionados.size-2):'');
 }
 
 
