@@ -2491,47 +2491,53 @@ async function buscarLojasPorSeg(escopo){
   lista.innerHTML='';
 
   carregarGoogleMaps(placesKey, async function(){
-    if(!window.google||!window.google.maps||!window.google.maps.places){
-      status.innerHTML='❌ Falha ao carregar Google Maps. Verifique a chave e a conexão.';
-      return;
+    // PASSO 1: SDK carregou?
+    if(!window.google||!window.google.maps){
+      status.innerHTML='❌ [P1] Google Maps não carregou. Chave inválida ou sem conexão.'; return;
     }
+    status.innerHTML='[P1] Maps OK... verificando Places...';
+    if(!window.google.maps.places){
+      status.innerHTML='❌ [P2] Places library não carregou. Aguarde e tente novamente.'; return;
+    }
+    status.innerHTML='[P2] Places OK...';
 
-    // Coordenadas
+    // PASSO 3: Coordenadas
     var lat,lng;
     if(cidadeManual){
-      status.innerHTML='📍 Localizando "'+cidadeManual+'"...';
+      status.innerHTML='[P3] Geocoding "'+cidadeManual+'"...';
       try{
         var geoRes=await new Promise(function(res,rej){
           new google.maps.Geocoder().geocode({address:cidadeManual+' Brasil',language:'pt-BR'},function(r,st){
             if(st==='OK'&&r&&r[0]) res(r[0].geometry.location);
-            else rej(new Error('Cidade não encontrada: '+st));
+            else rej(new Error('Geocoding: '+st));
           });
         });
         lat=geoRes.lat(); lng=geoRes.lng();
-      }catch(e){ status.innerHTML='❌ '+e.message; return; }
+        status.innerHTML='[P3] Localizado: '+lat.toFixed(4)+','+lng.toFixed(4);
+      }catch(e){ status.innerHTML='❌ [P3] '+e.message; return; }
     } else {
-      status.innerHTML='📡 Obtendo localização...';
+      status.innerHTML='[P3] Obtendo GPS...';
       try{
         var pos=await new Promise(function(res,rej){
           navigator.geolocation.getCurrentPosition(res,function(e){rej(new Error(e.message));},{timeout:10000,enableHighAccuracy:false});
         });
         lat=pos.coords.latitude; lng=pos.coords.longitude;
-      }catch(e){ status.innerHTML='❌ GPS: '+e.message+'. Digite uma cidade.'; return; }
+        status.innerHTML='[P3] GPS: '+lat.toFixed(4)+','+lng.toFixed(4);
+      }catch(e){ status.innerHTML='❌ [P3] GPS: '+e.message; return; }
     }
 
-    status.innerHTML='🔍 Buscando em '+(escopo==='bairro'?'bairro (1,5km)':'cidade (5km)')+'...';
-
-    // Mapa oculto para PlacesService
+    // PASSO 4: Inicializa mapa e PlacesService
+    status.innerHTML='[P4] Inicializando PlacesService...';
     var mapDiv=document.createElement('div');
-    mapDiv.style.cssText='width:100px;height:100px;position:fixed;left:-200px;top:-200px;visibility:hidden';
+    mapDiv.style.cssText='width:100px;height:100px;position:fixed;left:-200px;top:-200px';
     document.body.appendChild(mapDiv);
     var gmap=new google.maps.Map(mapDiv,{center:{lat:lat,lng:lng},zoom:14});
     var svc=new google.maps.places.PlacesService(gmap);
     var center=new google.maps.LatLng(lat,lng);
+    status.innerHTML='[P4] PlacesService OK. Buscando '+keywords.join(', ')+'...';
 
     function norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
     var nomesExist=new Set(DB.clientes.map(function(c){return norm(c.rs||'').slice(0,8);}));
-
     var resultados=[]; var erros=[]; var pending=keywords.length;
 
     function finalizar(){
@@ -2544,35 +2550,27 @@ async function buscarLojasPorSeg(escopo){
       if(pending>0){
         pending=0;
         try{ document.body.removeChild(mapDiv); }catch(e){}
-        var msg='⏰ Tempo esgotado.';
-        if(erros.length) msg+=' Erro: '+erros[0];
-        else msg+=' Verifique: 1) Places API habilitada 2) Cobrança ativa 3) Domínio liberado na chave';
-        status.innerHTML=msg;
+        status.innerHTML='❌ [P5] Timeout — callback nunca retornou. Erros: '+(erros.join(', ')||'nenhum. Verifique se Places API (Legacy) está ativa e faturamento OK.');
       }
     }, 25000);
 
+    // PASSO 5: nearbySearch
     keywords.forEach(function(kw){
-      // nearbySearch — mais confiável no mobile que textSearch
       svc.nearbySearch({
-        location: center,
-        radius: raio,
-        keyword: kw,
-        language: 'pt-BR'
+        location: center, radius: raio, keyword: kw, language: 'pt-BR'
       }, function(res, pstatus){
         if(pstatus===google.maps.places.PlacesServiceStatus.OK && res){
           res.forEach(function(p){
             if(!p.name||!p.geometry) return;
             resultados.push({
-              nome:p.name,
-              end2:p.vicinity||'',
-              lat:p.geometry.location.lat(),
-              lng:p.geometry.location.lng(),
+              nome:p.name, end2:p.vicinity||'',
+              lat:p.geometry.location.lat(), lng:p.geometry.location.lng(),
               placeId:p.place_id||'',
               prospect:!nomesExist.has(norm(p.name).slice(0,8))
             });
           });
-        } else if(pstatus!==google.maps.places.PlacesServiceStatus.ZERO_RESULTS){
-          erros.push(pstatus);
+        } else {
+          erros.push(kw+':'+pstatus);
         }
         if(--pending===0) finalizar();
       });
