@@ -445,15 +445,16 @@ if('serviceWorker' in navigator){var b=new Blob(["const CACHE='repcrm-mob-v26';s
     <div style="display:flex;align-items:center;gap:10px">
       <div id="voz-status-dot" style="width:9px;height:9px;border-radius:50%;background:var(--t3)"></div>
       <span style="font-size:12px;font-weight:600;background:linear-gradient(135deg,#7c3aed,#db2777);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Amora</span>
-      <span id="voz-status-txt" style="font-size:11px;color:var(--t2)">Diga "Amora" para ativar</span>
+      <span id="voz-status-txt" style="font-size:11px;color:var(--t2)">Toque em mim e fale</span>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
-      <button id="btn-falar" onclick="falarUltima()" style="display:none;background:none;border:1px solid #7c3aed;border-radius:8px;padding:3px 8px;font-size:10px;color:#7c3aed;cursor:pointer"><i class="ti ti-volume"></i></button>
+      <button id="btn-falar" onclick="falarUltima()" title="Repetir" style="display:none;background:none;border:1px solid #7c3aed;border-radius:8px;padding:3px 8px;font-size:12px;color:#7c3aed;cursor:pointer"><i class="ti ti-repeat"></i></button><button id="btn-amora-mudo" onclick="amoraMudo()" title="Ligar/desligar a voz" style="background:none;border:1px solid #7c3aed;border-radius:8px;padding:3px 8px;font-size:12px;color:#7c3aed;cursor:pointer"><i class="ti ti-volume"></i></button>
       <button onclick="document.getElementById('painel-voz').style.display='none'" style="background:none;border:none;color:var(--t3);font-size:16px;cursor:pointer"><i class="ti ti-x"></i></button>
     </div>
   </div>
   <div id="voz-transcricao" style="font-size:11px;color:#7c3aed;min-height:16px;font-style:italic;margin-bottom:8px"></div>
-  <div id="voz-resposta" style="font-size:12px;color:var(--t1);max-height:160px;overflow-y:auto;line-height:1.6"></div>
+  <div id="voz-resposta" style="font-size:14px;color:var(--t1);max-height:200px;overflow-y:auto;line-height:1.6">Toque no botão da Amora e fale um comando. Diga <b>"ajuda"</b> para ver exemplos.</div>
+  <div style="display:flex;gap:6px;margin-top:10px"><input id="voz-input" type="text" autocomplete="off" placeholder="ou digite o comando..." onkeydown="if(event.key==='Enter')amoraEnviarTexto()" style="flex:1;font-size:15px;padding:9px 12px;border-radius:12px;border:1px solid var(--bdr);background:var(--s2);color:var(--t1)"><button onclick="amoraEnviarTexto()" style="border:none;border-radius:12px;background:#7c3aed;color:#fff;padding:0 14px;font-size:16px"><i class="ti ti-send"></i></button></div>
 </div>
 
 <script>
@@ -660,6 +661,51 @@ function oferecerChaveIANuvem(){
       .observe(document.body,{childList:true,subtree:true});
   });
 })();
+
+// ══ VISUALIZADOR DE FOTO EM TELA CHEIA ══
+// Pinça para dar zoom, arraste para mover, toque duplo alterna zoom, X ou "voltar" fecha.
+function abrirFotoTelaCheia(src){
+  if(!src||src.indexOf('data:')!==0&&src.indexOf('blob:')!==0&&src.indexOf('http')!==0) return;
+  var ov=document.createElement('div');
+  ov.id='foto-tela-cheia';
+  ov.style.cssText='position:fixed;inset:0;z-index:100001;background:#000;touch-action:none;overflow:hidden';
+  ov.innerHTML='<img src="'+src+'" style="position:absolute;left:50%;top:50%;max-width:100%;max-height:100%;transform:translate(-50%,-50%);transform-origin:center center;user-select:none;-webkit-user-drag:none">'
+    +'<button aria-label="Fechar" style="position:absolute;top:calc(12px + env(safe-area-inset-top));right:12px;width:46px;height:46px;border-radius:50%;border:none;background:rgba(255,255,255,.18);color:#fff;font-size:26px;line-height:46px">✕</button>'
+    +'<div style="position:absolute;bottom:calc(14px + env(safe-area-inset-bottom));left:0;right:0;text-align:center;color:rgba(255,255,255,.7);font-size:13px;pointer-events:none">Pinça para ampliar · toque duplo para zoom</div>';
+  document.body.appendChild(ov);
+  var img=ov.querySelector('img'), esc=1, tx=0, ty=0, pts={}, ini=null, ultToque=0;
+  function aplicar(){ img.style.transform='translate(calc(-50% + '+tx+'px), calc(-50% + '+ty+'px)) scale('+esc+')'; }
+  function fechar(){ ov.remove(); window.removeEventListener('popstate', fecharPorVoltar); }
+  function fecharPorVoltar(){ if(document.getElementById('foto-tela-cheia')) fechar(); }
+  // o botão "voltar" do celular fecha a foto em vez de sair da página
+  try{ history.pushState({foto:1},''); window.addEventListener('popstate', fecharPorVoltar); }catch(e){}
+  ov.querySelector('button').onclick=function(e){ e.stopPropagation(); try{ history.back(); }catch(_){ fechar(); } setTimeout(function(){ if(document.getElementById('foto-tela-cheia')) fechar(); },300); };
+  function dist(){ var v=Object.values(pts); return Math.hypot(v[0].x-v[1].x, v[0].y-v[1].y); }
+  ov.addEventListener('pointerdown', function(e){
+    pts[e.pointerId]={x:e.clientX,y:e.clientY};
+    var n=Object.keys(pts).length;
+    if(n===2) ini={d:dist(), esc:esc};
+    else if(n===1){
+      ini={x:e.clientX, y:e.clientY, tx:tx, ty:ty};
+      var ag=Date.now();
+      if(ag-ultToque<300){ if(esc>1){ esc=1; tx=0; ty=0; } else { esc=2.5; } aplicar(); }
+      ultToque=ag;
+    }
+  });
+  ov.addEventListener('pointermove', function(e){
+    if(!pts[e.pointerId]) return;
+    pts[e.pointerId]={x:e.clientX,y:e.clientY};
+    var n=Object.keys(pts).length;
+    if(n===2&&ini&&ini.d){ esc=Math.min(6,Math.max(1, ini.esc*dist()/ini.d)); if(esc===1){ tx=0; ty=0; } aplicar(); }
+    else if(n===1&&ini&&esc>1&&ini.x!=null){ tx=ini.tx+(e.clientX-ini.x); ty=ini.ty+(e.clientY-ini.y); aplicar(); }
+  });
+  function soltar(e){ delete pts[e.pointerId]; var n=Object.keys(pts).length; if(n===1){ var v=Object.values(pts)[0]; ini={x:v.x,y:v.y,tx:tx,ty:ty}; } else if(!n) ini=null; }
+  ov.addEventListener('pointerup', soltar); ov.addEventListener('pointercancel', soltar);
+  ov.addEventListener('wheel', function(e){ e.preventDefault(); esc=Math.min(6,Math.max(1, esc*(e.deltaY<0?1.15:0.87))); if(esc===1){tx=0;ty=0;} aplicar(); }, {passive:false});
+}
+
+// Mostra a dica "Toque para ampliar" só quando há foto no modal
+setInterval(function(){ var i=document.getElementById('nf-preview-m'), d=document.getElementById('nf-preview-dica'); if(i&&d) d.style.display=(i.style.display==='none'||!i.getAttribute('src'))?'none':''; },400);
 // ══ DATA LOCAL ══
 // toISOString() converte para UTC: depois das 21h (Brasília) o "hoje" virava amanhã.
 function dataISO(d){
@@ -1330,6 +1376,268 @@ function bannerFilaDashM(){
   }catch(e){ console.warn(e); }
 }
 
+window.MIXCFG={db:function(){return (typeof fbDBM!=='undefined'&&fbDBM)?fbDBM:null;}, chave:function(){return fbChaveM();}, toast:function(m){toastM(m);}};
+
+// ════════════════════════════════════════════════════════════════
+// MIX DE PRODUTOS — leitura só de produto + quantidade (PDF do pedido
+// ou XML da NF). Não cria pedido e não mexe em valores/parcelas.
+// Nuvem: <chave>/mix/<cnpj>/<compra>  e  <chave>/mixProd/<código>
+// ════════════════════════════════════════════════════════════════
+var MIX_SEG=[
+  ['Kit almofada pipoca',/^KIT ALMOFADA PIPOCA/],['Kit canecas',/^KIT CANECA/],['Kits',/^KIT\b/],
+  ['Canecas',/^(CANECA|XICARA|XÍCARA|CANECAO)/],['Copos',/^COPO/],['Garrafas/Tumblers',/^(GARRAFA|TUMBLER|SQUEEZE|TERMICA|TÉRMICA)/],
+  ['Lunch box',/^(LUNCH|LANCHEIRA|POTE|MARMITA)/],['Mochilas',/^(MOCHILA|BOLSA|SACOLA|PASTA)/],['Almofadas',/^(ALMOFADA|MICROPEROLA|MICROPÉROLA)/],['Mantas',/^MANTA/],
+  ['Pelúcias',/^PELUCIA|^PELÚCIA/],['Bules',/^BULE/],['Breakfast set',/^BREAKFAST/],['Ornamentos',/^ORNAMENTO/],
+  ['Necessaires/Estojos',/^(NECESSAIRE|ESTOJO)/],['Luminárias',/^(LUMINARIA|LUMINÁRIA|ABAJUR)/],['Porta-objetos',/^PORTA/],
+  ['Cofres',/^COFRE/],['Chaveiros',/^CHAVEIRO/],['Pratos/Tigelas',/^(PRATO|TIGELA|BOWL)/]
+];
+var MIX_LIC=[
+  ['Stitch (Disney)',['STITCH']],['Disney Princesas',['CINDERELA','BELA ','PRINCESAS','ARIEL','RAPUNZEL','BRANCA DE NEVE']],
+  ['Mickey & Minnie',['MICKEY','MINNIE']],['Pooh (Disney)',['POOH']],['Toy Story',['WOODY','BUZZ','TOY STORY']],['Frozen',['FROZEN','ELSA','OLAF']],
+  ['Harry Potter',['HARRY POTTER','HOGWARTS','GRIFINORIA','CORVINAL','SONSERINA','LUFA']],['Star Wars',['BABY YODA','MANDALORIAN','STAR WARS','YODA','DARTH']],
+  ['Sanrio',['HELLO KITTY','KUROMI','CINNAMOROLL','MY MELODY','POMPOMPURIN']],['Pokémon',['POKEMON','POKÉMON','POKEBOLA','PIKACHU']],
+  ['Bob Esponja',['BOB ESPONJA','PATRICK']],['Marvel',['SPIDER','HOMEM ARANHA','CAPITAO','CAPITÃO','VINGADORES','IRON MAN','HULK','THOR','GROOT','WANDAVISION','LOKI','DEADPOOL','AVENGERS']],
+  ['DC',['SUPERMAN','BATMAN','MULHER MARAVILHA','LIGA DA JUSTICA','AQUAMAN','FLASH']],['Super Mario',['SUPER MARIO','1-UP','MARIO','YOSHI','LUIGI']],
+  ['Friends',['FRIENDS SOFA','FRIENDS VIBRANT','500ML FRIENDS','GRAFITE 500ML FRIENDS','FRIENDS CENTRAL']],['Peanuts',['SNOOPY','WOODSTOCK','PEANUTS']],
+  ['Garfield',['GARFIELD']],['Minions',['MINIONS']],['Patrulha Canina',['PATRULHA','PAW PATROL','SKYE','CHASE','MARSHALL']],['Ursinhos Carinhosos',['URSINHOS CARINHOSOS']],
+  ['Looney Tunes',['LOONEY','PERNALONGA','PIU PIU','TAZ']],['Tom & Jerry',['TOM AND JERRY','TOM E JERRY']],['Sonic',['SONIC']],['Game of Thrones',['GAME OF THRONES']],['Estranho Mundo de Jack',['JACK AND SALLY','JACK E SALLY']],['Disney (outros)',['ALICE IN WONDERLAND','ALICE NO PAIS','CARROS','MARIE','DUMBO','LILO','MOANA','ENCANTO']],['Jurassic Park',['JURASSIC']],['Gabby',['GABBY']],['Simpsons',['SIMPSON','HOMER']],['Turma da Mônica',['MONICA','MÔNICA','CEBOLINHA']],
+  ['Profissões',['PROFISS','ADMINISTRACAO','ENFERMAGEM','ENGENHARIA','ODONTOLOGIA','MEDICINA','DIREITO','ARQUITET','PSICOLOGIA','PROFESSOR','FORMATURA','NUTRICAO','FISIOTERAPIA','VETERINARIA','CONTABILIDADE']],
+  ['Café/frases',['CAFE','CAFÉ','MOTIVACIONAL','PODEROSA','FRASE']],['Viagem',['VIAGEM']],['Pets/Animais',['GATO','GATOLINO','PATA ','CACHORRO','PET ','CAPIVARA']],
+  ['Jardinagem',['JARDINAGEM']],['Unicórnio',['UNICORNIO','UNICÓRNIO']],['Futebol/Times',['GREMIO','GRÊMIO','INTERNACIONAL','FLAMENGO','CORINTHIANS','PALMEIRAS']],
+  ['Família/Datas',[' PAI',' MAE',' MÃE','NAMORAD','AMOR',' VÓ',' VO ','VOVO','VOVÓ']],['Astronauta/Espaço',['ASTRONAUTA','ESPACO','ESPAÇO']]
+];
+function mixSegmento(d){ d=String(d||'').toUpperCase(); for(var i=0;i<MIX_SEG.length;i++) if(MIX_SEG[i][1].test(d)) return MIX_SEG[i][0]; return 'Outros'; }
+function mixLicenca(d){ d=' '+String(d||'').toUpperCase()+' '; for(var i=0;i<MIX_LIC.length;i++){ var ws=MIX_LIC[i][1]; for(var j=0;j<ws.length;j++) if(d.indexOf(ws[j])>=0) return MIX_LIC[i][0]; } return 'Sem licença/tema'; }
+function _soDig(s){ return String(s||'').replace(/\D/g,''); }
+function _dataBR(s){ var m=String(s||'').match(/(\d{2})\/(\d{2})\/(\d{4})/); return m?m[3]+'-'+m[2]+'-'+m[1]:''; }
+
+// ── XML da NF-e ──
+function mixLerXML(texto){
+  var x=new DOMParser().parseFromString(texto,'text/xml');
+  var tag=function(el,n){ var e=el.getElementsByTagName(n)[0]; return e?e.textContent.trim():''; };
+  if(!x.getElementsByTagName('infNFe').length) throw new Error('XML não é uma NF-e');
+  var dest=x.getElementsByTagName('dest')[0]||x, emit=x.getElementsByTagName('emit')[0]||x;
+  var base={tipo:'NF', n:tag(x,'nNF'), dt:(tag(x,'dhEmi')||tag(x,'dEmi')).slice(0,10), cnpj:_soDig(tag(dest,'CNPJ')||tag(dest,'CPF')), cli:tag(dest,'xNome'),
+    emp:tag(emit,'xFant')||tag(emit,'xNome'), empNome:tag(emit,'xNome'), empCnpj:_soDig(tag(emit,'CNPJ'))};
+  var porPed={};
+  [].forEach.call(x.getElementsByTagName('det'), function(det){
+    var p=det.getElementsByTagName('prod')[0]; if(!p) return;
+    var c=tag(p,'cProd'), d=tag(p,'xProd').replace(/\s+Ean\s*:.*$/i,'').trim(), q=parseFloat(tag(p,'qCom'))||0, ped=tag(p,'xPed');
+    if(!c||!q) return;
+    (porPed[ped]=porPed[ped]||[]).push({c:c,d:d,q:q});
+  });
+  return Object.keys(porPed).map(function(ped){ return Object.assign({}, base, {ped:ped||'', itens:porPed[ped]}); });
+}
+
+// ── PDF do pedido (texto com posições, vindo do pdf.js) ──
+// paginas = [[{s,x,y}]]  (y cresce para cima, como no PDF)
+function mixLerPedidoPDF(paginas){
+  var todos=[].concat.apply([],paginas.map(function(pg,i){ return pg.map(function(it){ return {s:it.s,x:it.x,y:it.y,p:i}; }); })).filter(function(i){ return i.s&&i.s.trim(); });
+  var txt=todos.map(function(i){return i.s;}).join(' ');
+  var head={tipo:'PED', ped:'', dt:'', cnpj:'', cli:'', emp:''};
+  var mP=txt.match(/Pedido:\s*(\d+)/i); if(mP) head.ped=mP[1];
+  var mD=txt.match(/Data\s*Emiss[ãa]o:\s*(\d{2}\/\d{2}\/\d{4})/i); if(mD) head.dt=_dataBR(mD[1]);
+  var mC=txt.match(/\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/); if(mC) head.cnpj=_soDig(mC[0]);
+  var mT=txt.match(/Tipo\s*Pedido:\s*([^\s].*?)\s+(Status|Transportadora|Endere)/i); if(mT) head.emp=mT[1].trim();
+  var iCli=todos.findIndex(function(i){ return /^Cliente:?$/i.test(i.s.trim()); });
+  if(iCli>=0){ var yc=todos[iCli].y, pc=todos[iCli].p; head.cli=todos.filter(function(i){ return i.p===pc&&Math.abs(i.y-yc)<2&&i.x>todos[iCli].x&&i.x<280; }).map(function(i){return i.s;}).join(' ').trim(); }
+  // colunas pelo cabeçalho da tabela
+  var col={};
+  todos.forEach(function(i){ var s=i.s.trim(); if(/^C[óo]digo$/i.test(s)&&col.c==null) col.c=i.x; if(/^Descri[çc][ãa]o$/i.test(s)&&col.d==null) col.d=i.x; if(/^Ncm$/i.test(s)&&col.n==null) col.n=i.x; if(/^Qtde$/i.test(s)&&col.q==null) col.q=i.x; });
+  if(col.c==null||col.q==null) throw new Error('Não achei a tabela de itens neste PDF');
+  if(col.d==null) col.d=col.c+30; if(col.n==null) col.n=col.q-100;
+  var itens=[];
+  todos.forEach(function(i){
+    if(Math.abs(i.x-col.c)>12||!/^\d{3,9}$/.test(i.s.trim())) return;
+    var qItem=todos.find(function(o){ return o.p===i.p&&Math.abs(o.y-i.y)<2.5&&Math.abs(o.x-col.q)<15&&/^\d+([.,]\d+)?$/.test(o.s.trim()); });
+    if(!qItem) return;
+    var desc=todos.filter(function(o){ return o.p===i.p&&o.x>=col.d-6&&o.x<col.n-4&&Math.abs(o.y-i.y)<=15; })
+      .sort(function(a,b){ return b.y-a.y||a.x-b.x; }).map(function(o){return o.s.trim();}).join(' ').replace(/\s+/g,' ').trim();
+    itens.push({c:i.s.trim(), d:desc.replace(/\s*-\s*U\s*-\s*UNICA\s*$/i,'').trim(), q:parseFloat(qItem.s.replace(',','.'))||0});
+  });
+  if(!itens.length) throw new Error('Nenhum item encontrado no PDF');
+  head.itens=itens;
+  return [head];
+}
+
+// ── Guardar / sincronizar ─────────────────────────────────────────
+// MIXCFG é definido por cada app: {db(), chave(), toast(msg)}
+function _mixSlug(s){ return String(s||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,60); }
+function _mixFbKey(s){ return String(s).replace(/[.#$\[\]\/]/g,'_'); }
+function mixChaveCliente(c){ var d=_soDig(c&&c.cnpj); return d.length>=11?d:('nome_'+_mixSlug(c&&c.rs)); }
+function mixAcharCliente(cnpj, nome){
+  var d=_soDig(cnpj);
+  if(d.length>=11){ var c=DB.clientes.find(function(x){ return _soDig(x.cnpj)===d; }); if(c) return c; }
+  var sn=_mixSlug(nome); if(!sn) return null;
+  return DB.clientes.find(function(x){ return _mixSlug(x.rs)===sn; })||null;
+}
+function _mixGet(k,def){ try{ var v=fotoGet(k); return v?JSON.parse(v):def; }catch(e){ return def; } }
+function _mixSet(k,v){ fotoSet(k, JSON.stringify(v)); }
+function _mixPend(){ try{ return JSON.parse(localStorage.getItem('mix_pend')||'[]'); }catch(e){ return []; } }
+function _mixPendSet(l){ try{ localStorage.setItem('mix_pend', JSON.stringify(l)); }catch(e){} }
+function _mixRef(p){ var db=MIXCFG.db(); return db?db.ref(MIXCFG.chave()+'/'+p):null; }
+
+// Guarda uma compra (pedido ou NF). A NF vale mais que o pedido do mesmo número.
+// Guarda uma compra (pedido ou NF) já com a empresa. A NF vale mais que o pedido do mesmo número.
+function mixGuardarDoc(doc, empId){
+  var cli=mixAcharCliente(doc.cnpj, doc.cli);
+  var key=cli?mixChaveCliente(cli):(_soDig(doc.cnpj).length>=11?_soDig(doc.cnpj):'nome_'+_mixSlug(doc.cli));
+  var base=_mixFbKey(doc.ped?'P'+doc.ped:'N'+doc.n);
+  var docKey=_mixFbKey((empId||'semEmp')+'_'+base);
+  var cache=_mixGet('mix_'+key,{});
+  // compras importadas antes da separação por empresa (sem o prefixo) são trocadas pela nova
+  var legado=cache[base]; if(legado){ delete cache[base]; var lp0=_mixGet('mix_del',[]); lp0.push([key,base]); _mixSet('mix_del',lp0); }
+  var ant=cache[docKey]||legado;
+  var status;
+  if(ant&&ant.t==='NF'&&doc.tipo==='PED') status='ignorado';
+  else status=!ant?'novo':(ant.t==='PED'&&doc.tipo==='NF'?'nf-substituiu':(ant.t===doc.tipo&&(ant.n||'')===(doc.n||'')&&(ant.e||'')===(empId||'')?'repetido':'atualizado'));
+  var compacto={t:doc.tipo, n:doc.n||'', ped:doc.ped||'', dt:doc.dt||'', emp:doc.emp||'', e:empId||'', it:doc.itens.map(function(i){ return [_mixFbKey(i.c), i.q]; })};
+  var cat=_mixGet('mixprod',{}), novosCat={};
+  doc.itens.forEach(function(i){ var k=_mixFbKey(i.c); if(i.d&&cat[k]!==i.d){ cat[k]=i.d; novosCat[k]=i.d; } });
+  _mixSet('mixprod', cat);
+  if(status!=='ignorado'){
+    cache[docKey]=compacto; _mixSet('mix_'+key, cache);
+    var l=_mixPend(); l.push([key,docKey]); _mixPendSet(l);
+  } else if(legado&&!cache[docKey]){ cache[docKey]=Object.assign({},legado,{e:empId||''}); _mixSet('mix_'+key, cache); var l2=_mixPend(); l2.push([key,docKey]); _mixPendSet(l2); }
+  if(Object.keys(novosCat).length){ var lp=_mixGet('mixprod_pend',{}); Object.assign(lp,novosCat); _mixSet('mixprod_pend',lp); }
+  mixEnviarPendentes();
+  return {status:status, cli:cli, key:key, docKey:docKey, pecas:doc.itens.reduce(function(a,i){return a+i.q;},0), refs:doc.itens.length};
+}
+var _mixEnviando=false;
+function mixEnviarPendentes(){
+  var db=MIXCFG.db(); if(!db) return;
+  _mixEnviarRemocoes();
+  if(_mixEnviando){ _mixDenovo=true; return; }
+  var l=_mixPend(), cat=_mixGet('mixprod_pend',{});
+  var vistos={}; l=l.filter(function(p){ var k=p.join('|'); if(vistos[k]) return false; vistos[k]=1; return true; });
+  if(!l.length&&!Object.keys(cat).length) return;
+  _mixEnviando=true; _mixDenovo=false;
+  var enviado={};
+  var tarefas=l.map(function(par){
+    var doc=(_mixGet('mix_'+par[0],{}))[par[1]]; if(!doc) return Promise.resolve(par);
+    enviado[par.join('|')]=JSON.stringify(doc);
+    return _mixRef('mix/'+par[0]+'/'+par[1]).set(doc).then(function(){ return par; });
+  });
+  var catEnv=Object.keys(cat);
+  if(catEnv.length) tarefas.push(_mixRef('mixProd').update(cat).then(function(){ var atual=_mixGet('mixprod_pend',{}); catEnv.forEach(function(k){ if(atual[k]===cat[k]) delete atual[k]; }); _mixSet('mixprod_pend',atual); return null; }));
+  Promise.all(tarefas).then(function(ok){
+    // só tira da fila o que foi enviado na versão atual (se mudou no meio, envia de novo)
+    var feitos={}; ok.filter(Boolean).forEach(function(p){ var k=p.join('|'); var atual=JSON.stringify((_mixGet('mix_'+p[0],{}))[p[1]]||null); if(!enviado[k]||enviado[k]===atual) feitos[k]=1; });
+    _mixPendSet(_mixPend().filter(function(p){ return !feitos[p.join('|')]; }));
+  }).catch(function(e){ console.warn('mix nuvem', e); }).then(function(){
+    _mixEnviando=false;
+    if(_mixDenovo||_mixPend().length&&Object.keys(enviado).length) setTimeout(mixEnviarPendentes, 300);
+  });
+}
+var _mixDenovo=false;
+// Carrega as compras de um cliente: aparelho + nuvem (só desse cliente)
+function mixCarregar(c){
+  var key=mixChaveCliente(c), cache=_mixGet('mix_'+key,{});
+  var ref=_mixRef('mix/'+key);
+  var p=ref?ref.once('value').then(function(s){
+    var rem=s.val()||{};
+    Object.keys(rem).forEach(function(k){ var a=cache[k], b=rem[k]; if(!a||(b.t==='NF'&&a.t!=='NF')||(b.t===a.t)) cache[k]=b; });
+    _mixSet('mix_'+key, cache);
+  }).catch(function(){}):Promise.resolve();
+  return p.then(function(){
+    // descrições que faltam no catálogo deste aparelho
+    var cat=_mixGet('mixprod',{}), falta={};
+    Object.keys(cache).forEach(function(k){ (cache[k].it||[]).forEach(function(i){ if(!cat[i[0]]) falta[i[0]]=1; }); });
+    var cods=Object.keys(falta);
+    if(!cods.length||!MIXCFG.db()) return cache;
+    return Promise.all(cods.slice(0,400).map(function(cd){ return _mixRef('mixProd/'+cd).once('value').then(function(s){ if(s.val()) cat[cd]=s.val(); }).catch(function(){}); }))
+      .then(function(){ _mixSet('mixprod', cat); return cache; });
+  });
+}
+// Resumo por segmento / licença, com última compra × anterior
+// Resumo por segmento / licença, com última compra × anterior (opcionalmente de uma empresa só)
+function mixResumo(cache, empId){
+  var cat=_mixGet('mixprod',{});
+  var compras=Object.keys(cache).filter(function(k){ return !empId||(cache[k].e||'')===empId; }).map(function(k){ var d=cache[k]; var r={k:k,t:d.t,n:d.n,ped:d.ped,dt:d.dt,emp:d.emp,e:d.e||'',pecas:0,seg:{},lic:{}};
+    (d.it||[]).forEach(function(i){ var desc=cat[i[0]]||''; var s=mixSegmento(desc), l=mixLicenca(desc); r.pecas+=i[1]; r.seg[s]=(r.seg[s]||0)+i[1]; r.lic[l]=(r.lic[l]||0)+i[1]; });
+    return r; }).sort(function(a,b){ return (b.dt||'')>(a.dt||'')?1:-1; });
+  var tot={seg:{},lic:{}};
+  compras.forEach(function(r){ ['seg','lic'].forEach(function(t){ Object.keys(r[t]).forEach(function(k){ tot[t][k]=(tot[t][k]||0)+r[t][k]; }); }); });
+  return {compras:compras, tot:tot, ult:compras[0]||null, ant:compras[1]||null};
+}
+function mixHTML(R, compacto, exp){
+  if(!R.compras.length) return '<div style="color:var(--t3);font-size:13px;padding:6px 0">Nenhuma compra importada ainda.'+(compacto?' Importe os PDFs dos pedidos ou os XMLs das NFs no computador (Clientes → Importar itens).':' Use <b>Importar itens (PDF/XML)</b> na página de Clientes.')+'</div>';
+  function tabela(tipo, titulo){
+    var todos=Object.keys(R.tot[tipo]).sort(function(a,b){ return R.tot[tipo][b]-R.tot[tipo][a]; });
+    var ks=exp?todos:todos.slice(0,15);
+    titulo+=(todos.length>15?' <span style="font-weight:400;text-transform:none">— '+(exp?'todas as '+todos.length:'15 principais de '+todos.length)+'</span>':'');
+    var h='<div style="font-size:12px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;margin:10px 0 4px">'+titulo+'</div><table style="width:100%;border-collapse:collapse;font-size:13px">'
+      +'<tr style="color:var(--t3);font-size:11px"><td></td><td style="text-align:right">Total</td><td style="text-align:right">Última</td>'+(R.ant?'<td style="text-align:right">Anterior</td>':'')+'</tr>';
+    ks.forEach(function(k){
+      var u=R.ult.seg&&R.ult[tipo][k]||0, a=R.ant?(R.ant[tipo][k]||0):null;
+      var seta=a===null?'':(u>a?' <span style="color:var(--grn)">▲</span>':u<a?' <span style="color:var(--red)">▼</span>':'');
+      h+='<tr style="border-top:1px solid var(--bdr)"><td style="padding:4px 0">'+esc(k)+'</td><td style="text-align:right;font-weight:700">'+R.tot[tipo][k]+'</td><td style="text-align:right">'+(u||'—')+seta+'</td>'+(R.ant?'<td style="text-align:right;color:var(--t3)">'+(a||'—')+'</td>':'')+'</tr>';
+    });
+    return h+'</table>';
+  }
+  var h='<div style="font-size:13px;color:var(--t2)">'+R.compras.length+' compra(s) · última em <b>'+fmtD(R.ult.dt)+'</b> ('+R.ult.pecas+' peças)'+(R.ant?' · anterior '+fmtD(R.ant.dt)+' ('+R.ant.pecas+' peças)':'')+'</div>';
+  if(compacto) h+=tabela('seg','Segmentos (peças)')+tabela('lic','Licenças / temas (peças)');
+  else h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:28px;max-width:980px"><div>'+tabela('seg','Segmentos (peças)')+'</div><div>'+tabela('lic','Licenças / temas (peças)')+'</div></div>';
+  h+='<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;color:var(--acc)">Ver compras importadas</summary>'
+    +R.compras.map(function(r){ return '<div style="font-size:12px;padding:3px 0;border-bottom:1px solid var(--bdr)">'+fmtD(r.dt)+' · '+(r.t==='NF'?'NF '+esc(r.n):'Pedido')+(r.ped?' (ped. '+esc(r.ped)+')':'')+' · '+r.pecas+' peças'+(r.emp?' · '+esc(r.emp):'')+'</div>'; }).join('')+'</details>';
+  return h;
+}
+var _mixTela={};
+function mixRenderEm(el, c, compacto){
+  if(!el||!c) return;
+  el.innerHTML='<div style="color:var(--t3);font-size:13px">🔄 Carregando mix de produtos...</div>';
+  mixCarregar(c).then(function(cache){
+    // abas por empresa (só das empresas que têm compra importada)
+    var emps={}; Object.keys(cache).forEach(function(k){ emps[cache[k].e||'']=1; });
+    var lista=Object.keys(emps);
+    var sel=_mixTela[el.id]&&_mixTela[el.id].c===c.id?_mixTela[el.id].sel:(lista.length===1?lista[0]:'');
+    if(sel&&!emps[sel]) sel='';
+    _mixTela[el.id]={c:c.id, cache:cache, compacto:compacto, sel:sel};
+    mixDesenhar(el.id);
+  }).catch(function(e){ el.innerHTML='<div style="color:var(--red)">Erro ao carregar: '+esc(e.message||e)+'</div>'; });
+}
+// Descobre de qual representada é a compra: CNPJ do emitente (NF) ou tipo do pedido (PDF),
+// usando o que você já associou antes (empresa.mixChaves), o CNPJ ou o nome da empresa.
+function mixEmpresaDoc(doc){
+  var chaves=mixChavesEmpresaDoc(doc);
+  for(var i=0;i<DB.empresas.length;i++){
+    var e=DB.empresas[i], mc=e.mixChaves||[];
+    if(chaves.some(function(k){ return mc.indexOf(k)>=0; })) return e.id;
+  }
+  if(doc.empCnpj){ var e1=DB.empresas.find(function(e){ return _soDig(e.cnpj)===doc.empCnpj; }); if(e1) return e1.id; }
+  var alvo=_mixSlug((doc.empNome||'')+' '+(doc.emp||''));
+  var e2=DB.empresas.find(function(e){ var s=_mixSlug(e.nome); return s.length>=4&&alvo.indexOf(s)>=0; });
+  return e2?e2.id:null;
+}
+function mixChavesEmpresaDoc(doc){
+  var k=[]; if(doc.empCnpj) k.push('cnpj:'+doc.empCnpj); if(doc.emp&&doc.tipo==='PED') k.push('tipo:'+_mixSlug(doc.emp));
+  return k;
+}
+function mixDesenhar(elId){
+  var st=_mixTela[elId], el=document.getElementById(elId); if(!st||!el) return;
+  var emps={}; Object.keys(st.cache).forEach(function(k){ var e=st.cache[k].e||''; emps[e]=(emps[e]||0)+1; });
+  var ids=Object.keys(emps);
+  var nomeEmp=function(id){ if(!id) return 'Sem empresa'; var e=DB.empresas.find(function(x){return x.id===id;}); return e?e.nome:'Empresa removida'; };
+  var corEmp=function(id){ var e=DB.empresas.find(function(x){return x.id===id;}); return e?e.cor:'var(--t3)'; };
+  var abas='';
+  if(ids.length>1||(ids.length===1&&ids[0])){
+    abas='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'
+      +(ids.length>1?'<button type="button" onclick="_mixTela[\''+elId+'\'].sel=\'\';mixDesenhar(\''+elId+'\')" style="padding:4px 10px;border-radius:14px;border:1px solid var(--bdr);font-size:12px;cursor:pointer;'+(st.sel===''?'background:var(--acc);color:#fff;border-color:var(--acc)':'background:none;color:var(--t2)')+'">Todas</button>':'')
+      +ids.map(function(id){ var on=st.sel===id; return '<button type="button" onclick="_mixTela[\''+elId+'\'].sel=\''+id+'\';mixDesenhar(\''+elId+'\')" style="padding:4px 10px;border-radius:14px;border:1px solid '+(on?corEmp(id):'var(--bdr)')+';font-size:12px;cursor:pointer;'+(on?'background:'+corEmp(id)+';color:#fff':'background:none;color:var(--t2)')+'"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+(on?'#fff':corEmp(id))+';margin-right:4px"></span>'+esc(nomeEmp(id))+' ('+emps[id]+')</button>'; }).join('')
+      +'</div>';
+  }
+  var R=mixResumo(st.cache, st.sel);
+  var maior=Math.max(Object.keys(R.tot.seg).length, Object.keys(R.tot.lic).length);
+  var botao=maior>15?'<div style="display:flex;justify-content:flex-end;margin:-2px 0 4px"><button type="button" onclick="_mixTela[\''+elId+'\'].exp=!_mixTela[\''+elId+'\'].exp;mixDesenhar(\''+elId+'\')" style="padding:5px 12px;border-radius:14px;border:1px solid var(--acc);background:none;color:var(--acc);font-size:12px;font-weight:600;cursor:pointer">'+(st.exp?'▲ Reduzir (15 principais)':'▼ Expandir (ver todas)')+'</button></div>':'';
+  el.innerHTML=abas+botao+mixHTML(R, st.compacto, !!st.exp);
+}
+function _mixEnviarRemocoes(){
+  var l=_mixGet('mix_del',[]); if(!l.length||!MIXCFG.db()) return;
+  Promise.all(l.map(function(p){ return _mixRef('mix/'+p[0]+'/'+p[1]).remove().then(function(){ return p.join('|'); }).catch(function(){ return null; }); }))
+    .then(function(ok){ _mixSet('mix_del', _mixGet('mix_del',[]).filter(function(p){ return ok.indexOf(p.join('|'))<0; })); });
+}
+
+
 // ══ SINCRONIZAÇÃO SEGURA (igual à do computador) ══
 // Antes: cada salvamento substituía o banco inteiro na nuvem — inclusive
 // apagando produtos, orçamentos e modelos que só o computador usa — e ao abrir
@@ -1657,12 +1965,12 @@ function renderDashM(){
   var empTabs=DB.empresas.map(emp=>`<button class="emp-tab ${emp.id===empAtualM?'act':''}" onclick="selecionarEmpM('${emp.id}')"><div class="emp-dot" style="background:${emp.cor}"></div>${emp.nome.split(' ')[0]}</button>`).join('');
 
   cont.innerHTML=`
-  <div class="card" style="margin:12px 12px 0;padding:12px">
-    <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Geral — ${hoje.toLocaleString('pt-BR',{month:'long',year:'numeric'})}</div>
+  <div class="card" style="margin:12px 12px 0;padding:14px 12px">
+    <div style="font-size:13px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Geral — ${hoje.toLocaleString('pt-BR',{month:'long',year:'numeric'})}</div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-      <div style="text-align:center"><div style="font-size:10px;color:var(--t3)">Vendas</div><div style="font-size:14px;font-weight:700;color:var(--t1)">${fmt(totalVendaMes)}</div></div>
-      <div style="text-align:center"><div style="font-size:10px;color:var(--t3)">Faturamento</div><div style="font-size:14px;font-weight:700;color:var(--grn)">${fmt(totalFatMes)}</div></div>
-      <div style="text-align:center"><div style="font-size:10px;color:var(--t3)">Em aberto</div><div style="font-size:14px;font-weight:700;color:var(--org)">${totalAberto}</div></div>
+      <div style="text-align:center"><div style="font-size:13px;color:var(--t3)">Vendas</div><div style="font-size:21px;font-weight:800;color:var(--t1)">${fmt(totalVendaMes)}</div></div>
+      <div style="text-align:center"><div style="font-size:13px;color:var(--t3)">Faturamento</div><div style="font-size:21px;font-weight:800;color:var(--grn)">${fmt(totalFatMes)}</div></div>
+      <div style="text-align:center"><div style="font-size:13px;color:var(--t3)">Em aberto</div><div style="font-size:21px;font-weight:800;color:var(--org)">${totalAberto}</div></div>
     </div>
   </div>
   <div style="display:flex;gap:8px;margin:8px 12px 0">
@@ -4243,7 +4551,7 @@ function conectarRefsFirebaseM(){
     firebase.database().ref('.info/connected').on('value', function(snap){
       setSyncStatusM(snap.val() ? 'conectado' : 'offline');
       // Voltou a internet: envia as fotos que ficaram pendentes
-      if(snap.val()){ setTimeout(sincronizarFotosM, 4000); setTimeout(oferecerChaveIANuvem, 5000); }
+      if(snap.val()){ setTimeout(sincronizarFotosM, 4000); setTimeout(oferecerChaveIANuvem, 5000); setTimeout(mixEnviarPendentes, 3000); }
     });
     if(!fbEscutandoM){
       fbEscutandoM = true;
@@ -4365,12 +4673,6 @@ function carregarVozAmora(){
 }
 if(_vozSintetizador){ _vozSintetizador.onvoiceschanged=carregarVozAmora; carregarVozAmora(); }
 
-function falarAmora(texto){
-  // Síntese de voz desativada — resposta apenas em texto
-  _ultimaResposta=texto;
-  var el=document.getElementById('btn-falar');
-  if(el) el.style.display='none';
-}
 
 function falarUltima(){ if(_ultimaResposta) falarAmora(_ultimaResposta); }
 
@@ -4430,222 +4732,267 @@ function carregarFotoAmoraSettings(){
 
 
 function getNomeAmora(){ var cfg=loadCfg(); return (cfg.nomeAmora||'Amora').toLowerCase(); }
+function _amNorm(s){ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9\/: ]+/g,' ').replace(/\s+/g,' ').trim(); }
+function _amSet(id,v,html){ var el=document.getElementById(id); if(el){ if(html) el.innerHTML=v; else el.textContent=v; } }
+function _amStatus(txt,cor){ _amSet('voz-status-txt',txt); var d=document.getElementById('voz-status-dot'); if(d) d.style.background=cor||'var(--t3)'; }
 
+// Fala a resposta (voz do celular). Pode desligar no botão 🔊 do painel.
+function falarAmora(texto){
+  _ultimaResposta=texto;
+  var el=document.getElementById('btn-falar'); if(el) el.style.display='inline-block';
+  if(loadCfg().amoraMudo||!window.speechSynthesis) return;
+  try{
+    speechSynthesis.cancel();
+    var t=String(texto||'').replace(/<[^>]+>/g,' ').replace(/[*#_`•]/g,' ').replace(/R\$\s?/g,'').replace(/\s+/g,' ').trim();
+    (t.match(/[^.!?]+[.!?]*/g)||[t]).forEach(function(p){
+      var u=new SpeechSynthesisUtterance(p.trim()); u.lang='pt-BR';
+      var v=(typeof _vzVoz==='function'?_vzVoz():null)||_vozAmora; if(v) u.voice=v;
+      speechSynthesis.speak(u);
+    });
+  }catch(e){}
+}
+function amoraMudo(){
+  var cfg=loadCfg(); cfg.amoraMudo=!cfg.amoraMudo;
+  saveCfg(cfg);
+  if(cfg.amoraMudo&&window.speechSynthesis) speechSynthesis.cancel();
+  _amBotaoMudo();
+}
+function _amBotaoMudo(){ var b=document.getElementById('btn-amora-mudo'); if(b) b.innerHTML=loadCfg().amoraMudo?'<i class="ti ti-volume-off"></i>':'<i class="ti ti-volume"></i>'; }
+
+// Toque no botão = ouve UM comando (não precisa dizer o nome). Toque de novo = para.
 function toggleVoz(){
   if(vozAtiva) pararVoz();
   else iniciarVoz();
 }
-
+function _amAbrirPainel(){
+  var p=document.getElementById('painel-voz'); if(p) p.style.display='block';
+  _amBotaoMudo();
+}
 function iniciarVoz(){
+  _amAbrirPainel();
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){ toastM('Reconhecimento de voz não suportado. Use o Chrome.'); return; }
-  document.getElementById('painel-voz').style.display='block';
-  var _fraseAcumulada = '';
-  var _pausaTimer = null;
-  var _aguardandoComando = false;
-
-  reconhecimento=new SR();
+  if(!SR){ _amStatus('Sem microfone aqui — digite o comando abaixo'); var i=document.getElementById('voz-input'); if(i) i.focus(); return; }
+  if(window.speechSynthesis) speechSynthesis.cancel(); // não ouvir a própria voz
+  var finalTxt='', parcial='', erro='';
+  try{
+    reconhecimento=new SR();
+  }catch(e){ _amStatus('Não consegui abrir o microfone'); return; }
   reconhecimento.lang='pt-BR';
   reconhecimento.continuous=false;
   reconhecimento.interimResults=true;
   reconhecimento.maxAlternatives=1;
-
   reconhecimento.onstart=function(){
     vozAtiva=true;
-    document.getElementById('btn-voz').style.boxShadow='0 0 0 4px rgba(219,39,119,.4),0 4px 20px rgba(124,58,237,.5)';
-    document.getElementById('voz-status-dot').style.background='#db2777';
-    document.getElementById('voz-status-txt').textContent='Ouvindo... diga "'+getNomeAmora()+'"';
-    if(!_aguardandoComando) document.getElementById('voz-transcricao').textContent='';
+    var b=document.getElementById('btn-voz'); if(b) b.style.boxShadow='0 0 0 6px rgba(219,39,119,.45),0 4px 20px rgba(124,58,237,.5)';
+    _amStatus('Ouvindo... pode falar','#db2777');
+    _amSet('voz-transcricao','');
   };
-
-  reconhecimento.onresult=function(event){
-    var txt='';
-    for(var i=0;i<event.results.length;i++) txt+=event.results[i][0].transcript;
-    txt=txt.trim();
-    document.getElementById('voz-transcricao').textContent='🎤 "'+txt+'"';
-
-    if(event.results[event.results.length-1].isFinal){
-      _fraseAcumulada=(_fraseAcumulada+' '+txt).trim();
-      var txLower=_fraseAcumulada.toLowerCase();
-      var nome=getNomeAmora();
-
-      // Detectou o nome — aguarda o resto do comando
-      if(txLower.includes(nome)){
-        _aguardandoComando=true;
-        clearTimeout(_pausaTimer);
-        var comando=txLower.replace(new RegExp(nome,'gi'),'').trim();
-        if(comando.length>2){
-          // Tem comando junto com o nome — processa com delay para capturar mais
-          _pausaTimer=setTimeout(function(){
-            document.getElementById('voz-status-txt').textContent='Amora processando...';
-            document.getElementById('voz-resposta').innerHTML='<span style="color:#7c3aed">⏳ Analisando...</span>';
-            processarComandoVoz(_fraseAcumulada.replace(new RegExp(nome,'gi'),'').trim());
-            _fraseAcumulada=''; _aguardandoComando=false;
-          },1200);
-        } else {
-          // Só o nome — responde e fica ouvindo o comando
-          var saud='Olá! Como posso ajudar?';
-          document.getElementById('voz-resposta').innerHTML='<span style="color:#7c3aed">👋 '+saud+'</span>';
-          falarAmora(saud);
-          document.getElementById('voz-status-txt').textContent='Ouvindo seu comando...';
-        }
-      } else if(_aguardandoComando && _fraseAcumulada.length>2){
-        // Já ouviu o nome antes, agora recebeu o comando
-        clearTimeout(_pausaTimer);
-        _pausaTimer=setTimeout(function(){
-          var fraseCompleta=_fraseAcumulada.toLowerCase();
-          var nome2=getNomeAmora();
-          var cmd=fraseCompleta.replace(new RegExp(nome2,'gi'),'').trim();
-          if(cmd.length>2){
-            document.getElementById('voz-status-txt').textContent='Amora processando...';
-            document.getElementById('voz-resposta').innerHTML='<span style="color:#7c3aed">⏳ Analisando...</span>';
-            processarComandoVoz(cmd);
-          }
-          _fraseAcumulada=''; _aguardandoComando=false;
-        },800);
-      }
-    }
+  reconhecimento.onresult=function(ev){
+    parcial=''; var fin='';
+    for(var i=0;i<ev.results.length;i++){ if(ev.results[i].isFinal) fin+=ev.results[i][0].transcript; else parcial+=ev.results[i][0].transcript; }
+    if(fin) finalTxt=fin;
+    _amSet('voz-transcricao','🎤 "'+(finalTxt||parcial).trim()+'"');
   };
-
-  reconhecimento.onerror=function(e){
-    var msgs={'not-allowed':'Permissão de microfone negada.','network':'Erro de rede.'};
-    if(msgs[e.error]) document.getElementById('voz-resposta').innerHTML='❌ '+msgs[e.error];
-    if(e.error==='not-allowed'||e.error==='network') pararVoz();
-  };
-
+  reconhecimento.onerror=function(e){ erro=e.error||''; };
   reconhecimento.onend=function(){
-    // Reinicia automaticamente enquanto ativo
-    if(vozAtiva){
-      setTimeout(function(){
-        try{ reconhecimento.start(); }catch(e){}
-      },200);
-    }
+    vozAtiva=false; clearTimeout(_amTimer);
+    var b=document.getElementById('btn-voz'); if(b) b.style.boxShadow='0 4px 20px rgba(124,58,237,.5)';
+    var txt=(finalTxt||parcial).trim();
+    if(txt){ processarComandoVoz(txt); return; }
+    var msgs={'not-allowed':'O microfone está bloqueado. No Chrome: toque no cadeado ao lado do endereço → Permissões → Microfone → Permitir.',
+      'service-not-allowed':'O microfone está bloqueado para este site. Libere em Configurações do Chrome → Configurações do site → Microfone.',
+      'network':'O reconhecimento de voz precisa de internet. Verifique a conexão ou digite o comando abaixo.',
+      'audio-capture':'Nenhum microfone disponível (outro app pode estar usando).',
+      'no-speech':'Não ouvi nada. Toque em mim e fale logo em seguida.'};
+    _amStatus('Toque em mim e fale');
+    if(erro&&erro!=='aborted') _amSet('voz-resposta','⚠️ '+(msgs[erro]||('Erro no microfone: '+erro)));
+    else if(!erro) _amSet('voz-resposta','Não ouvi nada. Toque em mim e fale logo em seguida.');
   };
-
-  reconhecimento.start();
+  try{ reconhecimento.start(); }catch(e){ _amStatus('Toque em mim e fale'); _amSet('voz-resposta','⚠️ Não consegui ligar o microfone: '+(e.message||e)); return; }
+  clearTimeout(_amTimer); _amTimer=setTimeout(function(){ try{ reconhecimento.stop(); }catch(e){} },15000);
 }
-
+var _amTimer=null;
 function pararVoz(){
-  vozAtiva=false;
+  vozAtiva=false; clearTimeout(_amTimer);
   if(reconhecimento){ try{ reconhecimento.stop(); }catch(e){} }
-  if(_vozSintetizador) _vozSintetizador.cancel();
-  document.getElementById('btn-voz').style.boxShadow='0 4px 20px rgba(124,58,237,.5)';
-  document.getElementById('voz-status-dot').style.background='var(--t3)';
-  document.getElementById('voz-status-txt').textContent='Diga "'+getNomeAmora()+'" para ativar';
+  var b=document.getElementById('btn-voz'); if(b) b.style.boxShadow='0 4px 20px rgba(124,58,237,.5)';
+  _amStatus('Toque em mim e fale');
 }
+function amoraEnviarTexto(){
+  var i=document.getElementById('voz-input'); if(!i||!i.value.trim()) return;
+  var t=i.value.trim(); i.value=''; i.blur();
+  _amSet('voz-transcricao','⌨️ "'+t+'"');
+  processarComandoVoz(t);
+}
+
+// ── Entende o comando ──────────────────────────────────────────
+var _AM_STOP={'para':1,'pra':1,'com':1,'cliente':1,'clientes':1,'loja':1,'abrir':1,'abre':1,'mostrar':1,'mostra':1,'buscar':1,'busca':1,'procurar':1,'procura':1,'ver':1,'resumo':1,'preparar':1,'prepara':1,'visita':1,'visitar':1,'mapa':1,'rota':1,'whatsapp':1,'zap':1,'mensagem':1,'ligar':1,'liga':1,'lembrete':1,'lembrar':1,'lembra':1,'agendar':1,'marcar':1,'marca':1,'amanha':1,'hoje':1,'depois':1,'semana':1,'proxima':1,'segunda':1,'terca':1,'quarta':1,'quinta':1,'sexta':1,'sabado':1,'domingo':1,'horas':1,'hora':1,'dele':1,'dela':1,'qual':1,'quais':1,'quanto':1,'quantos':1,'como':1,'onde':1,'esta':1,'sobre':1,'compra':1,'comprou':1,'pedido':1,'pedidos':1,'ultimo':1,'ultima':1,'fazer':1,'favor':1,'por':1,'uma':1,'um':1,'que':1,'the':1,'dos':1,'das':1,'nos':1,'nas':1,'ele':1,'ela':1,'isso':1,'aqui':1,'tenho':1,'minha':1,'meu':1,'ltda':1,'eireli':1,'comercio':1,'presentes':1,'store':1,'shop':1};
+function amoraAcharCliente(txNorm){
+  var ws=txNorm.split(' ').filter(function(w){ return w.length>=3&&!_AM_STOP[w]&&!/^\d+$/.test(w); });
+  if(!ws.length) return null;
+  var melhor=null, mScore=0;
+  (DB.clientes||[]).forEach(function(c){
+    if(!c.rs) return;
+    var nw=_amNorm(c.rs).split(' ');
+    var score=0;
+    ws.forEach(function(w){ if(nw.indexOf(w)>=0) score+=2; else if(w.length>=4&&nw.some(function(n){ return n.length>=4&&(n.indexOf(w)===0||w.indexOf(n)===0); })) score+=1; });
+    if(score>mScore||(score===mScore&&score>0&&melhor&&c.rs.length<melhor.rs.length)){ melhor=c; mScore=score; }
+  });
+  return mScore>=2?melhor:null;
+}
+var _AM_MESES={janeiro:1,fevereiro:2,marco:3,abril:4,maio:5,junho:6,julho:7,agosto:8,setembro:9,outubro:10,novembro:11,dezembro:12};
+function amoraData(tx){
+  var d=new Date(); d.setHours(12,0,0,0);
+  var m;
+  if(/depois de amanha/.test(tx)){ d.setDate(d.getDate()+2); return dataISO(d); }
+  if(/\bamanha\b/.test(tx)){ d.setDate(d.getDate()+1); return dataISO(d); }
+  if((m=tx.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/))){ var a=m[3]?(m[3].length===2?2000+(+m[3]):+m[3]):d.getFullYear(); var r=new Date(a,+m[2]-1,+m[1],12); if(!m[3]&&r<new Date(d.getTime()-864e5)) r.setFullYear(a+1); return dataISO(r); }
+  if((m=tx.match(/\bdia (\d{1,2})(?: de ([a-z]+))?/))){ var mes=m[2]&&_AM_MESES[m[2]]?_AM_MESES[m[2]]-1:d.getMonth(); var r2=new Date(d.getFullYear(),mes,+m[1],12); if(r2<new Date(d.getTime()-864e5)) { if(m[2]) r2.setFullYear(r2.getFullYear()+1); else r2.setMonth(r2.getMonth()+1); } return dataISO(r2); }
+  var dias=['domingo','segunda','terca','quarta','quinta','sexta','sabado'];
+  for(var i=0;i<7;i++){ if(new RegExp('\\b'+dias[i]+'\\b').test(tx)){ var add=(i-d.getDay()+7)%7||7; d.setDate(d.getDate()+add); return dataISO(d); } }
+  if(/proxima semana|semana que vem/.test(tx)){ d.setDate(d.getDate()+7); return dataISO(d); }
+  return dataISO(d);
+}
+function amoraHora(tx){
+  var m=tx.match(/\b(\d{1,2})(?:h|:| horas? e | horas?)(\d{2})?\b/)||tx.match(/\bas (\d{1,2})\b/);
+  if(!m) return '';
+  var h=+m[1]; if(h>23) return ''; if(/\b(tarde|noite)\b/.test(tx)&&h<12) h+=12;
+  return String(h).padStart(2,'0')+':'+String(m[2]||'00').padStart(2,'0');
+}
+function _amTemTel(c){ return c&&(c.cel||c.fone); }
 
 async function processarComandoVoz(texto){
-  document.getElementById('voz-status-txt').textContent='Processando...';
-  document.getElementById('voz-resposta').innerHTML='⏳ Analisando...';
+  _amAbrirPainel();
+  // tira o nome da assistente do começo ("Amora, ...", "a mora ...", "ok amora ...")
+  var nome=_amNorm(getNomeAmora());
+  var tx=_amNorm(texto);
+  var nomeRe=nome.split('').join('\\s?');
+  tx=tx.replace(new RegExp('^(ok |ei |oi |ola |hey )?('+nomeRe+'|amor a|a mora)\\b\\s*'),'').trim();
+  var original=String(texto).replace(new RegExp('^\\s*(ok |ei |oi |olá |ola |hey )?('+getNomeAmora()+'|a mora)[,!.]?\\s*','i'),'').trim()||texto;
+  if(!tx){ responder('Oi! Pode falar o que precisa. Diga "ajuda" para ver o que eu sei fazer.'); return; }
+  _amStatus('Pensando...','#7c3aed');
+  _amSet('voz-resposta','<span style="color:#7c3aed">⏳ Entendendo...</span>',true);
 
-  function norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
-  var txNorm = norm(texto);
-
-  // Resposta com voz para qualquer resultado
-  function responderAmora(texto){
-    document.getElementById('voz-resposta').innerHTML=texto.replace(/\n/g,'<br>');
-    document.getElementById('voz-status-txt').textContent='Ouvindo... diga "'+getNomeAmora()+'"';
-    falarAmora(texto.replace(/<[^>]+>/g,''));
+  function responder(t, semVoz){
+    _amSet('voz-resposta', esc(t).replace(/\n/g,'<br>'), true);
+    _amStatus('Toque em mim e fale');
+    if(!semVoz) falarAmora(t);
   }
+  function tem(re){ return re.test(tx); }
+  var cli=amoraAcharCliente(tx);
 
-  // ── Detecção LOCAL de intenção (sem IA) ──────────────
-  var ehBuscaCli = /buscar|abrir|ver|mostrar|cliente|procurar/.test(txNorm);
-  var ehLembrete = /visita|reuniao|reunião|lembrete|marcar|agenda|agendar|ligar|ligação/.test(txNorm);
-  var ehMapa = /mapa|rota|localizar|onde fica|endereço/.test(txNorm);
-  var ehWpp = /whatsapp|zap|mensagem/.test(txNorm);
-  var ehProx = /proximos|próximos|perto|nearby|aqui/.test(txNorm);
-  var ehAnalise = /analise|análise|últimos pedidos|ultimo pedido|histórico|resumo|antes da visita|preparar visita/.test(txNorm);
-
-  // Busca cliente no texto
-  var cliMatch = null;
-  var palavras = txNorm.split(' ').filter(function(w){ return w.length>3; });
-  DB.clientes.forEach(function(c){
-    if(!c.rs) return;
-    var nNorm = norm(c.rs);
-    if(palavras.some(function(w){ return nNorm.includes(w); })){
-      if(!cliMatch || norm(c.rs).length < norm(cliMatch.rs).length) cliMatch = c;
+  // 1. Ajuda
+  if(tem(/^(ajuda|comandos|o que voce (faz|sabe))/)){
+    responder('Exemplos: "resumo da Bella" (lê o que ela compra), "abrir cliente Dikas", "WhatsApp da Bella", "rota para Dikas", "ligar para Bella", "lembrete amanhã 10h ligar para Dikas", "fila do dia", "clientes próximos", "abrir pedidos". Qualquer outra pergunta eu passo para a IA.');
+    return;
+  }
+  // 2. Resumo / preparar visita (lê o mix de compras)
+  if(tem(/\b(resumo|resume|preparar|prepara|briefing|antes da visita|o que (ele |ela )?(mais )?compra|mix)\b/)){
+    if(cli){
+      _amSet('voz-resposta','🔊 Lendo o resumo de visita de <b>'+esc(cli.rs)+'</b>...',true); _amStatus('Toque em mim e fale');
+      navM('clientes'); setTimeout(function(){ abrirClienteM(cli.id); setTimeout(function(){ ouvirResumoCliente(cli.id); },400); },250);
+      return;
     }
-  });
-
-  if(ehProx){
-    navM('proximos'); buscarProximosM();
-    responderAmora('Buscando clientes próximos à sua localização!');
+    if(!tem(/\b(dia|hoje|semana|vendas|mes)\b/)){ responder('De qual cliente? Fale, por exemplo: "resumo da Bella".'); return; }
+  }
+  // 3. Fila do dia
+  if(!cli&&tem(/\b(fila|meu dia|o que (eu )?tenho (pra|para )?hoje|tarefas de hoje|agenda de hoje|inicio)\b/)){
+    navM('hoje');
+    var hj=dataISO(new Date());
+    var nt=(DB.tarefas||[]).filter(function(t){ return !t.done&&t.dt&&t.dt<=hj; }).length;
+    responder('Abrindo sua fila do dia.'+(nt?' Você tem '+nt+' tarefa'+(nt>1?'s':'')+' para hoje ou atrasada'+(nt>1?'s':'')+'.':''));
     return;
   }
-  if(ehMapa && cliMatch){
-    var end=[cliMatch.end,cliMatch.cid,cliMatch.uf].filter(Boolean).join(', ')||cliMatch.rs;
-    window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(end),'_blank');
-    responderAmora('Abrindo o mapa para '+cliMatch.rs+'!');
+  // 4. Clientes próximos
+  if(tem(/\b(proximos|proximo de mim|perto|por perto|redondeza|proximidade)/)&&!cli){
+    navM('proximos'); try{ buscarProximosM(); }catch(e){}
+    responder('Buscando clientes perto de você.');
     return;
   }
-  if(ehWpp && cliMatch && (cliMatch.cel||cliMatch.fone)){
-    wppM(cliMatch.cel||cliMatch.fone);
-    responderAmora('Abrindo WhatsApp de '+cliMatch.rs+'!');
-    return;
-  }
-  if(ehBuscaCli && !ehAnalise && cliMatch){
-    responderAmora('Abrindo o cadastro de '+cliMatch.rs+'!');
-    setTimeout(function(){ navM('clientes'); setTimeout(function(){ abrirClienteM(cliMatch.id); },300); },800);
-    return;
-  }
-  if(ehLembrete){
-    var dataMatch=texto.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
-    var dtTar=dataISO(new Date());
-    if(dataMatch){
-      var dia=dataMatch[1].padStart(2,'0'); var mes=dataMatch[2].padStart(2,'0');
-      var ano=dataMatch[3]?(dataMatch[3].length===2?'20'+dataMatch[3]:dataMatch[3]):new Date().getFullYear();
-      dtTar=ano+'-'+mes+'-'+dia;
-    }
-    var horaMatch=texto.match(/(\d{1,2})h(\d{0,2})/);
-    var hora=horaMatch?horaMatch[1].padStart(2,'0')+':'+(horaMatch[2]||'00').padStart(2,'0'):'';
-    var desc=texto.replace(/buscar|abrir|ver|mostrar|cliente|procurar|marcar|agendar|lembrete|visita|reunião|reuniao/gi,'').replace(/\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/g,'').replace(/\d{1,2}h\d{0,2}/g,'').trim();
-    if(hora) desc=hora+' - '+desc;
-    if(cliMatch) desc=desc+' - '+cliMatch.rs;
-    desc=desc.trim()||texto;
+  // 5. Lembrete / agendar
+  if(tem(/\b(lembrete|lembrar|lembra|me lembre|agendar|agenda uma|marcar|marca|anotar|anota|tarefa)\b/)){
+    var dt=amoraData(tx), hr=amoraHora(tx);
+    var W='[A-Za-zÀ-ÿ0-9]';
+    function tira(re){ desc=desc.replace(new RegExp('(^|[^A-Za-zÀ-ÿ0-9])(?:'+re+')(?!'+W+')','gi'),'$1'); }
+    var desc=original;
+    tira('me lembre(?: de| que)?|me lembra(?: de| que)?|lembrete(?: de| para| pra)?|lembrar(?: de)?|lembra(?: de)?|agendar|agenda uma|marcar|marca|anotar|anota|tarefa(?: de| para| pra)?');
+    tira('cria|criar|crie|faz|fazer|faça|um|uma|novo|nova');
+    tira('depois de amanhã|depois de amanha|amanhã|amanha|hoje|na próxima semana|na proxima semana|semana que vem');
+    tira('(?:na |no |para |pra )?(?:segunda|terça|terca|quarta|quinta|sexta|sábado|sabado|domingo)(?:-feira| feira)?');
+    tira('dia \\d{1,2}(?: de [a-zç]+)?');
+    desc=desc.replace(/\d{1,2}\/\d{1,2}(\/\d{2,4})?/g,'');
+    tira('(?:às |as |a partir das )?\\d{1,2}(?:h|:|\\s?horas?)(?:\\d{2})?(?: da (?:manhã|manha|tarde|noite))?');
+    tira('(?:às |as )?\\d{1,2} (?:da|de) (?:manhã|manha|tarde|noite)');
+    tira('às|as');
+    desc=desc.replace(/\s+/g,' ').replace(/^[\s,.:-]+|[\s,.:-]+$/g,'').trim();
+    if(!desc) desc='Lembrete';
+    desc=desc.charAt(0).toUpperCase()+desc.slice(1);
+    if(hr) desc=hr+' - '+desc;
     DB.tarefas=DB.tarefas||[];
-    DB.tarefas.push({id:'t'+Date.now(),desc:desc,dt:dtTar,done:false,cliId:cliMatch?cliMatch.id:'',empId:cliMatch?cliMatch.empId:''});
+    DB.tarefas.push({id:'t'+Date.now()+Math.floor(Math.random()*1000),desc:desc,dt:dt,done:false,cliId:cli?cli.id:'',empId:cli?(cli.empId||''):''});
     salvarDB();
-    var dtFmt=dtTar.split('-').reverse().join('/');
-    responderAmora('Lembrete criado! '+desc+' para o dia '+dtFmt+(cliMatch?', cliente '+cliMatch.rs:'')+'.');
+    responder('Lembrete criado para '+dt.split('-').reverse().join('/')+': '+desc+(cli?' (cliente '+cli.rs+')':'')+'.');
+    return;
+  }
+  // 6. Mapa / rota
+  if(tem(/\b(mapa|rota|navegar|como chego|endereco|localizacao|gps|waze)\b/)){
+    if(!cli){ responder('Não achei esse cliente. Fale o nome como está no cadastro.'); return; }
+    var end=[cli.end,cli.cid,cli.uf].filter(Boolean).join(', ')||cli.rs;
+    window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(end),'_blank');
+    responder('Abrindo o mapa de '+cli.rs+'.');
+    return;
+  }
+  // 7. WhatsApp
+  if(tem(/\b(whatsapp|whats|zap|zapzap|mensagem)\b/)){
+    if(!cli){ responder('De qual cliente? Fale, por exemplo: "WhatsApp da Bella".'); return; }
+    if(!_amTemTel(cli)){ responder(cli.rs+' não tem telefone no cadastro.'); return; }
+    responder('Abrindo o WhatsApp de '+cli.rs+'.');
+    setTimeout(function(){ wppM(cli.cel||cli.fone); },600);
+    return;
+  }
+  // 8. Ligar
+  if(tem(/\b(ligar|liga|ligue|telefonar|chamar)\b/)&&cli){
+    if(!_amTemTel(cli)){ responder(cli.rs+' não tem telefone no cadastro.'); return; }
+    responder('Ligando para '+cli.rs+'.');
+    setTimeout(function(){ location.href='tel:'+String(cli.cel||cli.fone).replace(/[^\d+]/g,''); },600);
+    return;
+  }
+  // 9. Abrir telas
+  var telas=[[/\bpedidos?\b/,'pedidos','Pedidos'],[/\bfiscal|notas?( fiscais)?\b/,'fiscal','Fiscal'],[/\bleads?\b/,'leads','Leads'],[/\bvendas\b/,'vendas','Vendas'],[/\bagenda\b/,'agenda','Agenda'],[/\b(painel|dashboard|inicio)\b/,'dash','Início'],[/\bclientes\b/,'clientes','Clientes']];
+  if(!cli&&tem(/^(abrir|abre|abra|mostrar|mostra|ir para|vai para|ver|tela)\b/)){
+    for(var ti=0;ti<telas.length;ti++) if(telas[ti][0].test(tx)){ navM(telas[ti][1]); responder('Abrindo '+telas[ti][2]+'.'); return; }
+  }
+  // 10. Abrir cliente (ou só falou o nome)
+  var perguntaIA=tem(/^(qual|quais|quanto|quantos|quantas|quando|como|por que|porque|o que|me diz|me fala|compare|analise|analisa)\b/)||tem(/\?$/);
+  if(cli&&(tem(/\b(abrir|abre|abra|mostrar|mostra|ver|buscar|busca|procurar|procura|ficha|cadastro)\b/)||(!perguntaIA&&tx.split(' ').length<=4))){
+    responder('Abrindo '+cli.rs+'.');
+    navM('clientes'); setTimeout(function(){ abrirClienteM(cli.id); },250);
     return;
   }
 
-  // ── Chama Gemini para análise avançada ──────────────
-  var cfg=loadCfg(); var key=(cfg.iakey||'').trim();
-  if(!key){
-    responderAmora('Preciso de uma chave do Gemini para análises avançadas. Configure em Configurações.');
-    return;
+  // 11. Pergunta livre → IA
+  var cfg=loadCfg(); var key=(cfg.iakey||localStorage.getItem('gemini_key')||'').trim();
+  if(!key){ responder('Não entendi o comando. Para perguntas livres eu preciso da chave de IA (Mais → Configurações). Diga "ajuda" para ver os comandos que funcionam sem IA.'); return; }
+  var ctx='';
+  if(cli){
+    var peds=(DB.pedidos||[]).filter(function(p){return p.cliId===cli.id&&!p.cancelado;}).sort(function(a,b){return b.dt>a.dt?1:-1;}).slice(0,8);
+    ctx='Cliente: '+cli.rs+' | Cidade: '+(cli.cid||'')+' | Comprador: '+(cli.comp||'')+'\nÚltimos pedidos:\n'+peds.map(function(p){ var e=(DB.empresas||[]).find(function(x){return x.id===p.empId;}); return '- '+(p.dt||'')+(e?' ('+e.nome+')':'')+' R$ '+(p.val||0).toLocaleString('pt-BR'); }).join('\n');
+    try{ var st=_mixTela&&_mixTela['mix-body-m']; var cache=(st&&st.c===cli.id)?st.cache:await mixCarregar(cli); ctx+='\nResumo de compras: '+montarTextoVisita(cli, cache, ''); }catch(e){}
+  } else {
+    try{ ctx=JSON.stringify(iaContextoCompletoM()); }catch(e){ ctx=''; }
   }
-
-  // Contexto rico do cliente para análise
-  var contextoCliente = '';
-  if(cliMatch){
-    var pedsCli=DB.pedidos.filter(function(p){return p.cliId===cliMatch.id&&!p.cancelado;}).sort(function(a,b){return b.dt>a.dt?1:-1;}).slice(0,5);
-    var empsCli=[...new Set(pedsCli.map(function(p){return p.empId;}))].map(function(eid){var e=DB.empresas.find(function(x){return x.id===eid;}); return e?e.nome:'';}).filter(Boolean);
-    contextoCliente='Cliente: '+cliMatch.rs+'\nCidade: '+(cliMatch.cid||'')+'\nSegmento: '+(cliMatch.seg||'')+'\nÚltimos pedidos:\n'+
-      pedsCli.map(function(p){
-        var e=DB.empresas.find(function(x){return x.id===p.empId;});
-        return '- '+(p.dt||'')+(e?' ('+e.nome+')':'')+' R$ '+(p.val||0).toLocaleString('pt-BR');
-      }).join('\n');
-  }
-
-  // Sem cliente específico identificado: usa o contexto completo do CRM (mesmo
-  // resumo rico usado na caixa "Perguntar à IA" do dashboard), não só os nomes.
-  var contextoGeral = contextoCliente || JSON.stringify(iaContextoCompletoM());
-  var prompt='Você é a Amora, assistente virtual de CRM. Responda de forma natural e fluida para ser lida em voz alta. Máximo 3 frases curtas.\n\n'+contextoGeral+'\n\nPergunta: '+texto;
-
+  var prompt='Você é a '+(loadCfg().nomeAmora||'Amora')+', assistente de um representante comercial que trabalha sozinho. Responda em português do Brasil, direto e natural, pois será lido em voz alta. No máximo 4 frases curtas, sem listas, asteriscos ou emojis. Use só os dados abaixo; se não souber, diga.\nHoje é '+dataISO(new Date())+'.\n\nDADOS:\n'+ctx+'\n\nPergunta: '+original;
+  _amSet('voz-resposta','<span style="color:#7c3aed">⏳ Perguntando à IA...</span>',true);
   try{
-    // Endpoint generateContent (não /v1beta/interactions) + gemini-3.6-flash +
-    // thinkingConfig.thinkingLevel, mesmo padrão corrigido no restante do app.
-    var url='https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent';
-    var r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},
-      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:200,thinkingConfig:{thinkingLevel:'low'}}})});
+    var r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},
+      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:1024,thinkingConfig:{thinkingLevel:'low'}}})});
     var d=await r.json();
-    if(d.error) throw new Error(d.error.message);
-    var resp=d.candidates?.[0]?.content?.parts?.[0]?.text||'Não consegui processar a solicitação.';
-    responderAmora(resp);
+    if(!r.ok||d.error) throw new Error((d.error&&d.error.message)||('Erro '+r.status));
+    var c0=(d.candidates||[])[0]||{};
+    var resp=((c0.content&&c0.content.parts)||[]).filter(function(p){return !p.thought;}).map(function(p){return p.text||'';}).join('').replace(/[*#_`]/g,'').trim();
+    responder(resp||'A IA não trouxe resposta. Tente perguntar de outro jeito.');
   }catch(e){
-    responderAmora('Desculpe, ocorreu um erro: '+e.message);
+    responder('Não consegui falar com a IA: '+(e.message||e));
   }
 }
 
@@ -4806,7 +5153,7 @@ window.addEventListener('load', function(){
   </div>
 
   <!-- Preview imagem -->
-  <img id="nf-preview-m" style="display:none;width:100%;max-height:160px;object-fit:contain;border-radius:10px;border:1px solid var(--bdr);margin-bottom:10px;background:var(--s2)">
+  <div style="position:relative"><img id="nf-preview-m" onclick="abrirFotoTelaCheia(this.src)" style="display:none;width:100%;max-height:220px;object-fit:contain;border-radius:10px;border:1px solid var(--bdr);margin-bottom:10px;background:var(--s2);cursor:zoom-in"><div id="nf-preview-dica" style="position:absolute;right:8px;bottom:18px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;padding:3px 8px;border-radius:12px;pointer-events:none"><i class="ti ti-arrows-maximize"></i> Toque para ampliar</div></div>
 
   <!-- Botão IA -->
   <button id="btn-ler-nf-m" onclick="lerNFcomIAM()" style="width:100%;padding:11px;border:none;border-radius:10px;background:linear-gradient(135deg,#0C447C,#185FA5);color:#fff;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px">
@@ -4842,5 +5189,166 @@ window.addEventListener('load', function(){
 </div>
 </div>
 
+<script>
+// Card "Mix de produtos" na ficha do cliente (celular)
+(function(){
+  var _orig=abrirClienteM;
+  abrirClienteM=function(id){
+    var r=_orig.apply(this,arguments);
+    try{
+      var c=DB.clientes.find(function(x){return x.id===id;});
+      var cards=document.querySelectorAll('#main-content .section > .card');
+      if(c&&cards.length){
+        cards[0].insertAdjacentHTML('afterend','<div class="card" id="vz-card-m" style="border-left:4px solid #7c3aed"><div class="card-title"><i class="ti ti-headphones" style="color:#7c3aed"></i>Preparar visita</div>'
+          +'<div style="display:flex;gap:8px"><button class="btn bp" style="flex:1;padding:12px" onclick="ouvirResumoCliente(\''+id+'\')"><i class="ti ti-volume"></i> Ouvir resumo</button>'
+          +'<button class="btn bs" style="flex:1;padding:12px;color:#7c3aed;border-color:#7c3aed" onclick="ouvirResumoIA(\''+id+'\')"><i class="ti ti-sparkles"></i> Resumo com IA</button></div>'
+          +'<div id="vz-texto-m" style="display:none;margin-top:10px;font-size:14px;line-height:1.5;color:var(--t2);background:var(--s2);border-radius:10px;padding:10px;white-space:pre-wrap"></div></div>'
+          +'<div class="card" id="mix-card-m"><div class="card-title"><i class="ti ti-chart-pie" style="color:#7c3aed"></i>Mix de produtos</div><div id="mix-body-m"></div></div>');
+        mixRenderEm(document.getElementById('mix-body-m'), c, true);
+      }
+    }catch(e){ console.warn(e); }
+    return r;
+  };
+})();
+</script>
+<script>
+// ════════════════════════════════════════════════════════════
+// RESUMO FALADO DA VISITA — lê em voz alta (voz do próprio celular,
+// grátis e sem internet) o que o cliente compra e o que está pendente.
+// ════════════════════════════════════════════════════════════
+function _vzNum(n){ return String(Math.round(n)); }
+function _vzLista(arr){ if(arr.length<=1) return arr.join(''); return arr.slice(0,-1).join(', ')+' e '+arr[arr.length-1]; }
+function _vzLimpa(t){ return String(t||'').replace(/&/g,' e ').replace(/\//g,' ').replace(/\(Disney\)/g,'').replace(/\s+/g,' ').trim(); }
+function montarTextoVisita(c, cache, empSel){
+  var fr=[];
+  var hoje=dataISO(new Date());
+  fr.push('Visita à '+_vzLimpa(c.rs)+(c.cid?', em '+c.cid:'')+'.');
+  if(c.comp) fr.push('Comprador: '+c.comp+'.');
+  // ritmo de compra (pedidos do sistema)
+  try{
+    var I=indiceVendas(), pares=(I.porCli[c.id]||[]).filter(function(x){ return !empSel||x.empId===empSel; });
+    pares.forEach(function(x){
+      var nome=_nomeEmp(x.empId);
+      var t=nome+': última compra há '+x.diasSem+' dias';
+      if(x.interv){ t+=', costuma comprar a cada '+x.interv+' dias'; if(x.diasSem>x.interv*1.3) t+=', está atrasado'; else if(x.diasSem>x.interv*0.85) t+=', está na hora de repor'; }
+      t+='. Ticket médio de '+_vzNum(x.ticket)+' reais.';
+      fr.push(t);
+    });
+  }catch(e){}
+  // mix de produtos importado
+  var R=mixResumo(cache||{}, empSel||'');
+  if(R.ult){
+    fr.push('Na última compra, em '+fmtD(R.ult.dt)+', levou '+_vzNum(R.ult.pecas)+' peças.');
+    var segs=Object.keys(R.ult.seg).sort(function(a,b){return R.ult.seg[b]-R.ult.seg[a];}).slice(0,3);
+    if(segs.length) fr.push('O que mais compra: '+_vzLista(segs.map(function(s){ return _vzNum(R.ult.seg[s])+' '+_vzLimpa(s); }))+'.');
+    var lics=Object.keys(R.tot.lic).filter(function(l){return l!=='Sem licença/tema';}).sort(function(a,b){return R.tot.lic[b]-R.tot.lic[a];}).slice(0,5);
+    if(lics.length) fr.push('Licenças e temas preferidos: '+_vzLista(lics.map(_vzLimpa))+'.');
+    if(R.ant){
+      var sobe=[], cai=[], parou=[], novo=[];
+      ['seg','lic'].forEach(function(t){
+        var ks={}; Object.keys(R.ult[t]).concat(Object.keys(R.ant[t])).forEach(function(k){ ks[k]=1; });
+        Object.keys(ks).forEach(function(k){
+          if(k==='Sem licença/tema'||k==='Outros') return;
+          var u=R.ult[t][k]||0, a=R.ant[t][k]||0;
+          if(!u&&a>=4) parou.push(k);
+          else if(!a&&u>=4) novo.push(k+' com '+_vzNum(u)+' peças');
+          else if(u-a>=5&&u>=a*1.4) sobe.push(k+' de '+_vzNum(a)+' para '+_vzNum(u));
+          else if(a-u>=5&&u<=a*0.6) cai.push(k+' de '+_vzNum(a)+' para '+_vzNum(u));
+        });
+      });
+      if(novo.length) fr.push('Começou a comprar: '+_vzLista(novo.slice(0,3).map(_vzLimpa))+'.');
+      if(sobe.length) fr.push('Cresceu: '+_vzLista(sobe.slice(0,3).map(_vzLimpa))+'.');
+      if(cai.length) fr.push('Caiu: '+_vzLista(cai.slice(0,3).map(_vzLimpa))+'. Vale perguntar o motivo.');
+      if(parou.length) fr.push('Comprava antes e não levou na última: '+_vzLista(parou.slice(0,3).map(_vzLimpa))+'.');
+    }
+  } else fr.push('Ainda não há itens de compras importados para este cliente.');
+  // pendências
+  var orcs=(DB.orcamentos||[]).filter(function(o){ return o.cliId===c.id&&o.status==='orcamento'; });
+  if(orcs.length) fr.push('Tem '+orcs.length+' orçamento'+(orcs.length>1?'s':'')+' em aberto, somando '+_vzNum(orcs.reduce(function(a,o){return a+(o.total||0);},0))+' reais.');
+  var tars=(DB.tarefas||[]).filter(function(t){ return t.cliId===c.id&&!t.done; });
+  if(tars.length) fr.push('Lembrete: '+_vzLista(tars.slice(0,2).map(function(t){ return _vzLimpa(t.desc); }))+'.');
+  var semNF=(DB.pedidos||[]).filter(function(p){ return p.cliId===c.id&&!p.cancelado&&!p.dtFat&&!p.nf; });
+  if(semNF.length) fr.push('Há '+semNF.length+' pedido'+(semNF.length>1?'s':'')+' aguardando faturamento.');
+  var uc=(c.hist||[]).find(function(h){return h&&h.iso;});
+  if(uc) fr.push('Último contato em '+fmtD(uc.iso)+': '+_vzLimpa(uc.resultadoTxt||'')+(uc.txt&&uc.txt.indexOf('—')>=0?', observação: '+_vzLimpa(uc.txt.split('—').slice(1).join(' ')):'')+'.');
+  else if(c.obs) fr.push('Observação do cadastro: '+_vzLimpa(c.obs)+'.');
+  fr.push('Boa visita!');
+  return fr.join(' ');
+}
+// ── Leitor ──
+var _vz={vel:1, texto:'', ativo:false};
+function _vzVoz(){
+  var vs=(window.speechSynthesis&&speechSynthesis.getVoices())||[];
+  return vs.find(function(v){return /pt[-_]BR/i.test(v.lang)&&/Google|Natural|Luciana|Francisca|Antonio/i.test(v.name);})||vs.find(function(v){return /pt[-_]BR/i.test(v.lang);})||vs.find(function(v){return /^pt/i.test(v.lang);})||null;
+}
+function falarTexto(texto){
+  if(!('speechSynthesis' in window)){ toastM('Este navegador não tem leitura em voz alta'); return; }
+  speechSynthesis.cancel();
+  _vz.texto=texto; _vz.ativo=true;
+  // divide em frases: fica mais natural e evita cortes em textos longos
+  var partes=texto.match(/[^.!?]+[.!?]*/g)||[texto];
+  var voz=_vzVoz();
+  partes.forEach(function(p,i){
+    var u=new SpeechSynthesisUtterance(p.trim()); u.lang='pt-BR'; u.rate=_vz.vel; if(voz) u.voice=voz;
+    if(i===partes.length-1) u.onend=function(){ _vz.ativo=false; _vzBarra(); };
+    speechSynthesis.speak(u);
+  });
+  _vzBarra();
+}
+function _vzBarra(){
+  var b=document.getElementById('vz-barra');
+  if(!_vz.ativo){ if(b) b.remove(); return; }
+  if(!b){ b=document.createElement('div'); b.id='vz-barra'; document.body.appendChild(b); }
+  b.style.cssText='position:fixed;left:10px;right:10px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:9999;background:#1f2937;color:#fff;border-radius:16px;padding:10px 12px;display:flex;align-items:center;gap:8px;box-shadow:0 6px 24px rgba(0,0,0,.35)';
+  var pausado=speechSynthesis.paused;
+  b.innerHTML='<i class="ti ti-volume" style="font-size:22px"></i><div style="flex:1;font-size:14px;font-weight:600">Lendo resumo da visita</div>'
+    +'<button onclick="vzPausar()" style="width:44px;height:44px;border-radius:50%;border:none;background:#374151;color:#fff;font-size:18px">'+(pausado?'▶':'⏸')+'</button>'
+    +'<button onclick="vzVel()" style="height:44px;padding:0 10px;border-radius:22px;border:none;background:#374151;color:#fff;font-size:14px;font-weight:700">'+_vz.vel+'x</button>'
+    +'<button onclick="vzParar()" style="width:44px;height:44px;border-radius:50%;border:none;background:#dc2626;color:#fff;font-size:18px">■</button>';
+}
+function vzPausar(){ if(speechSynthesis.paused) speechSynthesis.resume(); else speechSynthesis.pause(); setTimeout(_vzBarra,50); }
+function vzParar(){ speechSynthesis.cancel(); _vz.ativo=false; _vzBarra(); }
+function vzVel(){ _vz.vel=_vz.vel>=1.5?1:(_vz.vel+0.25); var t=_vz.texto; falarTexto(t); }
+if('speechSynthesis' in window){ try{ speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged=function(){}; }catch(e){} }
+
+// Botão na ficha: monta o resumo (com o mix já carregado) e lê
+function ouvirResumoCliente(id){
+  var c=DB.clientes.find(function(x){return x.id===id;}); if(!c) return;
+  var st=_mixTela['mix-body-m'];
+  var p=(st&&st.c===id)?Promise.resolve(st.cache):mixCarregar(c);
+  p.then(function(cache){
+    var texto=montarTextoVisita(c, cache, st&&st.c===id?st.sel:'');
+    var box=document.getElementById('vz-texto-m'); if(box){ box.style.display='block'; box.textContent=texto; }
+    falarTexto(texto);
+  });
+}
+// Versão com IA: pede um resumo mais "conversado" e lê (usa a chave de IA configurada)
+async function ouvirResumoIA(id){
+  var c=DB.clientes.find(function(x){return x.id===id;}); if(!c) return;
+  var cfg=loadCfg(), key=(cfg.iakey||localStorage.getItem('gemini_key')||'').trim();
+  if(!key){ toastM('Configure a chave de IA em Mais → Configurações'); return; }
+  var st=_mixTela['mix-body-m'];
+  var cache=(st&&st.c===id)?st.cache:await mixCarregar(c);
+  var base=montarTextoVisita(c, cache, st&&st.c===id?st.sel:'');
+  var box=document.getElementById('vz-texto-m'); if(box){ box.style.display='block'; box.textContent='🔄 A IA está preparando o resumo...'; }
+  var prompt='Você é assistente de um representante comercial que está indo visitar uma loja. Com os dados abaixo, escreva um roteiro FALADO de no máximo 120 palavras, em português do Brasil, tom direto e natural (vai ser lido em voz alta no carro). Diga: situação do cliente, o que ele mais compra, o que cresceu ou caiu, o que oferecer nesta visita (reposição e o que ele parou de comprar) e 1 pergunta para fazer ao comprador. Não use listas, asteriscos, emojis nem abreviações.\n\nDADOS:\n'+base;
+  try{
+    var txt;
+    if(key.indexOf('sk-ant-')===0){
+      var r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:500,messages:[{role:'user',content:prompt}]})});
+      var d=await r.json(); if(!r.ok||d.error) throw new Error((d.error&&d.error.message)||'Erro '+r.status); txt=(d.content||[]).map(function(x){return x.text||'';}).join('');
+    } else {
+      var r2=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:600}})});
+      var d2=await r2.json(); if(!r2.ok) throw new Error((d2.error&&d2.error.message)||'Erro '+r2.status); txt=((d2.candidates||[])[0]||{}).content; txt=txt?(txt.parts||[]).map(function(x){return x.text||'';}).join(''):'';
+    }
+    txt=(txt||'').replace(/[*#_`]/g,'').trim()||base;
+    if(box) box.textContent=txt;
+    falarTexto(txt);
+  }catch(e){
+    if(box) box.textContent='(IA indisponível: '+(e.message||e)+') — lendo o resumo simples.\n\n'+base;
+    falarTexto(base);
+  }
+}
+</script>
 </body>
 </html>
