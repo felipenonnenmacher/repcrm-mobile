@@ -133,6 +133,9 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 
 /* ── Scroll suave ── */
 ::-webkit-scrollbar{width:0;height:0}
+
+/* Campos de chave/senha interna: mascarados sem ser "senha" (evita o pop-up de senhas salvas) */
+input[data-mascara]{-webkit-text-security:disc;text-security:disc}
 </style>
 <script>
 if('serviceWorker' in navigator){var b=new Blob(["const CACHE='repcrm-mob-v26';self.addEventListener('install',e=>{self.skipWaiting();});self.addEventListener('activate',e=>{self.clients.claim();});self.addEventListener('fetch',e=>{e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)));});"],{type:'application/javascript'});navigator.serviceWorker.register(URL.createObjectURL(b),{scope:'./'}).catch(function(){});}
@@ -159,8 +162,12 @@ if('serviceWorker' in navigator){var b=new Blob(["const CACHE='repcrm-mob-v26';s
 
 <!-- NAVEGAÇÃO INFERIOR -->
 <div class="bottom-nav">
+  <button class="bnav-item" id="bnav-hoje" onclick="navM('hoje')">
+    <i class="ti ti-list-check" style="color:#7c3aed"></i>Hoje
+    <span class="bnav-badge" id="badge-hoje-m" style="display:none">0</span>
+  </button>
   <button class="bnav-item act" id="bnav-dash" onclick="navM('dash')">
-    <i class="ti ti-layout-dashboard"></i>Dashboard
+    <i class="ti ti-layout-dashboard"></i>Início
   </button>
   <button class="bnav-item" id="bnav-clientes" onclick="navM('clientes')">
     <i class="ti ti-users"></i>Clientes
@@ -309,6 +316,37 @@ if('serviceWorker' in navigator){var b=new Blob(["const CACHE='repcrm-mob-v26';s
   </div>
 </div>
 
+<div class="mbg" id="mMsgM">
+  <div class="msheet">
+    <div class="mhandle"></div>
+    <div class="msheettitle"><i class="ti ti-brand-whatsapp" style="color:#16a34a"></i> Mensagem pronta</div>
+    <div style="font-size:13px;color:var(--t3);margin-bottom:8px">Para: <b id="msgm-para" style="color:var(--t1)"></b></div>
+    <label class="fl">Motivo</label><select class="fi" id="msgm-motivo" onchange="msgTrocouMotivoM()" style="margin-bottom:8px"></select>
+    <label class="fl">Modelo</label><select class="fi" id="msgm-modelo" onchange="atualizarMensagemM()" style="margin-bottom:8px"></select>
+    <label class="fl">Mensagem (pode editar)</label><textarea class="fi" id="msgm-texto" rows="6" style="resize:vertical;margin-bottom:10px"></textarea>
+    <div class="btn-row"><button class="btn bs" onclick="copiarMensagemM()"><i class="ti ti-copy"></i> Copiar</button><button class="btn bp" style="background:#16a34a;border-color:#16a34a" onclick="enviarMensagemM()"><i class="ti ti-brand-whatsapp"></i> Abrir WhatsApp</button></div>
+    <div style="font-size:12px;color:var(--t3);margin-top:8px">Os modelos são editados no computador (Fila do dia → Modelos de mensagem) e chegam aqui pela nuvem.</div>
+  </div>
+</div>
+<div class="mbg" id="mResM">
+  <div class="msheet">
+    <div class="mhandle"></div>
+    <div class="msheettitle"><i class="ti ti-checklist"></i> Resultado do contato</div>
+    <div style="font-size:17px;font-weight:700;color:var(--t1)" id="resm-alvo"></div>
+    <div style="font-size:13px;color:var(--org);margin:4px 0 8px" id="resm-dica"></div>
+    <label class="fl">Canal</label><select class="fi" id="resm-canal" style="margin-bottom:10px"><option>WhatsApp</option><option>Ligação</option><option>Visita</option><option>E-mail</option></select>
+    <label class="fl">O que aconteceu?</label>
+    <div id="resm-opcoes" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px"></div>
+    <div id="resm-dias-box" style="display:none;margin-bottom:10px">
+      <label class="fl">Voltar a falar em (dias)</label>
+      <div style="display:flex;gap:6px;align-items:center"><input class="fi" id="resm-dias" type="number" min="1" style="width:90px">
+      <button class="chip" type="button" onclick="document.getElementById('resm-dias').value=3">3</button><button class="chip" type="button" onclick="document.getElementById('resm-dias').value=7">7</button><button class="chip" type="button" onclick="document.getElementById('resm-dias').value=15">15</button><button class="chip" type="button" onclick="document.getElementById('resm-dias').value=30">30</button></div>
+    </div>
+    <label class="fl">Observação (opcional)</label><input class="fi" id="resm-obs" placeholder="Ex.: pediu catálogo de verão" style="margin-bottom:12px">
+    <div class="btn-row"><button class="btn bs" onclick="fecharModal('mResM')">Cancelar</button><button class="btn bp" onclick="salvarResultadoM()"><i class="ti ti-check"></i> Salvar</button></div>
+  </div>
+</div>
+
 <!-- Modal Backup -->
 <div class="mbg" id="mBkpM">
   <div class="msheet">
@@ -344,10 +382,10 @@ if('serviceWorker' in navigator){var b=new Blob(["const CACHE='repcrm-mob-v26';s
     </div>
 
     <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px">Configurações</div>
-    <div class="fg"><label class="fl">Chave API Gemini (IA)</label><input class="fi" id="mcfg-key" type="password" placeholder="AQ... ou AIza..."></div>
+    <div class="fg"><label class="fl">Chave API Gemini (IA)</label><input class="fi" id="mcfg-key" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" data-mascara="1" placeholder="AQ... ou AIza..."></div>
     <div style="display:flex;gap:8px;align-items:center;margin:-6px 0 10px"><button class="btn bs" style="padding:6px 12px;font-size:12px" onclick="testarChaveIA('mcfg-key','mcfg-key-teste')"><i class="ti ti-plug-connected"></i> Testar chave</button><span id="mcfg-key-teste" style="font-size:12px"></span></div>
     <div style="display:flex;gap:6px;margin:-4px 0 10px"><button class="btn bs" style="flex:1;padding:6px 8px;font-size:12px" onclick="enviarChaveIANuvem()"><i class="ti ti-cloud-lock"></i> Levar p/ aparelhos</button><button class="btn bs" style="flex:1;padding:6px 8px;font-size:12px" onclick="pegarChaveIANuvem(false)"><i class="ti ti-cloud-download"></i> Pegar da nuvem</button></div>
-    <div class="fg"><label class="fl">Google Places API Key</label><input class="fi" id="mcfg-places-key" type="password" placeholder="AIza... (busca de lojas)"></div>
+    <div class="fg"><label class="fl">Google Places API Key</label><input class="fi" id="mcfg-places-key" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" data-mascara="1" placeholder="AIza... (busca de lojas)"></div>
     <div style="font-size:11px;color:var(--t3);margin-top:-8px;margin-bottom:8px">console.cloud.google.com → Places API (nova)</div>
     <div class="fg"><label class="fl">Nome da assistente virtual</label><input class="fi" id="mcfg-amora" placeholder="Amora" maxlength="20"></div>
     <div style="font-size:11px;color:var(--t3);margin-top:-8px">Diga este nome para ativar a assistente por voz</div>
@@ -535,8 +573,8 @@ function _ciPedirSenha(titulo, texto, confirmar){
     ov.innerHTML='<div style="background:var(--s1,#fff);color:var(--t1,#111);border-radius:14px;padding:18px;width:100%;max-width:360px;box-shadow:0 10px 40px rgba(0,0,0,.3);font-size:13px">'
       +'<div style="font-weight:700;font-size:15px;margin-bottom:6px">🔐 '+titulo+'</div>'
       +'<div style="color:var(--t2,#555);margin-bottom:10px;line-height:1.45">'+texto+'</div>'
-      +'<input type="password" id="ci-s1" placeholder="Senha" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--bdr,#ccc);border-radius:8px;margin-bottom:8px;font-size:14px;background:var(--s2,#fff);color:inherit">'
-      +(confirmar?'<input type="password" id="ci-s2" placeholder="Repita a senha" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--bdr,#ccc);border-radius:8px;margin-bottom:8px;font-size:14px;background:var(--s2,#fff);color:inherit">':'')
+      +'<input type="text" data-mascara="1" autocomplete="off" autocapitalize="off" id="ci-s1" placeholder="Senha" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--bdr,#ccc);border-radius:8px;margin-bottom:8px;font-size:14px;background:var(--s2,#fff);color:inherit">'
+      +(confirmar?'<input type="text" data-mascara="1" autocomplete="off" autocapitalize="off" id="ci-s2" placeholder="Repita a senha" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--bdr,#ccc);border-radius:8px;margin-bottom:8px;font-size:14px;background:var(--s2,#fff);color:inherit">':'')
       +'<div id="ci-msg" style="color:var(--red,#c00);min-height:16px;margin-bottom:6px"></div>'
       +'<div style="display:flex;gap:8px"><button id="ci-no" style="flex:1;padding:10px;border:1px solid var(--bdr,#ccc);border-radius:8px;background:none;color:inherit">Cancelar</button>'
       +'<button id="ci-ok" style="flex:1;padding:10px;border:none;border-radius:8px;background:var(--acc,#2563eb);color:#fff;font-weight:700">OK</button></div></div>';
@@ -603,6 +641,25 @@ function oferecerChaveIANuvem(){
   ref.once('value').then(function(s){ var p=s.val(); if(p&&p.ct) pegarChaveIANuvem(true); }).catch(function(){});
 }
 
+
+// ══ SEM POP-UP DE SENHAS SALVAS ══
+// O Chrome oferecia senhas salvas em qualquer campo porque existiam campos do
+// tipo "senha" na página. Agora só o login da nuvem é tratado como login; nos
+// outros campos o preenchimento automático fica desligado.
+(function(){
+  function ajustar(root){
+    (root.querySelectorAll?root.querySelectorAll('input,textarea'):[]).forEach(function(el){
+      if(el.dataset.login) return;
+      if(!el.hasAttribute('autocomplete')) el.setAttribute('autocomplete','off');
+      if(el.type==='search'||/busca|buscar/i.test(el.placeholder||'')){ el.setAttribute('autocomplete','off'); el.setAttribute('name','q_'+Math.random().toString(36).slice(2,7)); }
+    });
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    ajustar(document);
+    new MutationObserver(function(ms){ ms.forEach(function(m){ m.addedNodes.forEach(function(n){ if(n.nodeType===1){ if(n.matches&&n.matches('input,textarea')) ajustar(n.parentNode||document); else ajustar(n); } }); }); })
+      .observe(document.body,{childList:true,subtree:true});
+  });
+})();
 // ══ DATA LOCAL ══
 // toISOString() converte para UTC: depois das 21h (Brasília) o "hoje" virava amanhã.
 function dataISO(d){
@@ -800,12 +857,485 @@ function apagarDeVezM(id){
   if(fbRefImgsM){ fbRefImgsM.child(id).remove().catch(function(){}); }
   salvarDB(); renderLixeiraM(); renderFiscalM();
 }
+// ══ FILA DO DIA (lógica igual à do computador) ══
+function alertasCicloLista(){
+  const hoje=new Date();
+  const alertas=[];
+  const grupos={};
+  DB.pedidos.forEach(function(p){
+    if(p.cancelado||!p.dt) return;
+    const k=p.cliId+'|'+p.empId; (grupos[k]=grupos[k]||[]).push(p);
+  });
+  Object.keys(grupos).forEach(function(k){
+    const peds=grupos[k];
+    const cli=DB.clientes.find(function(c){return c.id===peds[0].cliId;});
+    if(!cli||cli.encerrado) return;
+    if(cli.naoAtendido&&cli.naoAtendido[peds[0].empId]) return;
+    if(peds.length<2) return;
+    const datas=peds.map(function(p){return new Date(p.dt+'T12:00');}).sort(function(a,b){return a-b;});
+    let somaInterv=0;
+    for(let i=1;i<datas.length;i++) somaInterv+=(datas[i]-datas[i-1])/86400000;
+    const intervMedio=Math.max(1,Math.round(somaInterv/(datas.length-1)));
+    const ultData=datas[datas.length-1];
+    const diasSem=Math.floor((hoje-ultData)/86400000);
+
+    const porAnoMes={};
+    peds.forEach(function(p){
+      const d=new Date(p.dt+'T12:00'); const key=d.getFullYear()+'-'+d.getMonth();
+      if(!porAnoMes[key]) porAnoMes[key]={ano:d.getFullYear(),mes:d.getMonth()};
+    });
+    const mesesFreq={};
+    Object.values(porAnoMes).forEach(function(e){
+      if(!mesesFreq[e.mes]) mesesFreq[e.mes]=[];
+      if(!mesesFreq[e.mes].includes(e.ano)) mesesFreq[e.mes].push(e.ano);
+    });
+    const mesesHab=Object.keys(mesesFreq).filter(function(m){return mesesFreq[m].length>=2;}).map(Number);
+    const compradosMesAno=Object.values(porAnoMes).filter(function(e){return e.ano===hoje.getFullYear();}).map(function(e){return e.mes;});
+    const mesesAtrasados=mesesHab.filter(function(m){return !compradosMesAno.includes(m)&&m<=hoje.getMonth();});
+
+    const atrasado=diasSem>intervMedio*1.3;
+    const proximo=!atrasado&&diasSem>intervMedio*0.85;
+
+    if(atrasado||proximo||mesesAtrasados.length){
+      const e=DB.empresas.find(function(x){return x.id===peds[0].empId;});
+      alertas.push({cli,e,diasSem,intervMedio,atrasado,proximo,mesesAtrasados,ultData});
+    }
+  });
+  if(!DB.cicloAcoes) DB.cicloAcoes={};
+  const hojeStr=dataISO(hoje);
+  return alertas.filter(function(a){
+    const acao=DB.cicloAcoes[a.cli.id];
+    if(!acao) return true;
+    return acao.ate<hojeStr;
+  });
+}
+function _diasEntre(isoA, isoB){ return Math.round((new Date(isoB+'T12:00')-new Date(isoA+'T12:00'))/86400000); }
+function _somaDias(iso, n){ var d=new Date(iso+'T12:00'); d.setDate(d.getDate()+n); return dataISO(d); }
+function telWpp(c){
+  // Para WhatsApp o celular vem primeiro; o fixo só se não houver celular
+  var cel=(c&&c.cel||'').replace(/\D/g,''), fone=(c&&c.fone||'').replace(/\D/g,'');
+  if(cel.length>=10) return cel;
+  if(fone.length>=10) return fone;
+  return cel||fone;
+}
+function _nomeEmp(id){ var e=DB.empresas.find(function(x){return x.id===id;}); return e?e.nome:''; }
+function _corEmp(id){ var e=DB.empresas.find(function(x){return x.id===id;}); return e?e.cor:'var(--t3)'; }
+function _valPed(p){ return +(p.val||0) || +(p.valfat||0) || 0; }
+function _chipEmp(id){ return '<span style="display:inline-flex;align-items:center;gap:4px;font-size:var(--fs-xs);color:var(--t2);margin-right:6px"><span style="width:7px;height:7px;border-radius:50%;background:'+_corEmp(id)+'"></span>'+esc(_nomeEmp(id))+'</span>'; }
+function indiceVendas(){
+  var hoje=dataISO(new Date());
+  var pares={}, porCli={};
+  DB.pedidos.forEach(function(p){
+    if(p.cancelado||!p.dt||!p.cliId||!p.empId) return;
+    var k=p.cliId+'|'+p.empId;
+    (pares[k]=pares[k]||{cliId:p.cliId, empId:p.empId, peds:[]}).peds.push(p);
+  });
+  Object.keys(pares).forEach(function(k){
+    var x=pares[k];
+    x.peds.sort(function(a,b){return a.dt<b.dt?-1:a.dt>b.dt?1:0;});
+    var vals=x.peds.map(_valPed);
+    x.n=x.peds.length;
+    x.total=vals.reduce(function(a,b){return a+b;},0);
+    x.ticket=x.n?x.total/x.n:0;
+    x.ult=x.peds[x.n-1].dt;
+    x.prim=x.peds[0].dt;
+    x.diasSem=_diasEntre(x.ult, hoje);
+    x.interv=x.n>=2?Math.max(1,Math.round(_diasEntre(x.prim,x.ult)/(x.n-1))):null;
+    x.prox=x.interv?_somaDias(x.ult, x.interv):null;
+    // Tendência: média dos 2 últimos pedidos x média dos anteriores
+    if(x.n>=4){
+      var ult2=(vals[x.n-1]+vals[x.n-2])/2;
+      var ant=vals.slice(0,x.n-2); var mAnt=ant.reduce(function(a,b){return a+b;},0)/ant.length;
+      x.tendencia=mAnt?ult2/mAnt:null;
+    } else x.tendencia=null;
+    // Últimos 12 meses x 12 meses anteriores
+    var d365=_somaDias(hoje,-365), d730=_somaDias(hoje,-730);
+    x.v12=0; x.v12ant=0;
+    x.peds.forEach(function(p){ if(p.dt>d365) x.v12+=_valPed(p); else if(p.dt>d730) x.v12ant+=_valPed(p); });
+    (porCli[x.cliId]=porCli[x.cliId]||[]).push(x);
+  });
+  var tickets=Object.keys(pares).map(function(k){return pares[k].ticket;}).filter(Boolean);
+  var ticketGeral=tickets.length?tickets.reduce(function(a,b){return a+b;},0)/tickets.length:0;
+  return {pares:pares, porCli:porCli, ticketGeral:ticketGeral, hoje:hoje};
+}
+function contatosCliente(c){ return (c&&c.hist||[]).filter(function(h){return h&&h.iso;}); }
+function ultimoContato(c){ var l=contatosCliente(c); return l.length?l[0]:null; }
+function _adiado(chave, hoje){ var a=DB.cicloAcoes&&DB.cicloAcoes[chave]; return a&&a.ate&&a.ate>=hoje; }
+var FILA_TIPOS={
+  tarefa:   {rot:'Lembrete',          cor:'var(--red)'},
+  orcamento:{rot:'Orçamento',         cor:'var(--org)'},
+  ciclo:    {rot:'Hora de comprar',   cor:'#7c3aed'},
+  queda:    {rot:'Comprando menos',   cor:'var(--red)'},
+  posvenda: {rot:'Pós-venda',         cor:'var(--grn)'},
+  lead:     {rot:'Lead',              cor:'var(--cyn)'},
+  cross:    {rot:'Oferecer outra marca', cor:'var(--acc)'},
+  geral:    {rot:'Contato',           cor:'var(--t2)'}
+};
+var filaFiltro='';
+var _filaCache=[];
+function montarFila(){
+  var I=indiceVendas(), hoje=I.hoje;
+  var itens={}; // chave → item
+  function item(chave, base){
+    if(!itens[chave]) itens[chave]=Object.assign({chave:chave, motivos:[], valor:0, empIds:[]}, base);
+    return itens[chave];
+  }
+  function addMotivo(it, tipo, txt, valor, empId, extra){
+    it.motivos.push(Object.assign({tipo:tipo, txt:txt, empId:empId||null}, extra||{}));
+    it.valor+=valor||0;
+    if(empId&&it.empIds.indexOf(empId)<0) it.empIds.push(empId);
+  }
+  var cliAtivo=function(c){ return c&&!c.encerrado; };
+
+  // 1) Lembretes / tarefas vencidos ou de hoje
+  (DB.tarefas||[]).forEach(function(t){
+    if(t.done||!t.dt||t.dt>hoje) return;
+    var c=t.cliId?DB.clientes.find(function(x){return x.id===t.cliId;}):null;
+    var chave=c?'cli:'+c.id:'tar:'+t.id;
+    var it=item(chave, c?{tipoAlvo:'cli', cli:c}:{tipoAlvo:'tar', tarefa:t});
+    var atras=_diasEntre(t.dt,hoje);
+    var par=c&&t.empId?I.pares[c.id+'|'+t.empId]:null;
+    addMotivo(it,'tarefa',esc(t.desc)+(atras>0?' <b style="color:var(--red)">('+atras+'d atrasado)</b>':' (hoje'+(t.hora?' '+esc(t.hora):'')+')'), par?par.ticket*0.3:0, t.empId, {tarefaId:t.id});
+    it.urgente=true;
+  });
+
+  // 2) Orçamentos em aberto: follow-up no 2º e 5º dia e na véspera de vencer
+  (DB.orcamentos||[]).forEach(function(o){
+    if(o.status!=='orcamento'||!o.cliId) return;
+    var c=DB.clientes.find(function(x){return x.id===o.cliId;}); if(!cliAtivo(c)) return;
+    var dt=o.dt||o.dtCriacao; if(!dt) return;
+    var pontos=[_somaDias(dt,2), _somaDias(dt,5)];
+    if(o.validade) pontos.push(_somaDias(o.validade,-1));
+    var devidos=pontos.filter(function(p){return p<=hoje;}).sort();
+    if(!devidos.length) return;
+    var ultPonto=devidos[devidos.length-1];
+    if(o.ultFollowup && o.ultFollowup>=ultPonto) return;
+    if(o.validade && _diasEntre(o.validade,hoje)>7) return; // vencido há mais de uma semana: sai da fila
+    var it=item('cli:'+c.id,{tipoAlvo:'cli', cli:c});
+    var venc=o.validade?(o.validade<hoje?'vencido em '+fmtD(o.validade):'válido até '+fmtD(o.validade)):'';
+    addMotivo(it,'orcamento','Orçamento '+esc(o.num||'')+' de '+fmt(o.total||0)+' sem resposta há '+_diasEntre(dt,hoje)+'d'+(venc?' · '+venc:''), (o.total||0)*0.5, o.empId, {orcId:o.id, valorOrc:o.total, numOrc:o.num});
+  });
+
+  // 3) Ciclo de compra (mesma regra dos Alertas de Ciclo)
+  alertasCicloLista().forEach(function(a){
+    if(!cliAtivo(a.cli)) return;
+    var par=a.e?I.pares[a.cli.id+'|'+a.e.id]:null;
+    var ticket=par?par.ticket:I.ticketGeral;
+    var atraso=a.intervMedio?a.diasSem/a.intervMedio:1;
+    var prob=a.proximo?0.6:atraso>2.5?0.25:a.atrasado?0.5:0.4;
+    var txt=(a.atrasado?'Atrasado: ':a.proximo?'Perto de comprar: ':'Mês habitual: ')+a.diasSem+'d sem comprar (costuma comprar a cada '+a.intervMedio+'d)';
+    addMotivo(item('cli:'+a.cli.id,{tipoAlvo:'cli',cli:a.cli}),'ciclo',txt,ticket*prob,a.e&&a.e.id,{dias:a.diasSem});
+  });
+
+  // 4) Comprando menos (queda de volume)
+  Object.keys(I.pares).forEach(function(k){
+    var x=I.pares[k]; if(x.tendencia===null||x.tendencia>=0.6) return;
+    var c=DB.clientes.find(function(y){return y.id===x.cliId;}); if(!cliAtivo(c)) return;
+    if(_adiado('cli:'+c.id,hoje)||_adiado(c.id,hoje)) return;
+    addMotivo(item('cli:'+c.id,{tipoAlvo:'cli',cli:c}),'queda','Últimos pedidos '+Math.round((1-x.tendencia)*100)+'% menores que a média ('+fmt(x.ticket)+')', x.ticket*(1-x.tendencia)*0.5, x.empId);
+  });
+
+  // 5) Pós-venda: faturados há 7–15 dias, sem contato registrado depois do faturamento
+  DB.pedidos.forEach(function(p){
+    if(p.cancelado||!p.dtFat) return;
+    var d=_diasEntre(p.dtFat,hoje); if(d<7||d>15) return;
+    var c=DB.clientes.find(function(x){return x.id===p.cliId;}); if(!cliAtivo(c)) return;
+    var uc=ultimoContato(c); if(uc&&uc.iso>=p.dtFat) return;
+    addMotivo(item('cli:'+c.id,{tipoAlvo:'cli',cli:c}),'posvenda','Pedido '+esc(p.nf?'NF '+p.nf:p.num||'')+' faturado há '+d+'d — confirmar entrega e satisfação', _valPed(p)*0.1, p.empId, {nf:p.nf||p.num});
+  });
+
+  // 6) Leads: visita agendada vencida/hoje, ou parados há 7+ dias
+  (DB.leads||[]).forEach(function(l){
+    if(l.estagio==='Convertido'||l.estagio==='Perdido') return;
+    var ult=l.ultContato||l.dtCriacao||null;
+    var txt=null;
+    if(l.visita&&l.visita<=hoje) txt='Visita marcada para '+fmtD(l.visita);
+    else if(!ult) txt='Lead sem nenhum contato registrado';
+    else if(_diasEntre(ult,hoje)>=7) txt='Sem contato há '+_diasEntre(ult,hoje)+'d · estágio: '+esc(l.estagio||'Novo');
+    if(!txt) return;
+    var peso={'Negociação':0.5,'Proposta enviada':0.35,'Contato feito':0.2}[l.estagio]||0.1;
+    addMotivo(item('lead:'+l.id,{tipoAlvo:'lead',lead:l}),'lead',txt,I.ticketGeral*peso,null);
+  });
+
+  // 7) Oferecer outra marca (cross-sell) — as 5 melhores oportunidades
+  oportunidadesCross(I).slice(0,5).forEach(function(o){
+    addMotivo(item('cli:'+o.cli.id,{tipoAlvo:'cli',cli:o.cli}),'cross','Compra '+esc(o.compraDe.map(_nomeEmp).join(', '))+' mas nunca comprou '+esc(_nomeEmp(o.empId))+' ('+o.fitPct+'% dos clientes de '+esc(o.cli.seg||'mesmo perfil')+' compram)', o.pot*0.3, o.empId, {empCross:o.empId});
+  });
+
+  // Tira da fila quem foi adiado (contatado/sem interesse) — exceto lembretes vencidos
+  var lista=Object.keys(itens).map(function(k){return itens[k];}).filter(function(it){
+    var temTarefa=it.motivos.some(function(m){return m.tipo==='tarefa';});
+    if(temTarefa) return true;
+    var chaveAdiar=it.tipoAlvo==='cli'?it.cli.id:it.chave;
+    return !_adiado(chaveAdiar,hoje);
+  });
+  lista.forEach(function(it){
+    it.tipos=it.motivos.map(function(m){return m.tipo;});
+    it.score=it.valor+(it.urgente?1e9:0);
+    if(it.tipoAlvo==='cli'){ var pc=I.porCli[it.cli.id]||[]; it.ticketCli=pc.length?pc.reduce(function(a,x){return a+x.ticket;},0)/pc.length:0; }
+  });
+  lista.sort(function(a,b){return b.score-a.score;});
+  return lista;
+}
+function _contatosHoje(){
+  var hoje=dataISO(new Date()), n=0, pedidos=0, semana=_somaDias(hoje,-6), pedSem=0;
+  DB.clientes.forEach(function(c){ contatosCliente(c).forEach(function(h){ if(h.iso===hoje) n++; if(h.iso>=semana&&h.resultado==='pedido') pedSem++; }); });
+  (DB.leads||[]).forEach(function(l){ (l.contatos||[]).forEach(function(h){ if(h.iso===hoje) n++; }); });
+  return {hoje:n, pedSemana:pedSem};
+}
+var MODELOS_PADRAO=[
+  {id:'m_ciclo',   tipo:'ciclo',    nome:'Hora de repor',        texto:'Olá {comprador}! Tudo bem? Já faz {dias} dias do último pedido da {cliente} com a {empresa}. Pelo seu ritmo de compra, deve estar na hora de repor. Quer que eu te mande as novidades ou já monto o pedido com base no anterior?'},
+  {id:'m_orc',     tipo:'orcamento',nome:'Retorno do orçamento', texto:'Olá {comprador}! Conseguiu avaliar o orçamento {num_orcamento} de {valor_orcamento}? Se precisar ajustar quantidade, prazo ou condição de pagamento, me avisa que eu vejo com a {empresa}.'},
+  {id:'m_pos',     tipo:'posvenda', nome:'Pós-venda',            texto:'Olá {comprador}! Passando para saber se o pedido {nf} chegou certinho e se está tudo ok com a mercadoria. Qualquer coisa, estou à disposição!'},
+  {id:'m_queda',   tipo:'queda',    nome:'Comprando menos',      texto:'Olá {comprador}! Notei que os últimos pedidos da {cliente} ficaram menores que de costume. Aconteceu alguma coisa com o giro ou com os produtos da {empresa}? Posso te ajudar com alguma condição especial ou troca de mix.'},
+  {id:'m_cross',   tipo:'cross',    nome:'Oferecer outra marca', texto:'Olá {comprador}! Além da linha que você já trabalha comigo, também represento a {empresa_oferta}, que tem vendido muito bem em lojas do seu perfil aqui na região. Posso te mostrar o catálogo? Leva 5 minutos.'},
+  {id:'m_lead',    tipo:'lead',     nome:'Primeiro contato (lead)', texto:'Olá {comprador}! Aqui é {meu_nome}, representante comercial. Trabalho com marcas que podem complementar o mix da {cliente}. Posso te apresentar rapidamente?'},
+  {id:'m_tarefa',  tipo:'tarefa',   nome:'Retorno combinado',    texto:'Olá {comprador}! Conforme combinamos, estou retornando o contato. Podemos falar agora?'},
+  {id:'m_geral',   tipo:'geral',    nome:'Novidades',            texto:'Olá {comprador}! Tudo bem? Chegaram novidades na {empresa} e lembrei da {cliente}. Posso te mandar o catálogo?'}
+];
+function getModelos(){
+  if(!DB.modelos||!DB.modelos.length){ DB.modelos=MODELOS_PADRAO.map(function(m){return Object.assign({},m);}); }
+  return DB.modelos;
+}
+function preencherModelo(texto, ctx){
+  var cfg=loadCfg();
+  var v={comprador:ctx.comprador||'', cliente:ctx.cliente||'', dias:ctx.dias!=null?ctx.dias:'', empresa:ctx.empresa||'', empresa_oferta:ctx.empresa_oferta||ctx.empresa||'',
+         num_orcamento:ctx.num_orcamento||'', valor_orcamento:ctx.valor_orcamento?fmt(ctx.valor_orcamento):'', nf:ctx.nf||'', cidade:ctx.cidade||'', meu_nome:cfg.nome||'', ultimo_pedido:ctx.ultimo_pedido||''};
+  return String(texto||'').replace(/\{(\w+)\}/g,function(m,k){ return v.hasOwnProperty(k)?v[k]:m; }).replace(/Olá !/g,'Olá!').replace(/ {2,}/g,' ');
+}
+function _ctxItem(it, motivo){
+  var ctx={};
+  if(it.tipoAlvo==='cli'){
+    var c=it.cli; ctx.comprador=c.comp||''; ctx.cliente=c.rs; ctx.cidade=c.cid||'';
+    var empId=(motivo&&motivo.empId)||it.empIds[0]||c.empId; ctx.empresa=_nomeEmp(empId);
+    ctx.dias=dias(c)<999?dias(c):'';
+    if(motivo&&motivo.dias!=null) ctx.dias=motivo.dias;
+    if(motivo&&motivo.numOrc){ ctx.num_orcamento=motivo.numOrc; ctx.valor_orcamento=motivo.valorOrc; }
+    if(motivo&&motivo.nf) ctx.nf=motivo.nf;
+    if(motivo&&motivo.empCross){ ctx.empresa_oferta=_nomeEmp(motivo.empCross); }
+    if(c.ultFat) ctx.ultimo_pedido=fmtD(c.ultFat);
+  } else if(it.tipoAlvo==='lead'){
+    ctx.comprador=it.lead.nome||''; ctx.cliente=it.lead.empresa||it.lead.nome||''; ctx.cidade=it.lead.cidade||'';
+  }
+  return ctx;
+}
+var RESULTADOS={
+  pedido:     {rot:'Fez pedido',            ic:'ti-shopping-cart-check', cor:'var(--grn)'},
+  retornar:   {rot:'Retornar em…',          ic:'ti-calendar-repeat',     cor:'var(--acc)'},
+  semestoque: {rot:'Ainda tem estoque',     ic:'ti-packages',            cor:'var(--cyn)'},
+  naoatendeu: {rot:'Não atendeu / sem resposta', ic:'ti-phone-off',      cor:'var(--org)'},
+  seminteresse:{rot:'Sem interesse agora',  ic:'ti-thumb-down',          cor:'var(--red)'}
+};
+function oportunidadesCross(I){
+  I=I||indiceVendas();
+  var hoje=I.hoje, d365=_somaDias(hoje,-365);
+  var empsAtivas=DB.empresas.filter(function(e){return !e.encerrada&&!e.inativa;});
+  if(empsAtivas.length<2) return [];
+  // Quem compra de quem (últimos 12 meses)
+  var compra={}; // cliId → {empId:valor12m}
+  Object.keys(I.pares).forEach(function(k){ var x=I.pares[k]; if(x.ult<d365) return; (compra[x.cliId]=compra[x.cliId]||{})[x.empId]=x.v12||x.total; });
+  // Por segmento: % de clientes ativos que compram cada empresa
+  var seg={};
+  Object.keys(compra).forEach(function(cid){
+    var c=DB.clientes.find(function(x){return x.id===cid;}); if(!c) return;
+    var s=c.seg||'(sem segmento)'; seg[s]=seg[s]||{n:0,emp:{}}; seg[s].n++;
+    Object.keys(compra[cid]).forEach(function(e){ seg[s].emp[e]=(seg[s].emp[e]||0)+1; });
+  });
+  // Ticket médio de cada empresa (para estimar o valor de um primeiro pedido)
+  var tk={}; Object.keys(I.pares).forEach(function(k){ var x=I.pares[k]; (tk[x.empId]=tk[x.empId]||[]).push(x.ticket); });
+  Object.keys(tk).forEach(function(e){ tk[e]=tk[e].reduce(function(a,b){return a+b;},0)/tk[e].length; });
+  var ops=[];
+  Object.keys(compra).forEach(function(cid){
+    var c=DB.clientes.find(function(x){return x.id===cid;}); if(!c||c.encerrado) return;
+    var s=seg[c.seg||'(sem segmento)']; if(!s||s.n<2) return;
+    var vol=Object.keys(compra[cid]).reduce(function(a,e){return a+compra[cid][e];},0);
+    empsAtivas.forEach(function(e){
+      if(compra[cid][e.id]) return;
+      if(c.naoAtendido&&c.naoAtendido[e.id]) return;
+      var nEmp=s.emp[e.id]||0; if(!nEmp) return;
+      var fit=nEmp/s.n;
+      ops.push({cli:c, empId:e.id, compraDe:Object.keys(compra[cid]), fitPct:Math.round(fit*100), vol:vol, score:vol*fit, pot:(tk[e.id]||0)*fit});
+    });
+  });
+  ops.sort(function(a,b){return b.score-a.score;});
+  return ops;
+}
+
+// ════════════════════════════════════════════════════════════
+// FILA DO DIA — versão celular (mesma lógica do computador)
+// ════════════════════════════════════════════════════════════
+function _chipEmp(id){ return '<span style="display:inline-flex;align-items:center;gap:4px;font-size:13px;color:var(--t2);margin-right:6px"><span style="width:8px;height:8px;border-radius:50%;background:'+_corEmp(id)+'"></span>'+esc(_nomeEmp(id))+'</span>'; }
+function _telItem(it){ return it.tipoAlvo==='cli'?telWpp(it.cli):((it.lead&&it.lead.tel)||'').replace(/\D/g,''); }
+function _wppM(tel, texto){
+  var n=(tel||'').replace(/\D/g,''); if(!n){ toastM('Sem telefone cadastrado'); return; }
+  if(n.indexOf('55')!==0) n='55'+n;
+  window.open('https://wa.me/'+n+(texto?'?text='+encodeURIComponent(texto):''),'_blank');
+}
+function atualizarBadgeHojeM(){
+  try{ var n=montarFila().length; var b=document.getElementById('badge-hoje-m'); if(b){ b.textContent=n; b.style.display=n?'':'none'; } return n; }catch(e){ return 0; }
+}
+function renderHojeM(){
+  var cont=document.getElementById('main-content');
+  var lista=montarFila(); _filaCache=lista;
+  var cont2={}; lista.forEach(function(it){ it.tipos.forEach(function(t){ cont2[t]=(cont2[t]||0)+1; }); });
+  var st=_contatosHoje(), pot=lista.reduce(function(a,it){return a+(it.valor||0);},0);
+  var b=document.getElementById('badge-hoje-m'); if(b){ b.textContent=lista.length; b.style.display=lista.length?'':'none'; }
+  var vis=filaFiltro?lista.filter(function(it){return it.tipos.indexOf(filaFiltro)>=0;}):lista;
+  var h='<div class="section">'
+    +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">'
+    +_kpiM(lista.length,'na fila','var(--acc)')+_kpiM(fmt(pot),'em jogo','var(--grn)')+_kpiM(st.hoje,'contatos hoje','#7c3aed')+'</div>'
+    +'<div class="chips"><button class="chip'+(filaFiltro===''?' act':'')+'" onclick="filaFiltro=\'\';renderHojeM()">Todos '+lista.length+'</button>'
+    +Object.keys(FILA_TIPOS).filter(function(t){return cont2[t];}).map(function(t){ return '<button class="chip'+(filaFiltro===t?' act':'')+'" onclick="filaFiltro=\''+t+'\';renderHojeM()">'+FILA_TIPOS[t].rot+' '+cont2[t]+'</button>'; }).join('')+'</div>';
+  if(!vis.length){
+    h+='<div class="card" style="text-align:center;color:var(--grn);padding:28px 14px;font-size:17px"><i class="ti ti-circle-check" style="font-size:34px"></i><br>Fila zerada. Bom trabalho!</div>';
+  } else {
+    h+=vis.map(function(it){
+      var idx=lista.indexOf(it), tel=_telItem(it);
+      var nome, sub;
+      if(it.tipoAlvo==='cli'){ nome=esc(it.cli.rs); sub=esc([it.cli.comp,it.cli.cid].filter(Boolean).join(' · ')); }
+      else if(it.tipoAlvo==='lead'){ nome=esc(it.lead.empresa||it.lead.nome)+' <span style="font-size:12px;color:var(--cyn,#0891b2)">LEAD</span>'; sub=esc([it.lead.nome,it.lead.cidade].filter(Boolean).join(' · ')); }
+      else { nome=esc(it.tarefa.desc); sub='Lembrete sem cliente'; }
+      var mot=it.motivos.map(function(m){ var T=FILA_TIPOS[m.tipo]; return '<div style="margin-top:6px;font-size:14px;color:var(--t2);line-height:1.35"><span style="font-size:11px;font-weight:700;color:'+T.cor+';border:1px solid '+T.cor+';border-radius:20px;padding:1px 7px;margin-right:5px;white-space:nowrap">'+T.rot+'</span>'+(m.empId?_chipEmp(m.empId):'')+m.txt+'</div>'; }).join('');
+      var uc=it.tipoAlvo==='cli'?ultimoContato(it.cli):null;
+      var btns;
+      if(it.tipoAlvo==='tar') btns='<button class="btn bp" style="flex:1;padding:10px" onclick="concluirTarefaFilaM(\''+it.tarefa.id+'\')"><i class="ti ti-check"></i> Concluir</button>';
+      else btns='<button class="btn bs" style="flex:1;padding:10px;color:#16a34a;border-color:#16a34a" '+(tel?'':'disabled')+' onclick="abrirMensagemM('+idx+')"><i class="ti ti-brand-whatsapp"></i> WhatsApp</button>'
+        +'<button class="btn bs" style="padding:10px 14px" '+(tel?'':'disabled')+' onclick="ligarFilaM('+idx+')"><i class="ti ti-phone"></i></button>'
+        +'<button class="btn bp" style="flex:1;padding:10px" onclick="abrirResultadoM('+idx+')"><i class="ti ti-checklist"></i> Registrar</button>';
+      return '<div class="card" style="padding:12px">'
+        +'<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div style="min-width:0">'
+        +'<div style="font-size:17px;font-weight:700;color:var(--t1)"'+(it.tipoAlvo==='cli'?' onclick="abrirClienteM(\''+it.cli.id+'\')"':'')+'>'+(idx+1)+'. '+nome+'</div>'
+        +(sub?'<div style="font-size:13px;color:var(--t3)">'+sub+'</div>':'')+'</div>'
+        +(it.valor>0?'<div style="font-size:15px;font-weight:700;color:var(--grn);white-space:nowrap">'+fmt(it.valor)+'</div>':'')+'</div>'
+        +mot
+        +(uc?'<div style="font-size:12px;color:var(--t3);margin-top:6px"><i class="ti ti-history"></i> '+fmtD(uc.iso)+' · '+esc(uc.resultadoTxt||uc.txt||'')+'</div>':'')
+        +'<div style="display:flex;gap:6px;margin-top:10px">'+btns+'</div></div>';
+    }).join('');
+  }
+  h+='<div style="font-size:12px;color:var(--t3);padding:4px 2px 20px">Mande a mensagem pronta ou ligue e toque em <b>Registrar</b>: o próximo contato é agendado sozinho e o cliente sai da fila até lá.</div></div>';
+  cont.innerHTML=h;
+}
+function _kpiM(v,l,c){ return '<div class="card" style="margin:0;padding:10px;text-align:center"><div style="font-size:18px;font-weight:800;color:'+c+'">'+v+'</div><div style="font-size:11px;color:var(--t3)">'+l+'</div></div>'; }
+function concluirTarefaFilaM(id){ var t=DB.tarefas.find(function(x){return x.id===id;}); if(!t) return; t.done=true; salvarDB(); toastM('Lembrete concluído'); renderHojeM(); }
+function ligarFilaM(idx){
+  var it=_filaCache[idx]; if(!it) return;
+  var tel=it.tipoAlvo==='cli'?(melhorTelM(it.cli)):_telItem(it);
+  if(!tel){ toastM('Sem telefone'); return; }
+  window.location.href='tel:'+tel;
+  setTimeout(function(){ abrirResultadoM(idx,'Ligação'); },800);
+}
+function melhorTelM(c){ var cel=(c.cel||'').replace(/\D/g,''), f=(c.fone||'').replace(/\D/g,''); return cel.length>=10?cel:(f||cel); }
+
+// Mensagem pronta
+var _msgAtualM=null;
+function abrirMensagemM(idx){
+  var it=_filaCache[idx]; if(!it) return;
+  _msgAtualM={idx:idx, it:it};
+  var mods=getModelos(), m0=it.motivos[0]||{tipo:'geral'};
+  var pref=mods.find(function(m){return m.tipo===m0.tipo;})||mods[0];
+  document.getElementById('msgm-para').textContent=(it.tipoAlvo==='cli'?it.cli.rs:(it.lead.empresa||it.lead.nome))+' · '+_telItem(it);
+  document.getElementById('msgm-motivo').innerHTML=it.motivos.map(function(m,i){ return '<option value="'+i+'">'+FILA_TIPOS[m.tipo].rot+(m.empId?' · '+esc(_nomeEmp(m.empId)):'')+'</option>'; }).join('');
+  document.getElementById('msgm-modelo').innerHTML=mods.map(function(m){ return '<option value="'+m.id+'"'+(m===pref?' selected':'')+'>'+esc(m.nome)+'</option>'; }).join('');
+  atualizarMensagemM();
+  abrirModal('mMsgM');
+}
+function msgTrocouMotivoM(){
+  var m=_msgAtualM.it.motivos[+document.getElementById('msgm-motivo').value]||{};
+  var mod=getModelos().find(function(x){return x.tipo===m.tipo;}); if(mod) document.getElementById('msgm-modelo').value=mod.id;
+  atualizarMensagemM();
+}
+function atualizarMensagemM(){
+  var it=_msgAtualM.it, m=it.motivos[+document.getElementById('msgm-motivo').value]||it.motivos[0];
+  var mod=getModelos().find(function(x){return x.id===document.getElementById('msgm-modelo').value;});
+  document.getElementById('msgm-texto').value=preencherModelo(mod?mod.texto:'', _ctxItem(it,m));
+}
+function enviarMensagemM(){
+  var it=_msgAtualM.it;
+  _wppM(_telItem(it), document.getElementById('msgm-texto').value);
+  fecharModal('mMsgM');
+  setTimeout(function(){ abrirResultadoM(_msgAtualM.idx,'WhatsApp',true); },600);
+}
+function copiarMensagemM(){
+  var t=document.getElementById('msgm-texto'); t.select();
+  try{ navigator.clipboard.writeText(t.value); }catch(e){ document.execCommand('copy'); }
+  toastM('Mensagem copiada');
+}
+
+// Resultado do contato
+var _resAtualM=null;
+function abrirResultadoM(idx, canal, depoisMsg){
+  var it=_filaCache[idx]; if(!it) return;
+  _resAtualM={idx:idx, it:it, res:null};
+  document.getElementById('resm-alvo').textContent=it.tipoAlvo==='cli'?it.cli.rs:(it.lead.empresa||it.lead.nome);
+  document.getElementById('resm-dica').textContent=depoisMsg?'Mandou a mensagem? Se ainda não responderam, marque "sem resposta" e volta para a fila amanhã.':'';
+  document.getElementById('resm-canal').value=canal||'WhatsApp';
+  document.getElementById('resm-obs').value='';
+  document.getElementById('resm-dias').value='7';
+  document.getElementById('resm-dias-box').style.display='none';
+  document.getElementById('resm-opcoes').innerHTML=Object.keys(RESULTADOS).map(function(k){ var r=RESULTADOS[k];
+    return '<button type="button" class="resm-op" data-k="'+k+'" onclick="escolherResultadoM(\''+k+'\')" style="padding:12px 8px;border:1.5px solid var(--bdr);border-radius:12px;background:none;color:var(--t1);font-size:14px;font-weight:600;display:flex;align-items:center;gap:6px;justify-content:center"><i class="ti '+r.ic+'" style="color:'+r.cor+';font-size:18px"></i>'+r.rot+'</button>'; }).join('');
+  abrirModal('mResM');
+}
+function escolherResultadoM(k){
+  _resAtualM.res=k;
+  document.querySelectorAll('#resm-opcoes .resm-op').forEach(function(e){ var on=e.dataset.k===k; e.style.borderColor=on?'var(--acc)':'var(--bdr)'; e.style.background=on?'rgba(37,99,235,.12)':'none'; });
+  document.getElementById('resm-dias-box').style.display=(k==='retornar'||k==='semestoque')?'block':'none';
+  if(k==='semestoque') document.getElementById('resm-dias').value='15';
+  if(k==='retornar') document.getElementById('resm-dias').value='7';
+}
+function salvarResultadoM(){
+  var R=_resAtualM; if(!R||!R.res){ toastM('Escolha o que aconteceu'); return; }
+  var it=R.it, hoje=dataISO(new Date());
+  var canal=document.getElementById('resm-canal').value, obs=document.getElementById('resm-obs').value.trim();
+  var nDias=Math.max(1,parseInt(document.getElementById('resm-dias').value)||7);
+  var voltaEm={pedido:null, retornar:nDias, semestoque:nDias, naoatendeu:1, seminteresse:60}[R.res];
+  var resTxt=RESULTADOS[R.res].rot.replace('…',' '+nDias+' dias');
+  var reg={dt:new Date().toLocaleDateString('pt-BR'), iso:hoje, canal:canal, resultado:R.res, resultadoTxt:resTxt, motivos:it.motivos.map(function(m){return m.tipo;}), txt:'['+canal+'] '+resTxt+(obs?' — '+obs:'')};
+  if(!DB.cicloAcoes||Array.isArray(DB.cicloAcoes)) DB.cicloAcoes={};
+  var nome;
+  if(it.tipoAlvo==='cli'){
+    var c=it.cli; nome=c.rs;
+    c.hist=c.hist||[]; c.hist.unshift(reg);
+    it.motivos.forEach(function(m){
+      if(m.tarefaId){ var t=DB.tarefas.find(function(x){return x.id===m.tarefaId;}); if(t) t.done=true; }
+      if(m.orcId){ var o=(DB.orcamentos||[]).find(function(x){return x.id===m.orcId;}); if(o) o.ultFollowup=hoje; }
+    });
+    if(R.res==='pedido'){
+      var I=indiceVendas(), empId=it.empIds[0]||c.empId, par=I.pares[c.id+'|'+empId];
+      DB.cicloAcoes[c.id]={tipo:'pedido', ate:_somaDias(hoje, par&&par.interv?Math.max(7,Math.round(par.interv*0.8)):30), dt:hoje};
+    } else DB.cicloAcoes[c.id]={tipo:R.res, ate:_somaDias(hoje,voltaEm-1), dt:hoje};
+    if(R.res==='retornar'||R.res==='semestoque'||R.res==='naoatendeu')
+      DB.tarefas.push({id:uid(), desc:(R.res==='naoatendeu'?'Tentar de novo: ':'Retornar: ')+c.rs+(obs?' — '+obs:''), dt:_somaDias(hoje,voltaEm), hora:null, empId:it.empIds[0]||c.empId||null, cliId:c.id, tipo:'telefonema', importante:false, done:false, origem:'fila'});
+  } else if(it.tipoAlvo==='lead'){
+    var l=it.lead; nome=l.empresa||l.nome;
+    l.contatos=l.contatos||[]; l.contatos.unshift(reg); l.ultContato=hoje;
+    if(!l.estagio||l.estagio==='Novo') l.estagio='Contato feito';
+    if(R.res==='seminteresse') l.estagio='Perdido';
+    l.obs=((l.obs||'')+'\n'+reg.dt+' '+reg.txt).trim();
+    DB.cicloAcoes['lead:'+l.id]={tipo:R.res, ate:_somaDias(hoje,(voltaEm||7)-1), dt:hoje};
+    if(R.res==='retornar'||R.res==='semestoque'||R.res==='naoatendeu') l.visita=_somaDias(hoje,voltaEm);
+  }
+  salvarDB(); fecharModal('mResM');
+  toastM('✅ '+nome+': '+resTxt,2600);
+  if(R.res==='pedido'&&it.tipoAlvo==='cli'){ var eid=it.empIds[0]||it.cli.empId; if(eid) empAtualM=eid; setTimeout(function(){ prepNovoPedidoM(it.cli.id); setTimeout(function(){ var sel=document.getElementById('mped-cli'); if(sel&&![].some.call(sel.options,function(o){return o.value===it.cli.id;})) sel.insertAdjacentHTML('afterbegin','<option value="'+it.cli.id+'">'+esc(it.cli.rs)+'</option>'); if(sel) sel.value=it.cli.id; },250); },400); }
+  renderHojeM();
+}
+
+function bannerFilaDashM(){
+  try{
+    var n=montarFila(), pot=n.reduce(function(a,it){return a+(it.valor||0);},0);
+    if(!n.length) return;
+    var cont=document.getElementById('main-content');
+    cont.insertAdjacentHTML('afterbegin','<div class="section" style="padding-bottom:0"><div class="card" onclick="navM(\'hoje\')" style="border-left:4px solid #7c3aed;display:flex;align-items:center;gap:12px;cursor:pointer;margin:0"><i class="ti ti-list-check" style="font-size:28px;color:#7c3aed"></i><div style="flex:1"><div style="font-size:17px;font-weight:700;color:var(--t1)">Fila do dia: '+n.length+' contato(s)</div><div style="font-size:13px;color:var(--t3)">'+fmt(pot)+' em jogo · toque para começar</div></div><i class="ti ti-chevron-right" style="color:var(--t3)"></i></div></div>');
+  }catch(e){ console.warn(e); }
+}
+
 // ══ SINCRONIZAÇÃO SEGURA (igual à do computador) ══
 // Antes: cada salvamento substituía o banco inteiro na nuvem — inclusive
 // apagando produtos, orçamentos e modelos que só o computador usa — e ao abrir
 // o app a nuvem apagava o que estivesse só no celular. Agora junta registro por
 // registro e preserva o que o celular não conhece.
-var SYNC_COLS_M=['empresas','clientes','pedidos','tarefas','eventos','fiscal','finalidades','leads','fiscalLixeira'];
+var SYNC_COLS_M=['empresas','clientes','pedidos','tarefas','eventos','fiscal','finalidades','leads','fiscalLixeira','orcamentos','modelos'];
 function _canon(v){
   if(v===null||v===undefined) return undefined;
   if(Array.isArray(v)){ var a=v.map(_canon).filter(function(x){return x!==undefined;}); return a.length?a:undefined; }
@@ -955,8 +1485,8 @@ function renderNuvemAuthM(){
       +'<button class="btn bs" style="width:100%" onclick="nuvemSairM()"><i class="ti ti-logout"></i> Sair</button>';
   } else {
     box.innerHTML='<div style="font-size:11px;color:var(--t2);margin-bottom:6px">Entre com o mesmo e-mail e senha usados no computador.</div>'
-      +'<input class="fi" id="nuvem-auth-email-m" type="email" placeholder="E-mail" style="width:100%;margin-bottom:6px">'
-      +'<input class="fi" id="nuvem-auth-senha-m" type="password" placeholder="Senha" style="width:100%;margin-bottom:8px">'
+      +'<input class="fi" id="nuvem-auth-email-m" type="email" autocomplete="username" data-login="1" placeholder="E-mail" style="width:100%;margin-bottom:6px">'
+      +'<input class="fi" id="nuvem-auth-senha-m" type="password" autocomplete="current-password" data-login="1" placeholder="Senha" style="width:100%;margin-bottom:8px">'
       +'<div style="display:flex;gap:6px"><button class="btn bp" style="flex:1" onclick="nuvemEntrarM(false)">Entrar</button><button class="btn bs" style="flex:1" onclick="nuvemEntrarM(true)">Criar login</button></div>'
       +'<div id="nuvem-auth-status-m" style="font-size:11px;margin-top:6px;color:var(--t3)"></div>';
   }
@@ -1001,6 +1531,8 @@ function carregarDB(){
   DB.leads       = load('leads',[]);
   DB.cicloAcoes  = load('cicloAcoes',{});
   DB.fiscalLixeira = load('fiscalLixeira',[]);
+  DB.orcamentos = load('orcamentos',[]);
+  DB.modelos = load('modelos',[]);
 }
 function salvarDB(){
   save('empresas',   DB.empresas);
@@ -1023,6 +1555,8 @@ function salvarDB(){
   save('leads',       DB.leads||[]);
   save('cicloAcoes',  DB.cicloAcoes||{});
   save('fiscalLixeira', DB.fiscalLixeira||[]);
+  save('orcamentos', DB.orcamentos||[]);
+  save('modelos', DB.modelos||[]);
   arquivarNFs();
   salvarNuvemM();
 }
@@ -1059,7 +1593,8 @@ function navM(p){
 // ── Renderização principal ───────────────────────────────
 function renderM(){
   switch(paginaAtual){
-    case 'dash':     renderDashM(); break;
+    case 'dash':     renderDashM(); bannerFilaDashM(); break;
+    case 'hoje':     renderHojeM(); break;
     case 'clientes': renderClientesM(); break;
     case 'pedidos':  renderPedidosM(); break;
     case 'agenda':   renderAgendaM(); break;
@@ -1069,6 +1604,7 @@ function renderM(){
     case 'vendas':   renderVendasM(); break;
     case 'fiscal':   renderFiscalM(); break;
   }
+  if(paginaAtual!=='hoje') setTimeout(atualizarBadgeHojeM, 50);
 }
 
 // ══════════════════════════════
@@ -1098,7 +1634,7 @@ function renderDashM(){
   var cliEmp=DB.clientes.filter(c=>!c.encerrado&&DB.pedidos.some(p=>p.cliId===c.id&&p.empId===empAtualM));
   var ativos=cliEmp.filter(c=>dias(c)<=60).length;
   var inativos=cliEmp.filter(c=>dias(c)>90).length;
-  var alertasCiclo=calcAlertasCicloM();
+  var alertasCiclo=alertasCicloLista(); // mesma regra da Fila do dia
   var pedMes=ps.filter(p=>{if(!p.dt)return false;var d=new Date(p.dt+'T12:00');return d.getMonth()===mes&&d.getFullYear()===ano;});
   var ultPedidos=ps.filter(p=>p.dt).sort((a,b)=>b.dt>a.dt?1:-1).slice(0,30);
   var tarAtraso=DB.tarefas.filter(t=>t.dt&&t.dt<hjStr&&!t.done);
@@ -1131,33 +1667,13 @@ function renderDashM(){
   </div>
   <div style="display:flex;gap:8px;margin:8px 12px 0">
     ${briefingTileM(DB.tarefas.filter(t=>!t.done&&t.dt&&t.dt<=hjStr).length,'Tarefas pendentes','var(--red)',"navM('agenda')")}
-    ${briefingTileM(alertasCiclo.length,'Hora de comprar','#7c3aed',"document.getElementById('card-alertas-ciclo')?.scrollIntoView({behavior:'smooth'})")}
+    ${briefingTileM(alertasCiclo.length,'Hora de comprar','#7c3aed',"filaFiltro='ciclo';navM('hoje')")}
     ${briefingTileM(DB.pedidos.filter(p=>!p.dtFat&&!p.nf&&!p.cancelado).length,'Sem NF','var(--org)',"navM('pedidos')")}
   </div>
   ${tarAtraso.length?`<div class="card" style="margin:8px 12px 0;border-left:3px solid var(--red);padding:10px 12px">
     <div style="font-size:12px;font-weight:700;color:var(--red)"><i class="ti ti-alert-triangle"></i> ${tarAtraso.length} tarefa(s) atrasada(s)</div>
     ${tarAtraso.slice(0,2).map(t=>`<div style="font-size:11px;color:var(--t2);margin-top:4px">• ${t.desc} — ${fmtD(t.dt)}</div>`).join('')}
   </div>`:''}
-  <div class="card" id="card-alertas-ciclo" style="margin:8px 12px 0">
-    <div class="card-title"><i class="ti ti-repeat" style="color:#7c3aed"></i>Alertas de Ciclo de Compra</div>
-    ${!alertasCiclo.length?`<div style="color:var(--grn);font-size:12px;padding:4px 0"><i class="ti ti-circle-check"></i> Todos os clientes dentro do ciclo ou já contatados! 🎉</div>`:
-    alertasCiclo.slice(0,8).map(a=>{
-      var cor=a.atrasado?'var(--red)':a.proximo?'var(--org)':'var(--cyn)';
-      var txt=a.atrasado?'⚠️ Atrasado':a.proximo?'🕐 Próximo':'📅 Mês habitual pendente';
-      return `<div class="list-item" style="flex-wrap:wrap">
-        <div class="list-body" onclick="abrirClienteM('${a.cli.id}')" style="cursor:pointer">
-          <div class="list-name">${a.cli.rs}</div>
-          <div class="list-sub" style="color:${cor}">${txt} · ${a.diasSem}d sem comprar (média ${a.intervMedio}d)</div>
-        </div>
-        <div style="display:flex;gap:4px">
-          <button class="nota-btn" onclick="wppFollowUpCicloM('${a.cli.id}')" title="WhatsApp"><i class="ti ti-brand-whatsapp" style="color:var(--grn)"></i></button>
-          <button class="nota-btn" onclick="emailFollowUpCicloM('${a.cli.id}')" title="E-mail"><i class="ti ti-mail" style="color:var(--acc)"></i></button>
-          <button class="nota-btn" onclick="cicloAcaoM('${a.cli.id}','contatado')" title="Marcar como contatado (some por 7 dias)"><i class="ti ti-phone-check" style="color:var(--grn)"></i></button>
-          <button class="nota-btn" onclick="cicloAcaoM('${a.cli.id}','seminteresse')" title="Sem interesse neste ciclo"><i class="ti ti-x" style="color:var(--red)"></i></button>
-        </div>
-      </div>`;
-    }).join('')}
-  </div>
   <div class="card" id="card-ia-assistente-m" style="margin:8px 12px 0">
     <div class="card-title"><i class="ti ti-sparkles" style="color:var(--acc)"></i>Perguntar à IA</div>
     <div id="ia-msgs-box-m" style="max-height:220px;overflow-y:auto;font-size:12px;margin-bottom:8px"></div>
@@ -1166,7 +1682,6 @@ function renderDashM(){
       <button class="btn bp" style="padding:8px 12px" onclick="iaPerguntarLivreM()"><i class="ti ti-send"></i></button>
     </div>
   </div>
-  ${renderCardPosVendasM()}
   <div class="emp-tabs">${empTabs}</div>
   <div class="section">
     <div class="metrics">
@@ -3782,6 +4297,8 @@ function salvarLocal_M(){
   save('leads',       DB.leads||[]);
   save('cicloAcoes',  DB.cicloAcoes||{});
   save('fiscalLixeira', DB.fiscalLixeira||[]);
+  save('orcamentos', DB.orcamentos||[]);
+  save('modelos', DB.modelos||[]);
   arquivarNFs();
 }
 
