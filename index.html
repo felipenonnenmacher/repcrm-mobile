@@ -3116,7 +3116,7 @@ function renderLeadsM(){
   html+='<input class="fi" id="lead-empresa-m" placeholder="Empresa / Loja" style="font-size:14px;padding:10px">';
   html+='<input class="fi" id="lead-tel-m" placeholder="Telefone / WhatsApp" type="tel" style="font-size:14px;padding:10px">';
   html+='<input class="fi" id="lead-cidade-m" placeholder="Cidade" style="font-size:14px;padding:10px">';
-  html+='<select class="fi" id="lead-origem-m" style="font-size:14px;padding:10px"><option value="">Origem —</option><option>Indicação</option><option>Feira</option><option>Redes Sociais</option><option>Cold Call</option><option>Visita</option><option>Site</option><option>WhatsApp</option><option>Cartão de visita</option><option>Outro</option></select>';
+  html+='<select class="fi" id="lead-origem-m" style="font-size:14px;padding:10px"><option value="">Origem —</option><option>Indicação</option><option>Feira</option><option>Redes Sociais</option><option>Cold Call</option><option>Visita</option><option>Site</option><option>WhatsApp</option><option>Cartão de visita</option><option>Prospecção (mapa)</option><option>Outro</option></select>';
   html+='<select class="fi" id="lead-estagio-m" style="font-size:14px;padding:10px"><option>Novo</option><option>Contato feito</option><option>Proposta enviada</option><option>Negociação</option><option>Convertido</option><option>Perdido</option></select>';
   html+='<input class="fi" id="lead-visita-m" type="date" style="font-size:14px;padding:10px">';
   html+='<textarea class="fi" id="lead-obs-m" placeholder="Observações" style="font-size:14px;padding:10px;height:80px;resize:none"></textarea>';
@@ -3207,6 +3207,7 @@ function converterLeadM(id){
   var l=DB.leads.find(function(x){return x.id===id;}); if(!l) return;
   if(!confirm('Converter "'+l.nome+'" em cliente?')) return;
   var novoCli={id:uid(),rs:l.empresa||l.nome,comp:l.nome,fone:l.tel,cel:l.tel,cid:l.cidade,uf:'',obs:l.obs||'',email:'',cnpj:'',empId:DB.empresas[0]?.id||'',rede:'',ultFat:null,hist:[]};
+  if(l.end) novoCli.end=l.end; if(l.placeId) novoCli.placeId=l.placeId; if(l.geo) novoCli.geo=Object.assign({},l.geo,{q:''}); if(l.origem==='Prospecção (mapa)') novoCli.comp='';
   if(!DB.clientes) DB.clientes=[];
   DB.clientes.push(novoCli);
   l.estagio='Convertido';
@@ -3526,7 +3527,7 @@ function renderMaisM(){
     <div class="card">
       <div class="list-item" style="padding:12px 0" onclick="navM('proximos')">
         <i class="ti ti-map-pin" style="font-size:22px;color:var(--acc2)"></i>
-        <div class="list-body"><div class="list-name">📍 Clientes Próximos</div><div class="list-sub">Encontrar clientes na sua cidade atual</div></div>
+        <div class="list-body"><div class="list-name">🗺️ Mapa &amp; Prospecção</div><div class="list-sub">Lojas com potencial na sua rota e clientes perto de você</div></div>
         <i class="ti ti-chevron-right" style="color:var(--t3)"></i>
       </div>
       <div class="list-item" style="padding:12px 0" onclick="navM('vendas')">
@@ -3710,748 +3711,466 @@ function salvarCfgM(){
 }
 
 
-// ── Busca lojas por segmento (Google Places API v1) ──────
 
+// ════════════════════════════════════════════════════════════════
+// MAPA & PROSPECÇÃO (refeito do zero)
+//  • Prospects perto de mim / na rota do dia / numa cidade
+//  • Busca: Google Places API (New) — Text Search, com cache de 7 dias
+//  • Nota 0–100: tipo de loja × perfil dos seus clientes, movimento
+//    (avaliações), distância da rota, aberto agora; alerta de conflito
+//    quando fica perto de um cliente seu
+//  • Salvar como lead / descartar / montar rota no Google Maps
+//  • Meus clientes perto de mim (por distância real)
+//  Localização dos clientes: OpenStreetMap (grátis), guardada no cadastro
+// ════════════════════════════════════════════════════════════════
+var PR_TIPOS=[
+  {id:'presentes', nome:'Presentes',        q:'loja de presentes',        kw:['PRESENTE','PRESENTES','GIFT']},
+  {id:'geek',      nome:'Geek / Nerd',      q:'loja geek nerd',           kw:['GEEK','NERD','GAMER','GAMES','COLECION','ANIME']},
+  {id:'papelaria', nome:'Papelaria',        q:'papelaria',                kw:['PAPELARIA','ESCOLAR','LIVRARIA']},
+  {id:'utilidades',nome:'Utilidades / Casa',q:'loja de utilidades domésticas', kw:['UTILIDADE','CASA','BAZAR','COZINHA']},
+  {id:'decoracao', nome:'Decoração',        q:'loja de decoração',        kw:['DECORA','MOVEIS','MÓVEIS']},
+  {id:'brinquedos',nome:'Brinquedos',       q:'loja de brinquedos',       kw:['BRINQUEDO','INFANTIL','KIDS']},
+  {id:'livraria',  nome:'Livraria',         q:'livraria',                 kw:['LIVRARIA','LIVROS']},
+  {id:'festa',     nome:'Artigos de festa', q:'loja de artigos para festa', kw:['FESTA','CONFEITARIA','DOCES']},
+  {id:'variedades',nome:'Variedades',       q:'loja de variedades',       kw:['VARIEDADE','VAREJO','MULTIMARCA','MULTIMARCAS']},
+  {id:'cafe',      nome:'Café / Cafeteria', q:'cafeteria loja de café',   kw:['CAFE','CAFÉ','CAFETERIA']}
+];
+var PR_REDES=['AMERICANAS','MAGAZINE LUIZA','MAGALU','RIACHUELO','RENNER','C&A','CEA ','HAVAN','LOJAS COLOMBO','CASAS BAHIA','PONTO FRIO','KALUNGA','LEROY','TOK&STOK','TOK STOK','CAMICADO','PERNAMBUCANAS','CARREFOUR','WALMART','BIG ','ZAFFARI','ASSAI','ATACADAO','ATACADÃO','SAMS CLUB','RI HAPPY','PBKIDS','PB KIDS','LIVRARIA CULTURA','SARAIVA','LEITURA ','DAISO','MINISO','IMAGINARIUM','PUKET','MULTICOISAS','CACAU SHOW','KOPENHAGEN','O BOTICARIO','BOTICÁRIO','NATURA','FARMACIA','FARMÁCIA','DROGA','PANVEL'];
+var PR_CACHE_DIAS=7, PR_MAX_BUSCAS=12;
+var _PR={modo:'gps', res:null, sel:{}, centros:[], ocupado:false, msg:''};
 
-function _mapaEstaticoErro(el){
-  el.outerHTML='<div style="font-size:10px;color:var(--t3);padding:6px;border:1px dashed var(--bdr);border-radius:6px;margin-bottom:6px">Mapa indisponível — habilite a "Maps Static API" no Google Cloud Console com a mesma chave do Places.</div>';
+// ── utilidades ──
+function _prN(s){ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/[^A-Z0-9 ]+/g,' ').replace(/\s+/g,' ').trim(); }
+function _prDist(a,b){ var R=6371000, r=Math.PI/180, dLa=(b.lat-a.lat)*r, dLo=(b.lng-a.lng)*r; var x=Math.sin(dLa/2)*Math.sin(dLa/2)+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dLo/2)*Math.sin(dLo/2); return 2*R*Math.asin(Math.min(1,Math.sqrt(x))); }
+function _prFmtD(m){ return m<1000?Math.round(m/10)*10+' m':(m/1000).toFixed(m<10000?1:0).replace('.',',')+' km'; }
+function _prTel(t){ return String(t||'').replace(/\D/g,'').replace(/^55(?=\d{10,11}$)/,''); }
+function _prEhCel(t){ var d=_prTel(t); return d.length===11&&d[2]==='9'; }
+function _prLS(k,def){ try{ var v=localStorage.getItem(k); return v?JSON.parse(v):def; }catch(e){ return def; } }
+function _prLSset(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){ try{ localStorage.removeItem('repcm_prosp_cache'); localStorage.setItem(k,JSON.stringify(v)); }catch(e2){} } }
+function _prCfg(){ var c=loadCfg(); return {raio:c.prospRaio||2000, tipos:c.prospTipos||null, extra:c.prospExtra||''}; }
+function _prSalvarCfg(o){ var c=loadCfg(); Object.assign(c,o); saveCfg(c); }
+function _prChave(){ return (loadCfg().placesKey||'').trim(); }
+function _prGPS(){ return new Promise(function(res,rej){
+  if(!navigator.geolocation) return rej(new Error('GPS indisponível neste aparelho'));
+  navigator.geolocation.getCurrentPosition(function(p){ res({lat:p.coords.latitude,lng:p.coords.longitude}); },
+    function(e){ rej(new Error({1:'Permissão de localização negada — libere no navegador.',2:'Localização indisponível.',3:'GPS demorou demais — tente de novo.'}[e.code]||'Erro no GPS')); },
+    {timeout:15000, maximumAge:120000, enableHighAccuracy:true});
+}); }
+
+// ── Perfil: quais tipos de loja combinam com seus clientes ──
+function prPerfilTipos(){
+  var ativos=(DB.clientes||[]).filter(function(c){ return !c.encerrado; });
+  var cont={}; PR_TIPOS.forEach(function(t){ cont[t.id]=0; });
+  ativos.forEach(function(c){ var s=' '+_prN((c.seg||'')+' '+(c.rs||''))+' ';
+    PR_TIPOS.forEach(function(t){ if(t.kw.some(function(k){ return s.indexOf(_prN(k))>=0; })) cont[t.id]++; }); });
+  var max=Math.max.apply(null,Object.keys(cont).map(function(k){return cont[k];}).concat([1]));
+  var peso={}; PR_TIPOS.forEach(function(t){ peso[t.id]=0.5+0.5*(cont[t.id]/max); });
+  return {cont:cont, peso:peso, total:ativos.length};
+}
+function prTiposAtivos(){
+  var cfg=_prCfg(); if(cfg.tipos&&cfg.tipos.length) return cfg.tipos;
+  var P=prPerfilTipos();
+  var ord=PR_TIPOS.slice().sort(function(a,b){ return P.cont[b.id]-P.cont[a.id]; }).filter(function(t){ return P.cont[t.id]>0; }).map(function(t){return t.id;});
+  ['presentes','geek','papelaria'].forEach(function(t){ if(ord.indexOf(t)<0) ord.push(t); });
+  return ord.slice(0,3);
 }
 
-// ── KW segmento → busca Google Places ────────────────────
-var KW_SEG={
-  'Papelaria':'papelaria','Presente':'loja de presentes','Gamer':'games video game loja',
-  'Varejo':'loja varejo','Atacado':'atacado distribuidor','Tabacaria':'tabacaria',
-  'Farmácia':'farmácia','Móveis':'loja de móveis','Vestuário':'loja de roupas moda',
-  'Calçados':'loja de calçados','Brinquedos':'loja de brinquedos','Esporte':'artigos esportivos',
-  'Pet':'petshop pet','Cosméticos':'loja cosméticos beleza','Alimentício':'mercado supermercado',
-  'Escolar':'material escolar','Distribuidora':'distribuidora atacado','Livraria':'livraria',
-  'Eletrônicos':'loja eletrônicos','Informática':'loja informática computadores',
-  'Decoração':'loja decoração utilidades','Bazar':'bazar','Mercado':'mercado mercearia',
-  'Confeitaria':'confeitaria doces'
-};
-
-// Multi-select state
-var _segsSelecionados = new Set();
-
-function toggleSegBusca(seg, el){
-  if(_segsSelecionados.has(seg)){ _segsSelecionados.delete(seg); el.style.background='var(--s2)'; el.style.color='var(--t2)'; el.style.borderColor='var(--bdr)'; }
-  else { _segsSelecionados.add(seg); el.style.background='var(--acc)'; el.style.color='#fff'; el.style.borderColor='var(--acc)'; }
-  var todos = document.getElementById('seg-todos-btn');
-  if(todos){ var ativo=_segsSelecionados.size===0; todos.style.background=ativo?'var(--acc2)':'var(--s2)'; todos.style.color=ativo?'#fff':'var(--t2)'; }
+// ── Localização dos clientes (OpenStreetMap, 1 por segundo, guardada) ──
+function _prGeoOk(c){ return !!(c.geo&&c.geo.lat&&(c.geo.q===_prEndCli(c)||c.geo.p==='gps'||c.geo.p==='google')); }
+function _prEndCli(c){ return [c.end,c.bairro,c.cid,c.uf].filter(Boolean).join(', '); }
+var _prGeoFila=Promise.resolve(), _prGeoUlt=0;
+function prGeoCliente(c){
+  var q=_prEndCli(c);
+  if(_prGeoOk(c)) return Promise.resolve(c.geo);
+  if(!c.cid&&!c.end) return Promise.resolve(null);
+  _prGeoFila=_prGeoFila.then(function(){
+    var espera=Math.max(0,1100-(Date.now()-_prGeoUlt));
+    return new Promise(function(r){ setTimeout(r,espera); });
+  }).then(function(){
+    _prGeoUlt=Date.now();
+    function busca(params){ return fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&accept-language=pt-BR&'+params).then(function(r){ return r.json(); }).catch(function(){ return []; }); }
+    var ps=[]; if(c.end) ps.push('street='+encodeURIComponent(String(c.end).replace(/\s*-\s*[^,]*$/,'')));
+    if(c.cid) ps.push('city='+encodeURIComponent(c.cid)); if(c.uf) ps.push('state='+encodeURIComponent(c.uf));
+    return busca(ps.join('&')).then(function(d){
+      if(d&&d[0]) return {lat:+d[0].lat,lng:+d[0].lon,p:c.end?'rua':'cidade',q:q};
+      if(!c.cid) return null;
+      return new Promise(function(r){ setTimeout(r,1100); }).then(function(){ _prGeoUlt=Date.now(); return busca('city='+encodeURIComponent(c.cid)+(c.uf?'&state='+encodeURIComponent(c.uf):'')); })
+        .then(function(d2){ return d2&&d2[0]?{lat:+d2[0].lat,lng:+d2[0].lon,p:'cidade',q:q}:null; });
+    }).then(function(g){ if(g){ c.geo=g; _prGeoMudou=true; } return g; });
+  });
+  return _prGeoFila;
+}
+var _prGeoMudou=false;
+function _prGeoSalvar(){ if(_prGeoMudou){ _prGeoMudou=false; try{ salvarDB(); }catch(e){} } }
+function prGeoCidade(nome){
+  return fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&accept-language=pt-BR&q='+encodeURIComponent(nome+', Brasil'))
+    .then(function(r){ return r.json(); }).then(function(d){ if(!d||!d[0]) throw new Error('Não achei a cidade "'+nome+'"'); return {lat:+d[0].lat,lng:+d[0].lon}; });
+}
+function prCidadeDoGPS(pt){
+  return fetch('https://nominatim.openstreetmap.org/reverse?format=json&zoom=10&accept-language=pt-BR&lat='+pt.lat+'&lon='+pt.lng)
+    .then(function(r){ return r.json(); }).then(function(d){ var a=d.address||{}; return a.city||a.town||a.municipality||a.village||a.county||''; }).catch(function(){ return ''; });
+}
+// Guarda a posição exata do cliente (quando você está na loja)
+async function prSalvarLocalCliente(id){
+  var c=DB.clientes.find(function(x){return x.id===id;}); if(!c) return;
+  try{ var p=await _prGPS(); c.geo={lat:p.lat,lng:p.lng,p:'gps',q:_prEndCli(c)}; salvarDB(); toastM('📍 Localização de '+c.rs+' salva'); if(document.getElementById('pr-rota')) prDesenharParadas(); }
+  catch(e){ toastM(e.message); }
 }
 
+// ── Google Places (New) — Text Search ──
+var PR_CAMPOS=['places.id','places.displayName','places.formattedAddress','places.location','places.businessStatus','places.primaryTypeDisplayName','places.googleMapsUri','places.rating','places.userRatingCount','places.nationalPhoneNumber','places.websiteUri','places.currentOpeningHours.openNow'];
+function _prUsoMes(n){ var m=dataISO(new Date()).slice(0,7), u=_prLS('repcm_prosp_uso',{}); if(n){ u[m]=(u[m]||0)+n; Object.keys(u).forEach(function(k){ if(k<m.slice(0,4)) delete u[k]; }); _prLSset('repcm_prosp_uso',u); } return u[m]||0; }
+function _prNormPlace(p){
+  return {id:p.id, nome:(p.displayName&&(p.displayName.text||p.displayName))||'', end:p.formattedAddress||'', lat:p.location&&(typeof p.location.lat==='function'?p.location.lat():(p.location.latitude!=null?p.location.latitude:p.location.lat)), lng:p.location&&(typeof p.location.lng==='function'?p.location.lng():(p.location.longitude!=null?p.location.longitude:p.location.lng)),
+    st:p.businessStatus||'', tipo:(p.primaryTypeDisplayName&&(p.primaryTypeDisplayName.text||p.primaryTypeDisplayName))||'', url:p.googleMapsUri||p.googleMapsURI||'', nota:p.rating||0, aval:p.userRatingCount||0,
+    tel:p.nationalPhoneNumber||'', site:p.websiteUri||p.websiteURI||'', aberto:(p.currentOpeningHours&&typeof p.currentOpeningHours.openNow==='boolean')?p.currentOpeningHours.openNow:null};
+}
+async function prPlacesBuscar(q, centro, raio){
+  var ck=q+'|'+centro.lat.toFixed(3)+'|'+centro.lng.toFixed(3)+'|'+raio;
+  var cache=_prLS('repcm_prosp_cache',{}), agora=Date.now();
+  if(cache[ck]&&agora-cache[ck].t<PR_CACHE_DIAS*864e5) return {lista:cache[ck].r, cache:true};
+  var key=_prChave(); if(!key) throw new Error('SEM_CHAVE');
+  var corpo={textQuery:q, languageCode:'pt-BR', regionCode:'BR', pageSize:20, locationBias:{circle:{center:{latitude:centro.lat,longitude:centro.lng},radius:Math.min(50000,Math.max(500,raio*1.5))}}};
+  var lista;
+  try{
+    var r=await fetch('https://places.googleapis.com/v1/places:searchText',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':key,'X-Goog-FieldMask':PR_CAMPOS.join(',')},body:JSON.stringify(corpo)});
+    var d=await r.json().catch(function(){ return {}; });
+    if(!r.ok){ var m=(d.error&&d.error.message)||('Erro '+r.status); if(/not been used|disabled|not enabled|SERVICE_DISABLED/i.test(m)) m='A "Places API (New)" não está ativada no Google Cloud para esta chave.'; else if(/API key not valid|API_KEY_INVALID/i.test(m)) m='Chave do Google Places inválida.'; else if(/referer|referrer|blocked/i.test(m)) m='A chave está restrita e bloqueou este app. Libere o site do app nas restrições da chave.'; throw new Error(m); }
+    lista=(d.places||[]).map(_prNormPlace);
+  }catch(e){
+    if(e&&e.name==='TypeError'){ lista=await _prPlacesSDK(q, centro, raio, key); } else throw e;
+  }
+  _prUsoMes(1);
+  cache[ck]={t:agora, r:lista};
+  var ks=Object.keys(cache).sort(function(a,b){ return cache[b].t-cache[a].t; }); ks.slice(80).forEach(function(k){ delete cache[k]; });
+  _prLSset('repcm_prosp_cache',cache);
+  return {lista:lista, cache:false};
+}
+// Plano B (se o navegador bloquear a chamada direta): biblioteca JS do Google Maps
+var _prSDK=null;
+function _prCarregarSDK(key){
+  if(_prSDK) return _prSDK;
+  _prSDK=new Promise(function(res,rej){
+    if(window.google&&google.maps&&google.maps.importLibrary) return res();
+    window._prSdkOk=function(){ res(); };
+    var s=document.createElement('script'); s.async=true;
+    s.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(key)+'&loading=async&language=pt-BR&region=BR&callback=_prSdkOk';
+    s.onerror=function(){ _prSDK=null; rej(new Error('Sem conexão com o Google Maps')); };
+    document.head.appendChild(s);
+  });
+  return _prSDK;
+}
+async function _prPlacesSDK(q, centro, raio, key){
+  await _prCarregarSDK(key);
+  var lib=await google.maps.importLibrary('places');
+  var r=await lib.Place.searchText({textQuery:q, fields:['id','displayName','formattedAddress','location','businessStatus','primaryTypeDisplayName','googleMapsURI','rating','userRatingCount','nationalPhoneNumber','websiteURI'], locationBias:{center:{lat:centro.lat,lng:centro.lng},radius:Math.min(50000,Math.max(500,raio*1.5))}, maxResultCount:20, language:'pt-BR', region:'br'});
+  return (r.places||[]).map(_prNormPlace);
+}
+
+// ── Classifica os resultados ──
+function _prEhRede(nome){ var n=' '+_prN(nome)+' '; return PR_REDES.some(function(r){ return n.indexOf(' '+_prN(r)+' ')>=0||n.indexOf(' '+_prN(r))>=0&&_prN(r).length>5; }); }
+function _prPalavras(s){ return _prN(s).split(' ').filter(function(w){ return w.length>=3&&['LOJA','LTDA','COMERCIO','PRESENTES','EIRELI','EPP','ME','CIA','DE','DA','DO','DOS','DAS'].indexOf(w)<0; }); }
+function _prParecido(a,b){ var A=_prPalavras(a), B=_prPalavras(b); if(!A.length||!B.length) return false; var comum=A.filter(function(w){ return B.indexOf(w)>=0; }).length; return comum>=Math.min(2,Math.min(A.length,B.length)); }
+function prClassificar(lista, centros, raio){
+  var P=prPerfilTipos(), desc=_prLS('repcm_prosp_desc',{});
+  var clis=(DB.clientes||[]).filter(function(c){ return !c.encerrado; });
+  var telCli={}; clis.forEach(function(c){ [c.cel,c.fone].forEach(function(t){ var d=_prTel(t); if(d.length>=10) telCli[d]=c; }); });
+  var leadPor={}; (DB.leads||[]).forEach(function(l){ if(l.placeId) leadPor[l.placeId]=l; var d=_prTel(l.tel); if(d.length>=10) leadPor['t'+d]=l; });
+  var out=[];
+  lista.forEach(function(p){
+    if(!p.lat||!p.lng) return;
+    if(p.st&&p.st!=='OPERATIONAL') return;
+    if(desc[p.id]) return;
+    if(_prEhRede(p.nome)) return;
+    // distância até a parada mais próxima
+    var perto=null, dmin=1e12;
+    centros.forEach(function(c){ var d=_prDist(c,p); if(d<dmin){ dmin=d; perto=c; } });
+    if(dmin>raio*1.25) return;
+    p.dist=dmin; p.perto=perto&&perto.nome||'';
+    // já é cliente?
+    var tel=_prTel(p.tel);
+    var cli=(tel&&telCli[tel])||clis.find(function(c){ return c.placeId===p.id; })
+      ||clis.find(function(c){ return c.geo&&c.geo.p!=='cidade'&&_prDist(c.geo,p)<250&&_prParecido(c.rs,p.nome); })
+      ||clis.find(function(c){ return _prParecido(c.rs,p.nome)&&_prN(p.end).indexOf(_prN(c.cid||'@@'))>=0; });
+    if(cli){ p.cliente=cli; }
+    p.lead=leadPor[p.id]||(tel&&leadPor['t'+tel])||null;
+    // conflito: cliente seu a menos de 400 m
+    if(!cli){ var viz=null, dv=1e12; clis.forEach(function(c){ if(!c.geo||c.geo.p==='cidade') return; var d=_prDist(c.geo,p); if(d<dv){ dv=d; viz=c; } }); if(viz&&dv<400){ p.conflito={cli:viz, d:dv}; } }
+    // nota
+    var fit=Math.max.apply(null,(p.tiposIds||['?']).map(function(t){ return P.peso[t]||0.6; }));
+    var s=35*fit;
+    s+=Math.min(25, 25*Math.log10(1+(p.aval||0))/Math.log10(301));
+    if(p.nota>=4.5) s+=10; else if(p.nota>=4) s+=6; else if(p.nota&&p.nota<3.5) s-=8;
+    s+=25*(1-Math.min(dmin,raio)/raio);
+    if(p.aberto===true) s+=5;
+    if(p.conflito) s-=15;
+    p.score=Math.max(0,Math.min(100,Math.round(s)));
+    out.push(p);
+  });
+  out.sort(function(a,b){ return (a.cliente?1:0)-(b.cliente?1:0)||b.score-a.score; });
+  return out;
+}
+
+// ── Paradas da rota de hoje ──
+function _prRotaKey(){ return 'repcm_rota_'+dataISO(new Date()); }
+function prParadas(){
+  var ids=_prLS(_prRotaKey(),null);
+  if(!ids){
+    var hoje=dataISO(new Date()), s={};
+    (DB.tarefas||[]).forEach(function(t){ if(!t.done&&t.cliId&&t.dt===hoje) s[t.cliId]=1; });
+    (DB.eventos||[]).forEach(function(e){ var d=(e.dt||e.data||e.date||'').slice(0,10); if(d===hoje&&(e.cliId||e.clienteId)) s[e.cliId||e.clienteId]=1; });
+    ids=Object.keys(s);
+    Object.keys(s).length&&_prLSset(_prRotaKey(),ids);
+    // limpa rotas de dias anteriores
+    try{ Object.keys(localStorage).forEach(function(k){ if(/^repcm_rota_\d{4}-\d\d-\d\d$/.test(k)&&k!==_prRotaKey()) localStorage.removeItem(k); }); }catch(e){}
+  }
+  return ids.filter(function(id){ return DB.clientes.some(function(c){ return c.id===id; }); });
+}
+function prAddParada(id){ var l=prParadas(); if(l.indexOf(id)<0) l.push(id); _prLSset(_prRotaKey(),l); prDesenharParadas(); }
+function prTirarParada(id){ _prLSset(_prRotaKey(),prParadas().filter(function(x){return x!==id;})); prDesenharParadas(); }
+function prDesenharParadas(){
+  var el=document.getElementById('pr-rota'); if(!el) return;
+  var ids=prParadas();
+  el.innerHTML=(ids.length?ids.map(function(id,i){ var c=DB.clientes.find(function(x){return x.id===id;});
+      return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--bdr)"><span style="width:22px;height:22px;border-radius:50%;background:var(--acc);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+(i+1)+'</span>'
+        +'<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(c.rs)+'</div><div style="font-size:11px;color:var(--t3)">'+esc(c.cid||'')+(c.geo?(c.geo.p==='gps'?' · 📍 local exato':c.geo.p==='cidade'?' · ⚠️ só a cidade':''):' · sem localização ainda')+'</div></div>'
+        +'<button onclick="prSalvarLocalCliente(\''+id+'\')" title="Estou nesta loja: salvar a localização" style="border:1px solid var(--bdr);background:var(--s2);border-radius:8px;padding:6px 8px;font-size:12px;color:var(--t2)">📍</button>'
+        +'<button onclick="prTirarParada(\''+id+'\')" style="border:none;background:none;color:var(--red);font-size:18px;padding:4px 6px">✕</button></div>'; }).join('')
+    :'<div style="font-size:13px;color:var(--t3);padding:6px 0">Nenhuma visita marcada para hoje. Adicione os clientes que vai visitar:</div>')
+    +'<div style="position:relative;margin-top:8px"><input class="fi" id="pr-add-cli" autocomplete="off" placeholder="+ adicionar cliente à rota..." oninput="prSugerirCli(this.value)" style="font-size:14px"><div id="pr-sug" style="position:absolute;left:0;right:0;top:100%;z-index:20;background:var(--s1);border:1px solid var(--bdr);border-radius:10px;display:none;max-height:220px;overflow:auto"></div></div>';
+}
+function prSugerirCli(v){
+  var box=document.getElementById('pr-sug'); if(!box) return;
+  var q=_prN(v); if(q.length<2){ box.style.display='none'; return; }
+  var ids=prParadas();
+  var l=DB.clientes.filter(function(c){ return !c.encerrado&&ids.indexOf(c.id)<0&&(_prN(c.rs).indexOf(q)>=0||_prN(c.cid).indexOf(q)>=0); }).slice(0,8);
+  box.innerHTML=l.map(function(c){ return '<div onclick="prAddParada(\''+c.id+'\')" style="padding:10px 12px;border-bottom:1px solid var(--bdr);font-size:14px;color:var(--t1)">'+esc(c.rs)+' <span style="color:var(--t3);font-size:12px">'+esc(c.cid||'')+'</span></div>'; }).join('')||'<div style="padding:10px;font-size:13px;color:var(--t3)">Nenhum cliente</div>';
+  box.style.display='block';
+}
+
+// ── Tela ──
 function renderProximosM(){
-  _segsSelecionados.clear();
   var cont=document.getElementById('main-content');
-  var segs=[...new Set(DB.clientes.filter(function(c){return c.seg&&!c.encerrado;}).map(function(c){return c.seg;}))].sort();
-  var cfg=loadCfg(); var temKey=!!(cfg.placesKey||'').trim();
-
-  cont.innerHTML=`
-  <div class="section">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <div style="font-size:15px;font-weight:700;color:var(--t1)"><i class="ti ti-map-pin" style="color:var(--acc)"></i> Próximos</div>
-      <button class="btn bp" style="font-size:11px;padding:5px 12px" onclick="buscarProximosM()"><i class="ti ti-current-location"></i> Meus clientes</button>
-    </div>
-
-    <div class="card" style="margin-bottom:12px">
-      <div class="card-title" style="margin-bottom:10px"><i class="ti ti-building-store" style="color:var(--acc2)"></i> Buscar lojas por segmento</div>
-
-      <!-- Botão compacto de seleção -->
-      <button onclick="abrirModalSegsBusca()" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--bdr);border-radius:10px;background:var(--s2);cursor:pointer;margin-bottom:10px">
-        <span style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t2)">
-          <i class="ti ti-tags" style="color:var(--acc2)"></i>
-          <span id="seg-resumo-label">Todos os segmentos</span>
-        </span>
-        <i class="ti ti-chevron-down" style="color:var(--t3)"></i>
-      </button>
-
-      <!-- Campo cidade -->
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-        <i class="ti ti-map-2" style="color:var(--t3);font-size:16px;flex-shrink:0"></i>
-        <input class="fi" id="busca-cidade-manual" placeholder="Cidade (opcional — usa GPS se vazio)" style="flex:1;font-size:12px">
-      </div>
-
-      <div style="display:flex;gap:8px;margin-bottom:8px">
-        <button class="btn bs" style="flex:1;font-size:12px;padding:9px" onclick="buscarLojasPorSegBairro()"><i class="ti ti-building-store"></i> No bairro</button>
-        <button class="btn bp" style="flex:1;font-size:12px;padding:9px" onclick="buscarLojasPorSegCidade()"><i class="ti ti-building-community"></i> Na cidade</button>
-      </div>
-
-      ${!temKey?'<div style="font-size:10px;color:var(--org);text-align:center;padding:4px"><i class="ti ti-alert-triangle"></i> Configure a Google Places API Key em Configurações</div>':''}
-      <div id="seg-busca-status" style="font-size:12px;color:var(--t3);margin-top:8px;text-align:center;min-height:20px"></div>
-      <div id="seg-busca-lista" style="margin-top:4px"></div>
-    </div>
-
-    <div id="proximos-status" style="text-align:center;color:var(--t3);font-size:13px;padding:12px">Toque em <b>Meus clientes</b> para ver clientes da sua cidade.</div>
-    <div id="proximos-lista"></div>
-  </div>
-
-  <!-- Bottom sheet segmentos -->
-  <div id="modal-segs-busca" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;align-items:flex-end">
-    <div style="background:var(--s1);border-radius:16px 16px 0 0;width:100%;max-height:75vh;overflow-y:auto;padding:16px">
-      <div style="width:36px;height:4px;background:var(--bdr);border-radius:2px;margin:0 auto 14px"></div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-        <div style="font-size:15px;font-weight:700;color:var(--t1)">Selecionar segmentos</div>
-        <button onclick="fecharModalSegsBusca()" style="background:none;border:none;font-size:22px;color:var(--t3);cursor:pointer">✕</button>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:6px">
-        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;background:var(--s2);cursor:pointer">
-          <input type="checkbox" id="seg-check-todos" checked onchange="toggleTodosSegs(this)" style="width:18px;height:18px;accent-color:var(--acc2)">
-          <span style="font-size:13px;font-weight:600;color:var(--t1)">Todos os segmentos</span>
-        </label>
-        ${segs.map(function(s){ return '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;background:var(--s2);cursor:pointer"><input type="checkbox" class="seg-check-item" value="'+s+'" onchange="atualizarSegsM()" style="width:18px;height:18px;accent-color:var(--acc)"><span style="font-size:13px;color:var(--t1)">'+s+'</span></label>'; }).join('')}
-      </div>
-      <button onclick="fecharModalSegsBusca()" class="btn bp" style="width:100%;margin-top:16px;padding:12px;font-size:14px">Confirmar</button>
-    </div>
-  </div>`;
+  var cfg=_prCfg(), ativos=prTiposAtivos(), P=prPerfilTipos(), temKey=!!_prChave();
+  var chip=function(on){ return 'padding:8px 12px;border-radius:20px;font-size:13px;font-weight:600;border:1px solid '+(on?'var(--acc)':'var(--bdr)')+';background:'+(on?'var(--acc)':'var(--s2)')+';color:'+(on?'#fff':'var(--t2)'); };
+  cont.innerHTML='<div class="section">'
+   +'<div style="font-size:17px;font-weight:800;color:var(--t1);margin-bottom:12px"><i class="ti ti-map-search" style="color:var(--acc)"></i> Mapa &amp; Prospecção</div>'
+   +(!temKey?'<div class="card" style="border:1px solid var(--org);margin-bottom:12px;font-size:13px;line-height:1.5;color:var(--t2)"><b style="color:var(--org)">Falta a chave do Google Places.</b><br>No Google Cloud: ative <b>Places API (New)</b> (e, se quiser o mapa em imagem, <b>Maps Static API</b>), crie uma chave e cole em <b>Mais → Configurações → Google Places API Key</b>.<br><span style="color:var(--t3)">"Meus clientes perto" funciona sem chave.</span></div>':'')
+   +'<div class="card" style="margin-bottom:12px">'
+     +'<div style="font-size:12px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Onde procurar</div>'
+     +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'
+       +[['gps','📍 Perto de mim'],['rota','🚗 Na rota de hoje'],['cidade','🏙️ Numa cidade']].map(function(m){ return '<button onclick="prModo(\''+m[0]+'\')" style="'+chip(_PR.modo===m[0])+'">'+m[1]+'</button>'; }).join('')
+     +'</div>'
+     +(_PR.modo==='rota'?'<div id="pr-rota"></div>':'')
+     +(_PR.modo==='cidade'?'<input class="fi" id="pr-cidade" autocomplete="off" placeholder="Cidade (ex.: Caxias do Sul RS)" value="'+esc(_PR.cidade||'')+'" style="font-size:14px">':'')
+     +'<div style="font-size:12px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;margin:14px 0 8px">Distância máxima '+(_PR.modo==='rota'?'da rota':'')+'</div>'
+     +'<div style="display:flex;gap:6px">'+[1000,2000,5000,10000].map(function(r){ return '<button onclick="prRaio('+r+')" style="'+chip(cfg.raio===r)+'">'+_prFmtD(r)+'</button>'; }).join('')+'</div>'
+     +'<div style="font-size:12px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;margin:14px 0 8px">Tipos de loja <span style="text-transform:none;font-weight:400">(marcados pelo perfil dos seus clientes)</span></div>'
+     +'<div style="display:flex;gap:6px;flex-wrap:wrap">'+PR_TIPOS.map(function(t){ var on=ativos.indexOf(t.id)>=0; return '<button onclick="prTipo(\''+t.id+'\')" style="'+chip(on)+'">'+esc(t.nome)+(P.cont[t.id]?' <span style="opacity:.75;font-weight:400">'+P.cont[t.id]+'</span>':'')+'</button>'; }).join('')+'</div>'
+     +'<input class="fi" id="pr-extra" autocomplete="off" placeholder="Outro termo (ex.: loja de canecas personalizadas)" value="'+esc(cfg.extra)+'" onchange="_prSalvarCfg({prospExtra:this.value.trim()})" style="font-size:14px;margin-top:8px">'
+     +'<button class="btn bp" onclick="prBuscar()" '+(temKey?'':'disabled')+' style="width:100%;margin-top:14px;padding:13px;font-size:15px;font-weight:700"><i class="ti ti-search"></i> Buscar prospects</button>'
+     +'<div style="font-size:11px;color:var(--t3);text-align:center;margin-top:6px">Buscas no Google este mês: <b id="pr-uso">'+_prUsoMes(0)+'</b> · resultados ficam guardados '+PR_CACHE_DIAS+' dias</div>'
+   +'</div>'
+   +'<div id="pr-status" style="font-size:13px;color:var(--t2);text-align:center;min-height:18px;margin-bottom:8px"></div>'
+   +'<div id="pr-res"></div>'
+   +'<div class="card" style="margin-top:12px"><div style="display:flex;align-items:center;justify-content:space-between"><div style="font-size:15px;font-weight:700;color:var(--t1)">👥 Meus clientes perto</div><button class="btn bs" style="font-size:13px;padding:8px 12px" onclick="buscarProximosM()"><i class="ti ti-current-location"></i> Ver</button></div>'
+     +'<div id="proximos-status" style="font-size:13px;color:var(--t3);margin-top:6px"></div><div id="proximos-lista"></div></div>'
+   +'</div>';
+  if(_PR.modo==='rota') prDesenharParadas();
+  if(_PR.res) prDesenharRes();
 }
+function prModo(m){ var ci=document.getElementById('pr-cidade'); if(ci) _PR.cidade=ci.value; _PR.modo=m; renderProximosM(); }
+function prRaio(r){ _prSalvarCfg({prospRaio:r}); renderProximosM(); }
+function prTipo(id){ var l=prTiposAtivos().slice(), i=l.indexOf(id); if(i>=0){ if(l.length>1) l.splice(i,1); } else l.push(id); _prSalvarCfg({prospTipos:l}); var ci=document.getElementById('pr-cidade'); if(ci) _PR.cidade=ci.value; renderProximosM(); }
+function _prStatus(h){ var el=document.getElementById('pr-status'); if(el) el.innerHTML=h; }
 
-function abrirModalSegsBusca(){
-  var m=document.getElementById('modal-segs-busca');
-  if(m){m.style.display='flex';}
-}
-function fecharModalSegsBusca(){
-  var m=document.getElementById('modal-segs-busca');
-  if(m) m.style.display='none';
-}
-function toggleTodosSegs(cb){
-  document.querySelectorAll('.seg-check-item').forEach(function(i){i.checked=false;});
-  _segsSelecionados.clear();
-  atualizarLabelSegs();
-}
-function atualizarSegsM(){
-  _segsSelecionados.clear();
-  document.querySelectorAll('.seg-check-item:checked').forEach(function(cb){_segsSelecionados.add(cb.value);});
-  var todos=document.getElementById('seg-check-todos');
-  if(todos) todos.checked=_segsSelecionados.size===0;
-  atualizarLabelSegs();
-}
-function atualizarLabelSegs(){
-  var label=document.getElementById('seg-resumo-label');
-  if(!label) return;
-  if(_segsSelecionados.size===0) label.textContent='Todos os segmentos';
-  else if(_segsSelecionados.size===1) label.textContent=[..._segsSelecionados][0];
-  else label.textContent=[..._segsSelecionados].slice(0,2).join(', ')+(_segsSelecionados.size>2?' +'+ (_segsSelecionados.size-2):'');
-}
-
-
-function normalizar(str){
-  return str.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
-}
-
-var KW_SEG={
-  'Papelaria':'papelaria','Presente':'loja de presentes','Gamer':'games video game loja',
-  'Varejo':'loja varejo','Atacado':'atacado distribuidor','Tabacaria':'tabacaria',
-  'Farmácia':'farmácia','Móveis':'loja de móveis','Vestuário':'loja de roupas moda',
-  'Calçados':'loja de calçados','Brinquedos':'loja de brinquedos','Esporte':'artigos esportivos',
-  'Pet':'petshop pet','Cosméticos':'loja cosméticos beleza','Alimentício':'mercado supermercado',
-  'Escolar':'material escolar','Distribuidora':'distribuidora atacado','Livraria':'livraria',
-  'Eletrônicos':'loja eletrônicos','Informática':'loja informática',
-  'Decoração':'loja decoração','Bazar':'bazar','Mercado':'mercado','Confeitaria':'confeitaria'
-};
-
-// Carrega SDK Google Maps JS dinamicamente (resolve CORS)
-// ── Google Maps SDK loader ────────────────────────────
-var _gmapsLoaded=false;
-var _gmapsCallbacks=[];
-window._gmapsReadyCb=function(){ _gmapsLoaded=true; _gmapsCallbacks.forEach(function(cb){cb();}); _gmapsCallbacks=[]; };
-
-function carregarGoogleMaps(key,cb){
-  if(_gmapsLoaded){ cb(); return; }
-  _gmapsCallbacks.push(cb);
-  if(document.querySelector('script[data-gmaps]')) return;
-  var s=document.createElement('script');
-  s.dataset.gmaps='1';
-  s.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(key)+'&libraries=places&callback=_gmapsReadyCb&language=pt-BR&v=weekly';
-  s.async=true;
-  s.onerror=function(){ _gmapsCallbacks.forEach(function(cb){cb();}); _gmapsCallbacks=[]; };
-  document.head.appendChild(s);
-}
-
-function buscarLojasPorSegBairro(){ buscarLojasPorSeg('bairro'); }
-function buscarLojasPorSegCidade(){ buscarLojasPorSeg('cidade'); }
-
-async function buscarLojasPorSeg(escopo){
-  var status=document.getElementById('seg-busca-status');
-  var lista=document.getElementById('seg-busca-lista');
-  if(!status||!lista) return;
-
-  var cfg=loadCfg(); var placesKey=(cfg.placesKey||'').trim();
-  if(!placesKey){ status.innerHTML='⚠️ Configure a Google Places API Key em Configurações.'; return; }
-
-  var cidadeManual=(document.getElementById('busca-cidade-manual')?.value||'').trim();
-  var raio=escopo==='bairro'?1500:5000;
-
-  var segsAtivos=_segsSelecionados.size>0
-    ?[..._segsSelecionados]
-    :[...new Set(DB.clientes.filter(function(c){return c.seg&&!c.encerrado;}).map(function(c){return c.seg;}))];
-
-  var keywords=[...new Set(segsAtivos.map(function(s){return KW_SEG[s]||s;}).filter(Boolean))].slice(0,4);
-  if(!keywords.length){ status.innerHTML='⚠️ Nenhum segmento disponível.'; return; }
-
-  status.innerHTML='⏳ Carregando Google Maps...';
-  lista.innerHTML='';
-
-  carregarGoogleMaps(placesKey, async function(){
-    // PASSO 1: SDK carregou?
-    if(!window.google||!window.google.maps){
-      status.innerHTML='❌ [P1] Google Maps não carregou. Chave inválida ou sem conexão.'; return;
-    }
-    status.innerHTML='[P1] Maps OK... verificando Places...';
-    if(!window.google.maps.places){
-      status.innerHTML='❌ [P2] Places library não carregou. Aguarde e tente novamente.'; return;
-    }
-    status.innerHTML='[P2] Places OK...';
-
-    // PASSO 3: Coordenadas
-    var lat,lng;
-    if(cidadeManual){
-      status.innerHTML='[P3] Geocoding "'+cidadeManual+'"...';
-      try{
-        var geoRes=await new Promise(function(res,rej){
-          new google.maps.Geocoder().geocode({address:cidadeManual+' Brasil',language:'pt-BR'},function(r,st){
-            if(st==='OK'&&r&&r[0]) res(r[0].geometry.location);
-            else rej(new Error('Geocoding: '+st));
-          });
-        });
-        lat=geoRes.lat(); lng=geoRes.lng();
-        status.innerHTML='[P3] Localizado: '+lat.toFixed(4)+','+lng.toFixed(4);
-      }catch(e){ status.innerHTML='❌ [P3] '+e.message; return; }
+// ── Busca ──
+async function prBuscar(opts){
+  opts=opts||{};
+  if(_PR.ocupado) return; _PR.ocupado=true;
+  try{
+    var cfg=_prCfg(), raio=cfg.raio, centros=[];
+    if(_PR.modo==='gps'){
+      _prStatus('📍 Pegando sua localização...');
+      var g=await _prGPS(); centros=[{lat:g.lat,lng:g.lng,nome:'você'}];
+    } else if(_PR.modo==='cidade'){
+      var ci=document.getElementById('pr-cidade'); _PR.cidade=(ci&&ci.value||_PR.cidade||'').trim();
+      if(!_PR.cidade) throw new Error('Digite a cidade');
+      _prStatus('🏙️ Localizando '+esc(_PR.cidade)+'...');
+      var gc=await prGeoCidade(_PR.cidade); centros=[{lat:gc.lat,lng:gc.lng,nome:_PR.cidade}];
+      raio=Math.max(raio,5000);
     } else {
-      status.innerHTML='[P3] Obtendo GPS...';
-      try{
-        var pos=await new Promise(function(res,rej){
-          navigator.geolocation.getCurrentPosition(res,function(e){rej(new Error(e.message));},{timeout:10000,enableHighAccuracy:false});
-        });
-        lat=pos.coords.latitude; lng=pos.coords.longitude;
-        status.innerHTML='[P3] GPS: '+lat.toFixed(4)+','+lng.toFixed(4);
-      }catch(e){ status.innerHTML='❌ [P3] GPS: '+e.message; return; }
-    }
-
-    // PASSO 4: PlacesService direto — sem esperar tiles
-    status.innerHTML='🔍 Buscando '+keywords.join(', ')+'...';
-    var mapDiv=document.createElement('div');
-    mapDiv.style.cssText='width:10px;height:10px;position:fixed;bottom:0;right:0;opacity:0.01;pointer-events:none';
-    document.body.appendChild(mapDiv);
-    var gmap=new google.maps.Map(mapDiv,{center:{lat:lat,lng:lng},zoom:14,disableDefaultUI:true});
-    var svc=new google.maps.places.PlacesService(gmap);
-    var center=new google.maps.LatLng(lat,lng);
-
-    function norm(s){ return (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim(); }
-    var nomesExist=new Set(DB.clientes.map(function(c){return norm(c.rs||'').slice(0,8);}));
-    var resultados=[]; var erros=[]; var pending=keywords.length;
-
-    function finalizar(){
-      try{document.body.removeChild(mapDiv);}catch(e){}
-      clearTimeout(tmo);
-      _exibirResultadosProximos(resultados,lat,lng,placesKey,status,lista,erros);
-    }
-
-    var tmo=setTimeout(function(){
-      if(pending>0){
-        pending=0;
-        try{document.body.removeChild(mapDiv);}catch(e){}
-        status.innerHTML='❌ Timeout — Erros: '+(erros.join(', ')||'nenhum. Places API ativa?');
+      var ids=prParadas(); if(!ids.length) throw new Error('Adicione pelo menos um cliente à rota de hoje');
+      for(var i=0;i<ids.length;i++){
+        var c=DB.clientes.find(function(x){return x.id===ids[i];});
+        _prStatus('🗺️ Localizando paradas ('+(i+1)+'/'+ids.length+'): '+esc(c.rs));
+        var gg=await prGeoCliente(c); if(gg) centros.push({lat:gg.lat,lng:gg.lng,nome:c.rs,cliId:c.id});
       }
-    }, 20000);
-
-    keywords.forEach(function(kw){
-      svc.nearbySearch({
-        location:center, radius:raio, keyword:kw, language:'pt-BR'
-      }, function(res,pstatus){
-        if(pstatus===google.maps.places.PlacesServiceStatus.OK && res){
-          res.forEach(function(p){
-            if(!p.name||!p.geometry) return;
-            var plat=p.geometry.location.lat(); var plng=p.geometry.location.lng();
-            var R=6371000;
-            var dLat=(plat-lat)*Math.PI/180; var dLng=(plng-lng)*Math.PI/180;
-            var a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(lat*Math.PI/180)*Math.cos(plat*Math.PI/180)*Math.sin(dLng/2)*Math.sin(dLng/2);
-            var dist=Math.round(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
-            resultados.push({nome:p.name,end2:p.vicinity||'',lat:plat,lng:plng,dist:dist,placeId:p.place_id||'',prospect:!nomesExist.has(norm(p.name).slice(0,8))});
-          });
-        } else { erros.push(kw+':'+pstatus); }
-        if(--pending===0) finalizar();
-      });
-    });
-  });
-}
-
-
-function _exibirResultadosProximos(resultados,lat,lng,placesKey,status,lista,erros){
-  function norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
-  var uniq={}; resultados.forEach(function(p){uniq[norm(p.nome)]=p;}); resultados=Object.values(uniq);
-  resultados.sort(function(a,b){return (a.dist||0)-(b.dist||0);}); // ordena por distância
-
-  var prospects=resultados.filter(function(p){return p.prospect;});
-  var jaClientes=resultados.filter(function(p){return !p.prospect;});
-
-  if(!resultados.length){
-    status.innerHTML=erros.length?'❌ '+erros[0]:'Nenhum resultado. Tente outro segmento ou cidade.';
-    return;
-  }
-
-  // Estado do filtro de distância
-  var distFiltro=resultados[resultados.length-1]?.dist||5000;
-
-  function renderLista(distMax){
-    var filtrados=resultados.filter(function(p){return (p.dist||0)<=distMax;});
-    var html='';
-
-    // Botão Ver no Maps (abre todos no Google Maps)
-    if(filtrados.length){
-      var mapsUrl='https://www.google.com/maps/search/'+encodeURIComponent(
-        (segsAtivos||[]).slice(0,2).join(', ')
-      )+'/@'+lat+','+lng+',15z';
-      // Monta URL com múltiplos pins via search
-      var searchQuery=filtrados.slice(0,10).map(function(p){return p.nome;}).join(' OR ');
-      html+='<a href="'+mapsUrl+'" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;background:#4285F4;color:#fff;border-radius:10px;text-decoration:none;font-size:13px;font-weight:600;margin-bottom:12px">'
-        +'<i class="ti ti-map-2"></i> Ver '+filtrados.length+' local(is) no Google Maps'
-      +'</a>';
+      _prGeoSalvar(); prDesenharParadas();
+      if(!centros.length) throw new Error('Não consegui localizar as paradas. Confira o endereço/cidade no cadastro ou toque 📍 quando estiver na loja.');
     }
-
-    html+=filtrados.map(function(p){
-      var cor=p.prospect?'var(--red)':'var(--grn)';
-      var distStr=p.dist>=1000?(p.dist/1000).toFixed(1)+'km':p.dist+'m';
-      var mapsLink='https://www.google.com/maps/place/?q=place_id:'+(p.placeId||'')
-        +'&query='+encodeURIComponent(p.nome);
-      var wppCli=DB.clientes.find(function(c){return !p.prospect&&norm(c.rs||'').slice(0,8)===norm(p.nome).slice(0,8);});
-      return '<div style="padding:10px 0;border-bottom:1px solid var(--s3);display:flex;align-items:flex-start;gap:10px">'
-        +'<div style="min-width:8px;height:8px;border-radius:50%;background:'+cor+';margin-top:5px;flex-shrink:0"></div>'
-        +'<div style="flex:1;min-width:0">'
-          +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px">'
-            +'<div style="font-weight:600;font-size:13px;color:var(--t1)">'+p.nome+'</div>'
-            +'<span style="font-size:11px;color:var(--t3);white-space:nowrap;margin-top:2px">📍'+distStr+'</span>'
-          +'</div>'
-          +(p.end2?'<div style="font-size:10px;color:var(--t3);margin-top:1px">'+p.end2+'</div>':'')
-          +'<div style="display:flex;gap:10px;margin-top:5px;flex-wrap:wrap">'
-            +'<span style="font-size:11px;color:'+cor+';font-weight:600">'+(p.prospect?'⭐ Prospecto':'✓ Já cliente')+'</span>'
-            +'<a href="'+mapsLink+'" target="_blank" style="font-size:11px;color:var(--acc);text-decoration:none;font-weight:500"><i class="ti ti-map-pin"></i> Ver no Maps</a>'
-            +(wppCli&&(wppCli.cel||wppCli.fone)?'<a href="https://wa.me/55'+(wppCli.cel||wppCli.fone).replace(/\D/g,'')+'" target="_blank" style="font-size:11px;color:#25D366;text-decoration:none;font-weight:500"><i class="ti ti-brand-whatsapp"></i> WhatsApp</a>':'')
-          +'</div>'
-        +'</div>'
-      +'</div>';
-    }).join('');
-
-    if(!filtrados.length) html='<div style="text-align:center;color:var(--t3);padding:12px;font-size:12px">Nenhum resultado até '+( distMax>=1000?(distMax/1000).toFixed(1)+'km':distMax+'m')+'.</div>';
-    return html;
-  }
-
-  // Header com filtro de distância
-  var maxDist=resultados[resultados.length-1]?.dist||5000;
-  var step=maxDist>2000?500:100;
-
-  status.innerHTML='<b>'+resultados.length+'</b> local(is) · <span style="color:var(--red)">'+prospects.length+' prospecto(s)</span>'+(jaClientes.length?' · <span style="color:var(--grn)">'+jaClientes.length+' já cliente(s)</span>':'');
-
-  lista.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 0">'
-    +'<i class="ti ti-adjustments" style="color:var(--t3);font-size:14px;flex-shrink:0"></i>'
-    +'<span style="font-size:11px;color:var(--t3);flex-shrink:0">Distância máx:</span>'
-    +'<input type="range" id="dist-slider" min="'+step+'" max="'+maxDist+'" step="'+step+'" value="'+maxDist+'" style="flex:1" '
-      +'oninput="document.getElementById(\'dist-label\').textContent=this.value>=1000?(this.value/1000).toFixed(1)+\'km\':this.value+\'m\';'
-      +'document.getElementById(\'dist-results\').innerHTML=_renderListaProximos('+JSON.stringify(resultados)+',+this.value)">'
-    +'<span id="dist-label" style="font-size:12px;font-weight:600;color:var(--acc);min-width:36px;text-align:right">'+(maxDist>=1000?(maxDist/1000).toFixed(1)+'km':maxDist+'m')+'</span>'
-  +'</div>'
-  +'<div id="dist-results">'+renderLista(maxDist)+'</div>';
-
-  // Guarda função de render para o slider
-  window._renderListaProximos=function(res, distMax){
-    var filtrados=res.filter(function(p){return (p.dist||0)<=distMax;});
-    if(!filtrados.length) return '<div style="text-align:center;color:var(--t3);padding:12px;font-size:12px">Nenhum resultado nessa distância.</div>';
-
-    var mapsUrl='https://www.google.com/maps/search/lojas/@'+lat+','+lng+',15z';
-    var html='<a href="'+mapsUrl+'" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;background:#4285F4;color:#fff;border-radius:10px;text-decoration:none;font-size:13px;font-weight:600;margin-bottom:12px"><i class="ti ti-map-2"></i> Ver '+filtrados.length+' local(is) no Google Maps</a>';
-
-    function norm2(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
-    html+=filtrados.map(function(p){
-      var cor=p.prospect?'var(--red)':'var(--grn)';
-      var distStr=p.dist>=1000?(p.dist/1000).toFixed(1)+'km':p.dist+'m';
-      var mapsLink='https://www.google.com/maps/place/?q=place_id:'+p.placeId;
-      var wppCli=DB.clientes.find(function(c){return !p.prospect&&norm2(c.rs||'').slice(0,8)===norm2(p.nome).slice(0,8);});
-      return '<div style="padding:10px 0;border-bottom:1px solid var(--s3);display:flex;align-items:flex-start;gap:10px">'
-        +'<div style="min-width:8px;height:8px;border-radius:50%;background:'+cor+';margin-top:5px;flex-shrink:0"></div>'
-        +'<div style="flex:1;min-width:0">'
-          +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px">'
-            +'<div style="font-weight:600;font-size:13px;color:var(--t1)">'+p.nome+'</div>'
-            +'<span style="font-size:11px;color:var(--t3);white-space:nowrap;margin-top:2px">📍'+distStr+'</span>'
-          +'</div>'
-          +(p.end2?'<div style="font-size:10px;color:var(--t3);margin-top:1px">'+p.end2+'</div>':'')
-          +'<div style="display:flex;gap:10px;margin-top:5px;flex-wrap:wrap">'
-            +'<span style="font-size:11px;color:'+cor+';font-weight:600">'+(p.prospect?'⭐ Prospecto':'✓ Já cliente')+'</span>'
-            +(p.placeId?'<a href="'+mapsLink+'" target="_blank" style="font-size:11px;color:var(--acc);text-decoration:none;font-weight:500"><i class="ti ti-map-pin"></i> Ver no Maps</a>':'')
-            +(wppCli&&(wppCli.cel||wppCli.fone)?'<a href="https://wa.me/55'+(wppCli.cel||wppCli.fone).replace(/\D/g,'')+'" target="_blank" style="font-size:11px;color:#25D366;text-decoration:none;font-weight:500"><i class="ti ti-brand-whatsapp"></i> WhatsApp</a>':'')
-          +'</div>'
-        +'</div>'
-      +'</div>';
-    }).join('');
-    return html;
-  };
-}
-
-
-function _mapaEstaticoErro(el){
-  el.outerHTML='<div style="font-size:10px;color:var(--t3);padding:6px;border:1px dashed var(--bdr);border-radius:6px;margin-bottom:6px">Mapa indisponível — habilite a "Maps Static API" no Google Cloud Console com a mesma chave do Places.</div>';
-}
-
-// ── KW segmento → busca Google Places ────────────────────
-var KW_SEG={
-  'Papelaria':'papelaria','Presente':'loja de presentes','Gamer':'games video game loja',
-  'Varejo':'loja varejo','Atacado':'atacado distribuidor','Tabacaria':'tabacaria',
-  'Farmácia':'farmácia','Móveis':'loja de móveis','Vestuário':'loja de roupas moda',
-  'Calçados':'loja de calçados','Brinquedos':'loja de brinquedos','Esporte':'artigos esportivos',
-  'Pet':'petshop pet','Cosméticos':'loja cosméticos beleza','Alimentício':'mercado supermercado',
-  'Escolar':'material escolar','Distribuidora':'distribuidora atacado','Livraria':'livraria',
-  'Eletrônicos':'loja eletrônicos','Informática':'loja informática computadores',
-  'Decoração':'loja decoração utilidades','Bazar':'bazar','Mercado':'mercado mercearia',
-  'Confeitaria':'confeitaria doces'
-};
-
-// Multi-select state
-var _segsSelecionados = new Set();
-
-function toggleSegBusca(seg, el){
-  if(_segsSelecionados.has(seg)){ _segsSelecionados.delete(seg); el.style.background='var(--s2)'; el.style.color='var(--t2)'; el.style.borderColor='var(--bdr)'; }
-  else { _segsSelecionados.add(seg); el.style.background='var(--acc)'; el.style.color='#fff'; el.style.borderColor='var(--acc)'; }
-  var todos = document.getElementById('seg-todos-btn');
-  if(todos){ var ativo=_segsSelecionados.size===0; todos.style.background=ativo?'var(--acc2)':'var(--s2)'; todos.style.color=ativo?'#fff':'var(--t2)'; }
-}
-
-function renderProximosM(){
-  _segsSelecionados.clear();
-  var cont=document.getElementById('main-content');
-  var segs=[...new Set(DB.clientes.filter(function(c){return c.seg&&!c.encerrado;}).map(function(c){return c.seg;}))].sort();
-  var cfg=loadCfg(); var temKey=!!(cfg.placesKey||'').trim();
-
-  cont.innerHTML=`
-  <div class="section">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <div style="font-size:15px;font-weight:700;color:var(--t1)"><i class="ti ti-map-pin" style="color:var(--acc)"></i> Próximos</div>
-      <button class="btn bp" style="font-size:11px;padding:5px 12px" onclick="buscarProximosM()"><i class="ti ti-current-location"></i> Meus clientes</button>
-    </div>
-
-    <div class="card" style="margin-bottom:12px">
-      <div class="card-title" style="margin-bottom:10px"><i class="ti ti-building-store" style="color:var(--acc2)"></i> Buscar lojas por segmento</div>
-
-      <!-- Botão compacto de seleção -->
-      <button onclick="abrirModalSegsBusca()" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--bdr);border-radius:10px;background:var(--s2);cursor:pointer;margin-bottom:10px">
-        <span style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t2)">
-          <i class="ti ti-tags" style="color:var(--acc2)"></i>
-          <span id="seg-resumo-label">Todos os segmentos</span>
-        </span>
-        <i class="ti ti-chevron-down" style="color:var(--t3)"></i>
-      </button>
-
-      <!-- Campo cidade -->
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-        <i class="ti ti-map-2" style="color:var(--t3);font-size:16px;flex-shrink:0"></i>
-        <input class="fi" id="busca-cidade-manual" placeholder="Cidade (opcional — usa GPS se vazio)" style="flex:1;font-size:12px">
-      </div>
-
-      <div style="display:flex;gap:8px;margin-bottom:8px">
-        <button class="btn bs" style="flex:1;font-size:12px;padding:9px" onclick="buscarLojasPorSegBairro()"><i class="ti ti-building-store"></i> No bairro</button>
-        <button class="btn bp" style="flex:1;font-size:12px;padding:9px" onclick="buscarLojasPorSegCidade()"><i class="ti ti-building-community"></i> Na cidade</button>
-      </div>
-
-      ${!temKey?'<div style="font-size:10px;color:var(--org);text-align:center;padding:4px"><i class="ti ti-alert-triangle"></i> Configure a Google Places API Key em Configurações</div>':''}
-      <div id="seg-busca-status" style="font-size:12px;color:var(--t3);margin-top:8px;text-align:center;min-height:20px"></div>
-      <div id="seg-busca-lista" style="margin-top:4px"></div>
-    </div>
-
-    <div id="proximos-status" style="text-align:center;color:var(--t3);font-size:13px;padding:12px">Toque em <b>Meus clientes</b> para ver clientes da sua cidade.</div>
-    <div id="proximos-lista"></div>
-  </div>
-
-  <!-- Bottom sheet segmentos -->
-  <div id="modal-segs-busca" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;align-items:flex-end">
-    <div style="background:var(--s1);border-radius:16px 16px 0 0;width:100%;max-height:75vh;overflow-y:auto;padding:16px">
-      <div style="width:36px;height:4px;background:var(--bdr);border-radius:2px;margin:0 auto 14px"></div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-        <div style="font-size:15px;font-weight:700;color:var(--t1)">Selecionar segmentos</div>
-        <button onclick="fecharModalSegsBusca()" style="background:none;border:none;font-size:22px;color:var(--t3);cursor:pointer">✕</button>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:6px">
-        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;background:var(--s2);cursor:pointer">
-          <input type="checkbox" id="seg-check-todos" checked onchange="toggleTodosSegs(this)" style="width:18px;height:18px;accent-color:var(--acc2)">
-          <span style="font-size:13px;font-weight:600;color:var(--t1)">Todos os segmentos</span>
-        </label>
-        ${segs.map(function(s){ return '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;background:var(--s2);cursor:pointer"><input type="checkbox" class="seg-check-item" value="'+s+'" onchange="atualizarSegsM()" style="width:18px;height:18px;accent-color:var(--acc)"><span style="font-size:13px;color:var(--t1)">'+s+'</span></label>'; }).join('')}
-      </div>
-      <button onclick="fecharModalSegsBusca()" class="btn bp" style="width:100%;margin-top:16px;padding:12px;font-size:14px">Confirmar</button>
-    </div>
-  </div>`;
-}
-
-function abrirModalSegsBusca(){
-  var m=document.getElementById('modal-segs-busca');
-  if(m){m.style.display='flex';}
-}
-function fecharModalSegsBusca(){
-  var m=document.getElementById('modal-segs-busca');
-  if(m) m.style.display='none';
-}
-function toggleTodosSegs(cb){
-  document.querySelectorAll('.seg-check-item').forEach(function(i){i.checked=false;});
-  _segsSelecionados.clear();
-  atualizarLabelSegs();
-}
-function atualizarSegsM(){
-  _segsSelecionados.clear();
-  document.querySelectorAll('.seg-check-item:checked').forEach(function(cb){_segsSelecionados.add(cb.value);});
-  var todos=document.getElementById('seg-check-todos');
-  if(todos) todos.checked=_segsSelecionados.size===0;
-  atualizarLabelSegs();
-}
-function atualizarLabelSegs(){
-  var label=document.getElementById('seg-resumo-label');
-  if(!label) return;
-  if(_segsSelecionados.size===0) label.textContent='Todos os segmentos';
-  else if(_segsSelecionados.size===1) label.textContent=[..._segsSelecionados][0];
-  else label.textContent=[..._segsSelecionados].slice(0,2).join(', ')+(_segsSelecionados.size>2?' +'+ (_segsSelecionados.size-2):'');
-}
-
-
-function normalizar(str){
-  return str.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
-}
-
-var KW_SEG={
-  'Papelaria':'papelaria','Presente':'loja de presentes','Gamer':'games video game loja',
-  'Varejo':'loja varejo','Atacado':'atacado distribuidor','Tabacaria':'tabacaria',
-  'Farmácia':'farmácia','Móveis':'loja de móveis','Vestuário':'loja de roupas moda',
-  'Calçados':'loja de calçados','Brinquedos':'loja de brinquedos','Esporte':'artigos esportivos',
-  'Pet':'petshop pet','Cosméticos':'loja cosméticos beleza','Alimentício':'mercado supermercado',
-  'Escolar':'material escolar','Distribuidora':'distribuidora atacado','Livraria':'livraria',
-  'Eletrônicos':'loja eletrônicos','Informática':'loja informática',
-  'Decoração':'loja decoração','Bazar':'bazar','Mercado':'mercado','Confeitaria':'confeitaria'
-};
-
-// Carrega SDK Google Maps JS dinamicamente (resolve CORS)
-// ── Google Maps SDK loader ────────────────────────────
-var _gmapsLoaded=false;
-var _gmapsCallbacks=[];
-window._gmapsReadyCb=function(){ _gmapsLoaded=true; _gmapsCallbacks.forEach(function(cb){cb();}); _gmapsCallbacks=[]; };
-
-function carregarGoogleMaps(key,cb){
-  if(_gmapsLoaded){ cb(); return; }
-  _gmapsCallbacks.push(cb);
-  if(document.querySelector('script[data-gmaps]')) return;
-  var s=document.createElement('script');
-  s.dataset.gmaps='1';
-  s.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(key)+'&libraries=places&callback=_gmapsReadyCb&language=pt-BR&v=weekly';
-  s.async=true;
-  s.onerror=function(){ _gmapsCallbacks.forEach(function(cb){cb();}); _gmapsCallbacks=[]; };
-  document.head.appendChild(s);
-}
-
-function buscarLojasPorSegBairro(){ buscarLojasPorSeg('bairro'); }
-function buscarLojasPorSegCidade(){ buscarLojasPorSeg('cidade'); }
-
-async function buscarLojasPorSeg(escopo){
-  var status=document.getElementById('seg-busca-status');
-  var lista=document.getElementById('seg-busca-lista');
-  if(!status||!lista) return;
-
-  var cfg=loadCfg(); var placesKey=(cfg.placesKey||'').trim();
-  if(!placesKey){ status.innerHTML='⚠️ Configure a Google Places API Key em Configurações.'; return; }
-
-  var cidadeManual=(document.getElementById('busca-cidade-manual')?.value||'').trim();
-  var raio=escopo==='bairro'?1500:5000;
-
-  var segsAtivos=_segsSelecionados.size>0
-    ?[..._segsSelecionados]
-    :[...new Set(DB.clientes.filter(function(c){return c.seg&&!c.encerrado;}).map(function(c){return c.seg;}))];
-
-  var keywords=[...new Set(segsAtivos.map(function(s){return KW_SEG[s]||s;}).filter(Boolean))].slice(0,4);
-  if(!keywords.length){ status.innerHTML='⚠️ Nenhum segmento disponível.'; return; }
-
-  status.innerHTML='⏳ Carregando Google Maps...';
-  lista.innerHTML='';
-
-  carregarGoogleMaps(placesKey, async function(){
-    // PASSO 1: SDK carregou?
-    if(!window.google||!window.google.maps){
-      status.innerHTML='❌ [P1] Google Maps não carregou. Chave inválida ou sem conexão.'; return;
+    // junta paradas muito próximas (uma busca cobre as duas)
+    var grupos=[]; centros.forEach(function(c){ if(!grupos.some(function(g){ return _prDist(g,c)<raio; })) grupos.push(c); });
+    var tipos=prTiposAtivos().map(function(id){ return PR_TIPOS.find(function(t){return t.id===id;}); }).filter(Boolean);
+    var extra=(document.getElementById('pr-extra')||{}).value; extra=(extra||cfg.extra||'').trim();
+    var qs=tipos.map(function(t){ return {q:t.q, id:t.id}; }); if(extra) qs.push({q:extra, id:'extra'});
+    var jobs=[]; grupos.forEach(function(g){ qs.forEach(function(q){ jobs.push({g:g,q:q}); }); });
+    var cortou=jobs.length>PR_MAX_BUSCAS; jobs=jobs.slice(0,PR_MAX_BUSCAS);
+    var achados={}, novas=0, feitas=0;
+    for(var j=0;j<jobs.length;j++){
+      _prStatus('🔎 Buscando '+esc(jobs[j].q.q)+(grupos.length>1?' perto de '+esc(jobs[j].g.nome):'')+'... ('+(j+1)+'/'+jobs.length+')');
+      var r=await prPlacesBuscar(jobs[j].q.q, jobs[j].g, raio); feitas++; if(!r.cache) novas++;
+      r.lista.forEach(function(p){ var a=achados[p.id]||(achados[p.id]=Object.assign({},p,{tiposIds:[]})); if(a.tiposIds.indexOf(jobs[j].q.id)<0) a.tiposIds.push(jobs[j].q.id); });
     }
-    status.innerHTML='[P1] Maps OK... verificando Places...';
-    if(!window.google.maps.places){
-      status.innerHTML='❌ [P2] Places library não carregou. Aguarde e tente novamente.'; return;
-    }
-    status.innerHTML='[P2] Places OK...';
-
-    // PASSO 3: Coordenadas
-    var lat,lng;
-    if(cidadeManual){
-      status.innerHTML='[P3] Geocoding "'+cidadeManual+'"...';
-      try{
-        var geoRes=await new Promise(function(res,rej){
-          new google.maps.Geocoder().geocode({address:cidadeManual+' Brasil',language:'pt-BR'},function(r,st){
-            if(st==='OK'&&r&&r[0]) res(r[0].geometry.location);
-            else rej(new Error('Geocoding: '+st));
-          });
-        });
-        lat=geoRes.lat(); lng=geoRes.lng();
-        status.innerHTML='[P3] Localizado: '+lat.toFixed(4)+','+lng.toFixed(4);
-      }catch(e){ status.innerHTML='❌ [P3] '+e.message; return; }
-    } else {
-      status.innerHTML='[P3] Obtendo GPS...';
-      try{
-        var pos=await new Promise(function(res,rej){
-          navigator.geolocation.getCurrentPosition(res,function(e){rej(new Error(e.message));},{timeout:10000,enableHighAccuracy:false});
-        });
-        lat=pos.coords.latitude; lng=pos.coords.longitude;
-        status.innerHTML='[P3] GPS: '+lat.toFixed(4)+','+lng.toFixed(4);
-      }catch(e){ status.innerHTML='❌ [P3] GPS: '+e.message; return; }
-    }
-
-    // PASSO 4: Mapa invisível mas renderizado (PlacesService exige mapa no DOM)
-    status.innerHTML='[P4] Inicializando...';
-    var mapDiv=document.createElement('div');
-    mapDiv.style.cssText='width:1px;height:1px;position:fixed;top:0;left:0;opacity:0;pointer-events:none;z-index:-1';
-    document.body.appendChild(mapDiv);
-    var gmap=new google.maps.Map(mapDiv,{center:{lat:lat,lng:lng},zoom:14});
-
-  });
+    // localiza clientes da região (para o alerta de conflito), sem travar: até 15 por busca
+    var semGeo=(DB.clientes||[]).filter(function(c){ return !c.encerrado&&!_prGeoOk(c)&&c.cid&&Object.keys(achados).some(function(k){ return _prN(achados[k].end).indexOf(_prN(c.cid))>=0; }); }).slice(0,15);
+    for(var s=0;s<semGeo.length;s++){ _prStatus('🗺️ Conferindo clientes da região ('+(s+1)+'/'+semGeo.length+')...'); await prGeoCliente(semGeo[s]); }
+    _prGeoSalvar();
+    _PR.centros=centros; _PR.raio=raio;
+    _PR.res=prClassificar(Object.keys(achados).map(function(k){return achados[k];}), centros, raio);
+    _PR.sel={}; _PR.mostrarTodos=false; _PR.msg=(cortou?'⚠️ Muitas paradas × tipos: busquei as '+PR_MAX_BUSCAS+' primeiras combinações. ':'')+(novas?novas+' busca(s) novas no Google':'tudo do cache (sem custo)');
+    if(opts.soAbertos) _PR.res=_PR.res.filter(function(p){ return p.aberto!==false; });
+    prDesenharRes();
+    return _PR.res;
+  }catch(e){
+    var m=e.message==='SEM_CHAVE'?'Configure a chave do Google Places em Mais → Configurações.':(e.message||String(e));
+    _prStatus('<span style="color:var(--red)">❌ '+esc(m)+'</span>');
+    return null;
+  }finally{ _PR.ocupado=false; }
 }
 
-
-function _exibirResultadosProximos(resultados,lat,lng,placesKey,status,lista){
-  function norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
-  var uniq={}; resultados.forEach(function(p){uniq[norm(p.nome)]=p;}); resultados=Object.values(uniq);
-  resultados.sort(function(a,b){return (b.prospect?1:0)-(a.prospect?1:0);});
-  var prospects=resultados.filter(function(p){return p.prospect;});
-  var jaClientes=resultados.filter(function(p){return !p.prospect;});
-
-  if(!resultados.length){ status.innerHTML='Nenhum resultado. Tente outro segmento ou cidade.'; return; }
-
-  var LETRAS='ABCDEFGHIJKLMNOPQRSTUVWXY';
-  var mapUrl='https://maps.googleapis.com/maps/api/staticmap?size=640x280&scale=2&maptype=roadmap&key='+encodeURIComponent(placesKey);
-  mapUrl+='&markers=color:blue%7Clabel:V%7C'+lat+','+lng;
-  resultados.slice(0,24).forEach(function(p,i){
-    p._letra=LETRAS[i];
-    mapUrl+='&markers=color:'+(p.prospect?'red':'green')+'%7Clabel:'+p._letra+'%7C'+p.lat+','+p.lng;
-  });
-
-  status.innerHTML='<b>'+resultados.length+'</b> local(is) · <span style="color:var(--red)">'+prospects.length+' prospecto(s)</span>'+(jaClientes.length?' · <span style="color:var(--grn)">'+jaClientes.length+' já cliente(s)</span>':'');
-
-  lista.innerHTML='<img src="'+mapUrl+'" style="width:100%;border-radius:8px;display:block;margin-bottom:4px" onerror="_mapaEstaticoErro(this)">'
-    +'<div style="font-size:10px;color:var(--t3);margin-bottom:10px">🔵 V=você · 🟢 já cliente · 🔴 prospecto</div>'
-    +resultados.map(function(p){
-      var cor=p.prospect?'var(--red)':'var(--grn)';
-      var mapsLink='https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lng+(p.placeId?'&destination_place_id='+p.placeId:'');
-      var norm2=function(s){return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();};
-      var wppCli=DB.clientes.find(function(c){return !p.prospect&&norm2(c.rs||'').slice(0,8)===norm2(p.nome).slice(0,8);});
-      return '<div style="padding:9px 0;border-bottom:1px solid var(--s3);display:flex;align-items:flex-start;gap:10px">'
-        +'<span style="background:'+cor+';color:#fff;border-radius:50%;width:22px;height:22px;min-width:22px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;margin-top:2px">'+(p._letra||'•')+'</span>'
-        +'<div style="flex:1;min-width:0">'
-          +'<div style="font-weight:600;font-size:13px;color:var(--t1);word-break:break-word">'+p.nome+'</div>'
-          +(p.end2?'<div style="font-size:10px;color:var(--t3);margin-top:1px;word-break:break-word">'+p.end2+'</div>':'')
-          +'<div style="display:flex;gap:10px;margin-top:5px;flex-wrap:wrap">'
-            +'<span style="font-size:11px;color:'+cor+';font-weight:600">'+(p.prospect?'⭐ Prospecto':'✓ Já cliente')+'</span>'
-            +'<a href="'+mapsLink+'" target="_blank" style="font-size:11px;color:var(--acc);text-decoration:none;font-weight:500"><i class="ti ti-navigation"></i> Rota</a>'
-            +(wppCli&&(wppCli.cel||wppCli.fone)?'<a href="https://wa.me/55'+(wppCli.cel||wppCli.fone).replace(/\D/g,'')+'" target="_blank" style="font-size:11px;color:#25D366;text-decoration:none;font-weight:500"><i class="ti ti-brand-whatsapp"></i> WhatsApp</a>':'')
-          +'</div>'
-        +'</div>'
-      +'</div>';
-    }).join('');
+// ── Resultados ──
+function prDesenharRes(){
+  var el=document.getElementById('pr-res'); if(!el||!_PR.res) return;
+  var uso=document.getElementById('pr-uso'); if(uso) uso.textContent=_prUsoMes(0);
+  var R=_PR.res, prosp=R.filter(function(p){ return !p.cliente; }), clis=R.filter(function(p){ return p.cliente; });
+  _prStatus('<b>'+prosp.length+'</b> prospect(s)'+(clis.length?' · '+clis.length+' já cliente(s)':'')+(_PR.msg?'<br><span style="font-size:11px;color:var(--t3)">'+_PR.msg+'</span>':''));
+  if(!R.length){ el.innerHTML='<div class="card" style="text-align:center;color:var(--t3);font-size:14px">Nada encontrado. Aumente a distância ou marque outros tipos de loja.</div>'; return; }
+  var mostra=_PR.mostrarTodos?prosp:prosp.slice(0,5);
+  var nSel=Object.keys(_PR.sel).length;
+  var h=_prMapaImg(prosp.slice(0,15));
+  h+='<div style="display:flex;gap:8px;margin:10px 0">'
+    +'<button class="btn '+(nSel?'bp':'bs')+'" style="flex:1;font-size:13px;padding:10px" onclick="prAbrirRota()"><i class="ti ti-route"></i> Abrir rota no Maps'+(nSel?' (+'+nSel+' prospect'+(nSel>1?'s':'')+')':'')+'</button></div>';
+  h+=mostra.map(function(p,i){ return _prCard(p,i); }).join('');
+  if(prosp.length>5) h+='<button class="btn bs" style="width:100%;margin-top:8px;font-size:13px" onclick="_PR.mostrarTodos=!_PR.mostrarTodos;prDesenharRes()">'+(_PR.mostrarTodos?'▲ Mostrar só os 5 melhores':'▼ Ver todos ('+prosp.length+')')+'</button>';
+  if(clis.length) h+='<details style="margin-top:10px"><summary style="font-size:13px;color:var(--t3);cursor:pointer">Lojas encontradas que já são suas clientes ('+clis.length+')</summary>'+clis.map(function(p){ return '<div style="font-size:13px;padding:6px 0;border-bottom:1px solid var(--bdr)">✓ '+esc(p.nome)+' → <a href="#" onclick="abrirClienteM(\''+p.cliente.id+'\');return false" style="color:var(--acc)">'+esc(p.cliente.rs)+'</a>'+(p.cliente.placeId?'':' <a href="#" onclick="prVincular(\''+p.id+'\');return false" style="font-size:11px;color:var(--t3)">(vincular)</a>')+'</div>'; }).join('')+'</details>';
+  el.innerHTML=h;
+}
+var PR_LETRAS='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+function _prMapaImg(lista){
+  var key=_prChave(); if(!key||!lista.length) return '';
+  var u='https://maps.googleapis.com/maps/api/staticmap?size=640x300&scale=2&language=pt-BR&key='+encodeURIComponent(key);
+  _PR.centros.slice(0,8).forEach(function(c,i){ u+='&markers=color:blue%7Clabel:'+(c.cliId?(i+1):'V')+'%7C'+c.lat.toFixed(5)+','+c.lng.toFixed(5); });
+  lista.forEach(function(p,i){ u+='&markers=color:'+(p.conflito?'orange':'red')+'%7Clabel:'+PR_LETRAS[i]+'%7C'+p.lat.toFixed(5)+','+p.lng.toFixed(5); });
+  return '<img src="'+u+'" alt="" style="width:100%;border-radius:12px;display:block" onerror="this.outerHTML=\'<div style=&quot;font-size:11px;color:var(--t3);text-align:center;padding:6px&quot;>(Mapa em imagem indisponível — ative a Maps Static API se quiser vê-lo)</div>\'">'
+    +'<div style="font-size:11px;color:var(--t3);margin-top:4px">🔵 paradas/você · 🔴 prospect · 🟠 prospect perto de cliente seu</div>';
+}
+function _prCard(p,i){
+  var cor=p.score>=70?'var(--grn)':p.score>=45?'var(--org)':'var(--t3)';
+  var sel=!!_PR.sel[p.id];
+  var tel=_prTel(p.tel);
+  return '<div class="card" style="margin-bottom:8px;padding:12px;'+(sel?'border:2px solid var(--acc)':'')+'">'
+   +'<div style="display:flex;gap:10px;align-items:flex-start">'
+     +'<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0"><span style="width:26px;height:26px;border-radius:50%;background:'+(p.conflito?'#f97316':'#dc2626')+';color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center">'+(PR_LETRAS[i]||'•')+'</span><span style="font-size:15px;font-weight:800;color:'+cor+'">'+p.score+'</span></div>'
+     +'<div style="flex:1;min-width:0">'
+       +'<div style="font-size:15px;font-weight:700;color:var(--t1)">'+esc(p.nome)+'</div>'
+       +'<div style="font-size:12px;color:var(--t3);margin-top:2px">'+esc(p.tipo||'')+(p.nota?' · ⭐ '+String(p.nota).replace('.',',')+' ('+p.aval+')':'')+(p.aberto===true?' · <span style="color:var(--grn)">aberto agora</span>':p.aberto===false?' · fechado agora':'')+'</div>'
+       +'<div style="font-size:12px;color:var(--t2);margin-top:2px">'+esc(p.end)+'</div>'
+       +'<div style="font-size:12px;color:var(--t2);margin-top:3px">📏 '+_prFmtD(p.dist)+(p.perto&&p.perto!=='você'?' de '+esc(p.perto):p.perto==='você'?' de você':'')+'</div>'
+       +(p.conflito?'<div style="font-size:12px;color:#ea580c;font-weight:600;margin-top:3px">⚠️ a '+_prFmtD(p.conflito.d)+' do seu cliente '+esc(p.conflito.cli.rs)+'</div>':'')
+       +(p.lead?'<div style="font-size:12px;color:var(--acc);font-weight:600;margin-top:3px">★ Já está nos seus leads ('+esc(p.lead.estagio||'Novo')+')</div>':'')
+     +'</div></div>'
+   +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">'
+     +'<button onclick="prSel(\''+p.id+'\')" style="flex:1;min-width:92px;padding:9px 6px;border-radius:10px;border:1px solid var(--acc);background:'+(sel?'var(--acc)':'transparent')+';color:'+(sel?'#fff':'var(--acc)')+';font-size:12px;font-weight:700">'+(sel?'✓ Na rota':'+ Rota')+'</button>'
+     +'<a href="https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lng+'&destination_place_id='+encodeURIComponent(p.id)+'" target="_blank" style="flex:1;min-width:70px;text-align:center;padding:9px 6px;border-radius:10px;border:1px solid var(--bdr);color:var(--t1);font-size:12px;font-weight:600;text-decoration:none">🧭 Ir</a>'
+     +(tel?'<a href="tel:'+tel+'" style="flex:1;min-width:70px;text-align:center;padding:9px 6px;border-radius:10px;border:1px solid var(--bdr);color:var(--t1);font-size:12px;font-weight:600;text-decoration:none">📞 Ligar</a>':'')
+     +(_prEhCel(tel)?'<a href="https://wa.me/55'+tel+'" target="_blank" style="flex:1;min-width:70px;text-align:center;padding:9px 6px;border-radius:10px;border:1px solid #25d366;color:#16a34a;font-size:12px;font-weight:600;text-decoration:none">WhatsApp</a>':'')
+     +(p.site?'<a href="'+esc(p.site)+'" target="_blank" style="flex:1;min-width:60px;text-align:center;padding:9px 6px;border-radius:10px;border:1px solid var(--bdr);color:var(--t1);font-size:12px;text-decoration:none">🌐 Site</a>':'')
+   +'</div>'
+   +'<div style="display:flex;gap:6px;margin-top:6px">'
+     +(p.lead?'':'<button onclick="prSalvarLead(\''+p.id+'\')" style="flex:2;padding:9px;border-radius:10px;border:none;background:var(--grn);color:#fff;font-size:13px;font-weight:700">★ Salvar como lead</button>')
+     +'<button onclick="prDescartar(\''+p.id+'\')" style="flex:1;padding:9px;border-radius:10px;border:1px solid var(--bdr);background:var(--s2);color:var(--t3);font-size:12px">Descartar</button>'
+   +'</div></div>';
+}
+function _prAchar(id){ return (_PR.res||[]).find(function(p){ return p.id===id; }); }
+function prSel(id){ if(_PR.sel[id]) delete _PR.sel[id]; else _PR.sel[id]=1; prDesenharRes(); }
+function _prCidadeDoEnd(end){ var m=String(end||'').match(/,\s*([^,\-]+?)\s*-\s*[A-Z]{2}\b/); return m?m[1].trim():''; }
+function prSalvarLead(id){
+  var p=_prAchar(id); if(!p) return;
+  DB.leads=DB.leads||[];
+  var l={id:uid(), nome:p.nome, empresa:p.nome, tel:p.tel||'', cidade:_prCidadeDoEnd(p.end), origem:'Prospecção (mapa)', estagio:'Novo',
+    visita:_PR.modo==='rota'||_PR.sel[id]?dataISO(new Date()):null,
+    obs:[p.end, p.tipo, p.nota?'Google ⭐ '+p.nota+' ('+p.aval+' avaliações)':'', p.site, p.conflito?'Atenção: a '+_prFmtD(p.conflito.d)+' do cliente '+p.conflito.cli.rs:''].filter(Boolean).join('\n'),
+    dtCriacao:dataISO(new Date()), placeId:p.id, end:p.end, geo:{lat:p.lat,lng:p.lng,p:'google'}, mapsUrl:p.url||''};
+  DB.leads.push(l); p.lead=l; salvarDB();
+  toastM('★ '+p.nome+' salvo nos Leads');
+  prDesenharRes();
+}
+function prDescartar(id){
+  var p=_prAchar(id); if(!p) return;
+  var d=_prLS('repcm_prosp_desc',{}); d[id]=dataISO(new Date()); _prLSset('repcm_prosp_desc',d);
+  delete _PR.sel[id]; _PR.res=_PR.res.filter(function(x){ return x.id!==id; });
+  toastM('Descartado — não aparece mais'); prDesenharRes();
+}
+function prVincular(id){
+  var p=_prAchar(id); if(!p||!p.cliente) return;
+  p.cliente.placeId=p.id; if(!p.cliente.geo||p.cliente.geo.p==='cidade') p.cliente.geo={lat:p.lat,lng:p.lng,p:'google',q:_prEndCli(p.cliente)};
+  salvarDB(); toastM('Vinculado a '+p.cliente.rs); prDesenharRes();
+}
+// Rota no Google Maps: paradas + prospects escolhidos, na ordem do mais perto
+async function prAbrirRota(){
+  var pts=_PR.centros.filter(function(c){ return c.cliId; }).map(function(c){ return {lat:c.lat,lng:c.lng}; });
+  Object.keys(_PR.sel).forEach(function(id){ var p=_prAchar(id); if(p) pts.push({lat:p.lat,lng:p.lng,pid:p.id}); });
+  if(!pts.length){ toastM('Marque "+ Rota" nos prospects que quer visitar'); return; }
+  var ini=null; try{ ini=await _prGPS(); }catch(e){ ini=_PR.centros[0]||pts[0]; }
+  var ord=[], resto=pts.slice(), atual=ini;
+  while(resto.length){ var bi=0, bd=1e12; resto.forEach(function(p,i){ var d=_prDist(atual,p); if(d<bd){ bd=d; bi=i; } }); atual=resto.splice(bi,1)[0]; ord.push(atual); }
+  ord=ord.slice(0,10);
+  var dest=ord.pop();
+  var u='https://www.google.com/maps/dir/?api=1&travelmode=driving&destination='+dest.lat+','+dest.lng+(dest.pid?'&destination_place_id='+encodeURIComponent(dest.pid):'');
+  if(ord.length) u+='&waypoints='+ord.map(function(p){ return p.lat+','+p.lng; }).join('%7C');
+  window.open(u,'_blank');
 }
 
-function _mapaEstaticoErro(el){
-  el.outerHTML='<div style="font-size:10px;color:var(--t3);padding:6px;border:1px dashed var(--bdr);border-radius:6px;margin-bottom:6px">Mapa indisponível — habilite a Maps Static API no Google Cloud Console.</div>';
-}
-
-
+// ── Meus clientes perto de mim ──
 async function buscarProximosM(){
-  var status = document.getElementById('proximos-status');
-  var lista = document.getElementById('proximos-lista');
-  if(!status||!lista) return;
-
-  status.innerHTML='<i class="ti ti-loader"></i> Obtendo sua localização...';
-  lista.innerHTML='';
-
-  if(!navigator.geolocation){
-    status.innerHTML='❌ Geolocalização não disponível neste dispositivo.'; return;
-  }
-
-  navigator.geolocation.getCurrentPosition(async function(pos){
-    _minhaLocM = {lat: pos.coords.latitude, lng: pos.coords.longitude};
-    status.innerHTML='📍 Localização obtida! Identificando sua cidade...';
-
-    try{
-      // Reverse geocode para descobrir cidade atual
-      var r = await fetch(
-        'https://nominatim.openstreetmap.org/reverse?format=json&lat='+_minhaLocM.lat+'&lon='+_minhaLocM.lng+'&zoom=10',
-        {headers:{'User-Agent':'RepCRM-Mobile/1.0'}}
-      );
-      var d = await r.json();
-      var cidadeOriginal = d.address?.city || d.address?.town || d.address?.municipality || d.address?.county || '';
-      var cidadeAtual = normalizar(cidadeOriginal);
-
-      if(!cidadeAtual){
-        status.innerHTML='❌ Não foi possível identificar sua cidade atual.'; return;
-      }
-
-      // Filtra clientes da mesma cidade
-      var clisCidade = DB.clientes.filter(function(c){
-        if(c.encerrado) return false;
-        var cidCli = normalizar(c.cid||'');
-        return cidCli===cidadeAtual ||
-               cidCli.includes(cidadeAtual) ||
-               cidadeAtual.includes(cidCli);
-      });
-
-      status.innerHTML = '📍 Você está em <b>'+cidadeOriginal+'</b> · '+
-        '<b>'+clisCidade.length+'</b> cliente(s) nesta cidade'+
-        (clisCidade.length?
-          ' <button onclick="abrirTodosMapaM()" class="btn bs" style="font-size:10px;padding:2px 8px;margin-left:6px"><i class="ti ti-map"></i> Ver todos</button>':'');
-
-      if(!clisCidade.length){
-        lista.innerHTML='<div style="color:var(--t3);font-size:13px;padding:20px;text-align:center">Nenhum cliente cadastrado em '+cidadeOriginal+'.</div>';
-        return;
-      }
-
-      // Guarda para abrir todos no mapa
-      window._proximosResultados = clisCidade;
-
-      lista.innerHTML = clisCidade.map(function(c){
-        var e = DB.empresas.find(function(emp){return emp.id===c.empId;});
-        var endCompleto = [c.end, c.cid, c.uf].filter(Boolean).join(', ');
-        var endMapa = encodeURIComponent(endCompleto||c.cid||c.rs);
-        return '<div class="list-item">'+
-          
-          '<div class="list-body" onclick="abrirClienteM(\''+c.id+'\')" style="cursor:pointer">'+
-            '<div class="list-name">'+c.rs+'</div>'+
-            '<div class="list-sub" style="color:var(--t2)">'+(c.end||'Sem endereço cadastrado')+'</div>'+
-            (c.comp?'<div class="list-sub">'+c.comp+'</div>':'')+
-          '</div>'+
-          '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">'+
-            '<button onclick="window.open(\'https://www.google.com/maps/search/?api=1&query='+endMapa+'\',\'_blank\')" '+
-              'style="background:none;border:1px solid var(--acc);border-radius:6px;padding:4px 10px;font-size:10px;color:var(--acc);cursor:pointer">'+
-              '<i class="ti ti-map-pin"></i> Mapa</button>'+
-            (c.cel||c.fone?
-              '<button onclick="wppM(\''+((c.cel||c.fone)||'')+'\''+')" '+
-              'style="background:none;border:1px solid #25d366;border-radius:6px;padding:4px 10px;font-size:10px;color:#25d366;cursor:pointer">'+
-              '<i class="ti ti-brand-whatsapp"></i></button>':'')+ 
-          '</div>'+
-        '</div>';
-      }).join('');
-
-    }catch(err){
-      status.innerHTML='❌ Erro ao identificar cidade: '+err.message;
-    }
-
-  }, function(err){
-    var msgs={1:'Permissão negada. Toque em Permitir.',2:'Localização indisponível.',3:'Tempo esgotado.'};
-    status.innerHTML='❌ '+(msgs[err.code]||'Erro ao obter localização.');
-  },{timeout:15000, maximumAge:60000});
+  var st=document.getElementById('proximos-status'), li=document.getElementById('proximos-lista');
+  if(!st||!li) return;
+  st.innerHTML='📍 Pegando sua localização...'; li.innerHTML='';
+  try{
+    var eu=await _prGPS();
+    var cidade=await prCidadeDoGPS(eu), cn=_prN(cidade);
+    var clis=(DB.clientes||[]).filter(function(c){ return !c.encerrado; });
+    var daCidade=cn?clis.filter(function(c){ var x=_prN(c.cid); return x&&(x===cn||x.indexOf(cn)>=0||cn.indexOf(x)>=0); }):[];
+    var semGeo=daCidade.filter(function(c){ return !_prGeoOk(c); }).slice(0,20);
+    for(var i=0;i<semGeo.length;i++){ st.innerHTML='🗺️ Localizando clientes de '+esc(cidade)+' ('+(i+1)+'/'+semGeo.length+')...'; await prGeoCliente(semGeo[i]); }
+    _prGeoSalvar();
+    var lista=clis.filter(function(c){ return c.geo&&c.geo.p!=='cidade'; }).map(function(c){ return {c:c,d:_prDist(eu,c.geo)}; }).filter(function(x){ return x.d<15000; });
+    daCidade.forEach(function(c){ if(!lista.some(function(x){ return x.c===c; })) lista.push({c:c,d:null}); });
+    lista.sort(function(a,b){ return (a.d==null?1e12:a.d)-(b.d==null?1e12:b.d); });
+    window._proximosResultados=lista.map(function(x){ return x.c; });
+    if(!lista.length){ st.innerHTML='Nenhum cliente seu por perto'+(cidade?' ('+esc(cidade)+')':'')+'.'; return; }
+    var I=null; try{ I=indiceVendas(); }catch(e){}
+    st.innerHTML='Você está em <b>'+esc(cidade||'?')+'</b> · '+lista.length+' cliente(s) por perto';
+    li.innerHTML=lista.slice(0,30).map(function(x){ var c=x.c;
+      var pc=I&&I.porCli[c.id]||[], dias=pc.length?Math.min.apply(null,pc.map(function(p){return p.diasSem;})):null;
+      var tel=c.cel||c.fone;
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bdr)">'
+        +'<div style="flex:1;min-width:0" onclick="abrirClienteM(\''+c.id+'\')"><div style="font-size:14px;font-weight:600;color:var(--t1)">'+esc(c.rs)+'</div>'
+        +'<div style="font-size:12px;color:var(--t3)">'+(x.d!=null?'📏 '+_prFmtD(x.d):'📍 mesma cidade')+(dias!=null?' · última compra há '+dias+'d':'')+'</div></div>'
+        +'<a href="https://www.google.com/maps/dir/?api=1&destination='+(c.geo&&c.geo.p!=='cidade'?c.geo.lat+','+c.geo.lng:encodeURIComponent(_prEndCli(c)||c.rs))+'" target="_blank" style="border:1px solid var(--acc);border-radius:8px;padding:7px 10px;font-size:12px;color:var(--acc);text-decoration:none">🧭</a>'
+        +(tel?'<button onclick="wppM(\''+esc(tel)+'\')" style="border:1px solid #25d366;background:none;border-radius:8px;padding:7px 10px;font-size:12px;color:#16a34a">WA</button>':'')
+        +'<button onclick="prAddParada(\''+c.id+'\');toastM(\'Adicionado à rota de hoje\')" title="Adicionar à rota de hoje" style="border:1px solid var(--bdr);background:var(--s2);border-radius:8px;padding:7px 10px;font-size:12px;color:var(--t2)">+🚗</button></div>';
+    }).join('');
+  }catch(e){ st.innerHTML='<span style="color:var(--red)">❌ '+esc(e.message||e)+'</span>'; }
 }
-
-function abrirTodosMapaM(){
-  if(!window._proximosResultados||!window._proximosResultados.length) return;
-  window._proximosResultados.slice(0,9).forEach(function(c,i){
-    setTimeout(function(){
-      var end = encodeURIComponent([c.end,c.cid,c.uf].filter(Boolean).join(', ')||c.rs);
-      window.open('https://www.google.com/maps/search/?api=1&query='+end,'_blank');
-    },i*700);
-  });
+// Atalho (Amora / "tenho um tempo livre"): prospects abertos perto de mim
+function prProspectsAgora(soAbertos){
+  _PR.modo='gps'; navM('proximos');
+  return new Promise(function(r){ setTimeout(r,150); }).then(function(){ return prBuscar({soAbertos:!!soAbertos}); });
 }
-// ── Fim Clientes Próximos ────────────────────────────────
+// ── Fim Mapa & Prospecção ──
+
 // ══ FIREBASE SYNC ══
 // ╔══════════════════════════════════════════════════════╗
 // ║         CONFIGURAÇÃO FIREBASE — PREENCHA AQUI        ║
@@ -4883,7 +4602,7 @@ async function processarComandoVoz(texto){
 
   // 1. Ajuda
   if(tem(/^(ajuda|comandos|o que voce (faz|sabe))/)){
-    responder('Exemplos: "resumo da Bella" (lê o que ela compra), "abrir cliente Dikas", "WhatsApp da Bella", "rota para Dikas", "ligar para Bella", "lembrete amanhã 10h ligar para Dikas", "fila do dia", "clientes próximos", "abrir pedidos". Qualquer outra pergunta eu passo para a IA.');
+    responder('Exemplos: "resumo da Bella" (lê o que ela compra), "abrir cliente Dikas", "WhatsApp da Bella", "rota para Dikas", "ligar para Bella", "lembrete amanhã 10h ligar para Dikas", "fila do dia", "clientes próximos", "prospects perto", "tenho um tempo livre", "abrir pedidos". Qualquer outra pergunta eu passo para a IA.');
     return;
   }
   // 2. Resumo / preparar visita (lê o mix de compras)
@@ -4903,10 +4622,22 @@ async function processarComandoVoz(texto){
     responder('Abrindo sua fila do dia.'+(nt?' Você tem '+nt+' tarefa'+(nt>1?'s':'')+' para hoje ou atrasada'+(nt>1?'s':'')+'.':''));
     return;
   }
-  // 4. Clientes próximos
+  // 4a. Prospects (lojas novas) perto / tempo livre
+  var tempoLivre=tem(/\b(tempo livre|tempo sobrando|horario livre|janela|tenho \d+ minutos|sobrou tempo|visita cancelou|cancelou a visita)\b/);
+  if(tempoLivre||tem(/\b(prospect|prospects|prospecto|prospectos|prospectar|prospeccao|lojas novas|loja nova|clientes novos|cliente novo|potencial|potenciais)\b/)){
+    responder(tempoLivre?'Procurando lojas com potencial abertas perto de você.':'Procurando lojas com potencial perto de você.');
+    prProspectsAgora(tempoLivre).then(function(res){
+      if(!res) { _amSet('voz-resposta','Não consegui buscar. Veja a mensagem na tela de prospecção.'); return; }
+      var ps=res.filter(function(p){ return !p.cliente; }).slice(0,3);
+      if(!ps.length){ responder('Não achei lojas novas por perto. Tente aumentar a distância.'); return; }
+      responder('Achei '+res.filter(function(p){return !p.cliente;}).length+' lojas. As melhores: '+ps.map(function(p){ return p.nome+', a '+_prFmtD(p.dist); }).join('; ')+'.');
+    });
+    return;
+  }
+  // 4b. Clientes próximos
   if(tem(/\b(proximos|proximo de mim|perto|por perto|redondeza|proximidade)/)&&!cli){
-    navM('proximos'); try{ buscarProximosM(); }catch(e){}
-    responder('Buscando clientes perto de você.');
+    navM('proximos'); setTimeout(function(){ try{ buscarProximosM(); }catch(e){} },150);
+    responder('Buscando seus clientes perto de você.');
     return;
   }
   // 5. Lembrete / agendar
