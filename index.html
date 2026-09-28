@@ -386,7 +386,7 @@ if('serviceWorker' in navigator){var b=new Blob(["const CACHE='repcrm-mob-v26';s
     <div style="display:flex;gap:8px;align-items:center;margin:-6px 0 10px"><button class="btn bs" style="padding:6px 12px;font-size:12px" onclick="testarChaveIA('mcfg-key','mcfg-key-teste')"><i class="ti ti-plug-connected"></i> Testar chave</button><span id="mcfg-key-teste" style="font-size:12px"></span></div>
     <div style="display:flex;gap:6px;margin:-4px 0 10px"><button class="btn bs" style="flex:1;padding:6px 8px;font-size:12px" onclick="enviarChaveIANuvem()"><i class="ti ti-cloud-lock"></i> Levar p/ aparelhos</button><button class="btn bs" style="flex:1;padding:6px 8px;font-size:12px" onclick="pegarChaveIANuvem(false)"><i class="ti ti-cloud-download"></i> Pegar da nuvem</button></div>
     <div class="fg"><label class="fl">Google Places API Key</label><input class="fi" id="mcfg-places-key" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" data-mascara="1" placeholder="AIza... (busca de lojas)"></div>
-    <div style="font-size:11px;color:var(--t3);margin-top:-8px;margin-bottom:8px">console.cloud.google.com → Places API (nova)</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:-8px;margin-bottom:8px"><button type="button" class="btn bs" style="font-size:12px;padding:6px 10px" onclick="testarChavePlaces()">Testar chave</button><span style="font-size:11px;color:var(--t3)">Chave comum (AIza…) com a Places API (New) ativada</span></div><div id="mcfg-places-teste" style="font-size:12px;margin:-4px 0 8px;line-height:1.4"></div>
     <div class="fg"><label class="fl">Nome da assistente virtual</label><input class="fi" id="mcfg-amora" placeholder="Amora" maxlength="20"></div>
     <div style="font-size:11px;color:var(--t3);margin-top:-8px">Diga este nome para ativar a assistente por voz</div>
     <div class="fg">
@@ -3831,20 +3831,58 @@ async function prPlacesBuscar(q, centro, raio){
   if(cache[ck]&&agora-cache[ck].t<PR_CACHE_DIAS*864e5) return {lista:cache[ck].r, cache:true};
   var key=_prChave(); if(!key) throw new Error('SEM_CHAVE');
   var corpo={textQuery:q, languageCode:'pt-BR', regionCode:'BR', pageSize:20, locationBias:{circle:{center:{latitude:centro.lat,longitude:centro.lng},radius:Math.min(50000,Math.max(500,raio*1.5))}}};
-  var lista;
-  try{
-    var r=await fetch('https://places.googleapis.com/v1/places:searchText',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':key,'X-Goog-FieldMask':PR_CAMPOS.join(',')},body:JSON.stringify(corpo)});
-    var d=await r.json().catch(function(){ return {}; });
-    if(!r.ok){ var m=(d.error&&d.error.message)||('Erro '+r.status); if(/not been used|disabled|not enabled|SERVICE_DISABLED/i.test(m)) m='A "Places API (New)" não está ativada no Google Cloud para esta chave.'; else if(/API key not valid|API_KEY_INVALID/i.test(m)) m='Chave do Google Places inválida.'; else if(/referer|referrer|blocked/i.test(m)) m='A chave está restrita e bloqueou este app. Libere o site do app nas restrições da chave.'; throw new Error(m); }
-    lista=(d.places||[]).map(_prNormPlace);
-  }catch(e){
-    if(e&&e.name==='TypeError'){ lista=await _prPlacesSDK(q, centro, raio, key); } else throw e;
-  }
+  var lista=await _prPlacesChamar(corpo, key, q, centro, raio);
   _prUsoMes(1);
   cache[ck]={t:agora, r:lista};
   var ks=Object.keys(cache).sort(function(a,b){ return cache[b].t-cache[a].t; }); ks.slice(80).forEach(function(k){ delete cache[k]; });
   _prLSset('repcm_prosp_cache',cache);
   return {lista:lista, cache:false};
+}
+
+// Tenta as formas aceitas pelo Google: chave no cabeçalho → chave na URL → biblioteca JS.
+// Algumas chaves novas (começam com "AQ.") são recusadas com "API keys are not supported".
+function _prMsgErro(status, m, key){
+  var ini=(key||'').slice(0,4);
+  if(/API keys are not supported|OAuth ?2|UNAUTHENTICATED|assert a principal/i.test(m))
+    return 'O Google recusou esta chave para o Places (a chave salva começa com "'+ini+'…").'+(ini.indexOf('AQ.')===0?' Chaves que começam com "AQ." são vinculadas a conta de serviço e o Places não aceita.':'')+' Crie uma chave comum (começa com "AIza"): Google Cloud → APIs e serviços → Credenciais → Criar credenciais → Chave de API, SEM marcar "vincular a conta de serviço". Cole em Mais → Configurações → Google Places API Key.';
+  if(/not been used|disabled|not enabled|SERVICE_DISABLED/i.test(m)) return 'A "Places API (New)" não está ativada no Google Cloud para esta chave. Ative em APIs e serviços → Biblioteca → Places API (New).';
+  if(/API key not valid|API_KEY_INVALID|expired/i.test(m)) return 'Chave do Google Places inválida ou expirada (começa com "'+ini+'…").';
+  if(/referer|referrer|API_KEY_HTTP_REFERRER_BLOCKED|blocked/i.test(m)) return 'A chave está restrita e bloqueou este app. Nas restrições da chave, libere o endereço do app ou use "Nenhuma" restrição de aplicativo (mantendo a restrição só à Places API).';
+  if(/billing|BILLING/i.test(m)) return 'O projeto do Google Cloud precisa ter uma conta de faturamento ativa para usar o Places (a cota grátis continua valendo).';
+  if(status===429) return 'Limite de buscas do Google atingido — tente mais tarde.';
+  return m||('Erro '+status);
+}
+async function _prPlacesChamar(corpo, key, q, centro, raio){
+  var url='https://places.googleapis.com/v1/places:searchText', campos=PR_CAMPOS.join(',');
+  var modos={
+    header:function(){ return fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':key,'X-Goog-FieldMask':campos},body:JSON.stringify(corpo)}); },
+    query:function(){ return fetch(url+'?key='+encodeURIComponent(key)+'&fields='+encodeURIComponent(campos),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo)}); }
+  };
+  var ordem=['header','query'], salvo=null; try{ salvo=localStorage.getItem('prosp_modo'); }catch(e){}
+  if(salvo==='query') ordem=['query','header'];
+  var ultMsg='', ultSt=0, redeFalhou=false;
+  for(var i=0;i<ordem.length;i++){
+    var r;
+    try{ r=await modos[ordem[i]](); }catch(e){ redeFalhou=true; continue; }
+    var d=await r.json().catch(function(){ return {}; });
+    if(r.ok){ try{ localStorage.setItem('prosp_modo',ordem[i]); }catch(e){} return (d.places||[]).map(_prNormPlace); }
+    ultSt=r.status; ultMsg=(d.error&&d.error.message)||('Erro '+r.status);
+    if(!(r.status===401||r.status===403||/OAuth|not supported|UNAUTHENTICATED|principal/i.test(ultMsg))) break;
+  }
+  if(redeFalhou||/not supported|OAuth|principal/i.test(ultMsg)){
+    try{ return await Promise.race([_prPlacesSDK(q, centro, raio, key), new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('Google Maps não respondeu')); },12000); window.gm_authFailure=function(){ _prSDK=null; rej(new Error(ultMsg||'Chave recusada pelo Google Maps')); }; })]); }catch(e){ if(!ultMsg) ultMsg=e.message||String(e); }
+  }
+  throw new Error(_prMsgErro(ultSt, ultMsg, key));
+}
+// Botão "Testar chave" do Places (Configurações)
+async function testarChavePlaces(){
+  var out=document.getElementById('mcfg-places-teste'), inp=document.getElementById('mcfg-places-key');
+  var key=(inp&&inp.value||'').trim(); if(!out) return;
+  if(!key){ out.innerHTML='<span style="color:var(--org)">Cole a chave primeiro.</span>'; return; }
+  out.innerHTML='🔄 Testando...';
+  try{ var l=await _prPlacesChamar({textQuery:'papelaria em Porto Alegre', languageCode:'pt-BR', regionCode:'BR', pageSize:1}, key, 'papelaria em Porto Alegre', {lat:-30.03,lng:-51.22}, 2000);
+    out.innerHTML='<span style="color:var(--grn)">✅ Chave do Places funcionando'+(l.length?' ('+esc(l[0].nome)+')':'')+'</span>'; }
+  catch(e){ out.innerHTML='<span style="color:var(--red)">❌ '+esc(e.message||e)+'</span>'; }
 }
 // Plano B (se o navegador bloquear a chamada direta): biblioteca JS do Google Maps
 var _prSDK=null;
@@ -3965,8 +4003,11 @@ function renderProximosM(){
      +(_PR.modo==='cidade'?'<input class="fi" id="pr-cidade" autocomplete="off" placeholder="Cidade (ex.: Caxias do Sul RS)" value="'+esc(_PR.cidade||'')+'" style="font-size:14px">':'')
      +'<div style="font-size:12px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;margin:14px 0 8px">Distância máxima '+(_PR.modo==='rota'?'da rota':'')+'</div>'
      +'<div style="display:flex;gap:6px">'+[1000,2000,5000,10000].map(function(r){ return '<button onclick="prRaio('+r+')" style="'+chip(cfg.raio===r)+'">'+_prFmtD(r)+'</button>'; }).join('')+'</div>'
-     +'<div style="font-size:12px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;margin:14px 0 8px">Tipos de loja <span style="text-transform:none;font-weight:400">(marcados pelo perfil dos seus clientes)</span></div>'
-     +'<div style="display:flex;gap:6px;flex-wrap:wrap">'+PR_TIPOS.map(function(t){ var on=ativos.indexOf(t.id)>=0; return '<button onclick="prTipo(\''+t.id+'\')" style="'+chip(on)+'">'+esc(t.nome)+(P.cont[t.id]?' <span style="opacity:.75;font-weight:400">'+P.cont[t.id]+'</span>':'')+'</button>'; }).join('')+'</div>'
+     +'<div style="font-size:12px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;margin:14px 0 8px">Tipos de loja</div>'
+     +'<button onclick="prAbrirTipos()" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px;border:1px solid var(--bdr);border-radius:12px;background:var(--s2);text-align:left">'
+       +'<span style="min-width:0"><span style="display:block;font-size:14px;font-weight:700;color:var(--t1)">'+(ativos.length===PR_TIPOS.length?'Todos os tipos':ativos.length+' tipo'+(ativos.length>1?'s':'')+' selecionado'+(ativos.length>1?'s':''))+'</span>'
+       +'<span style="display:block;font-size:12px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(ativos.map(function(id){ var t=PR_TIPOS.find(function(x){return x.id===id;}); return t?t.nome:''; }).join(', '))+'</span></span>'
+       +'<span style="color:var(--t3);font-size:18px">▾</span></button>'
      +'<input class="fi" id="pr-extra" autocomplete="off" placeholder="Outro termo (ex.: loja de canecas personalizadas)" value="'+esc(cfg.extra)+'" onchange="_prSalvarCfg({prospExtra:this.value.trim()})" style="font-size:14px;margin-top:8px">'
      +'<button class="btn bp" onclick="prBuscar()" '+(temKey?'':'disabled')+' style="width:100%;margin-top:14px;padding:13px;font-size:15px;font-weight:700"><i class="ti ti-search"></i> Buscar prospects</button>'
      +'<div style="font-size:11px;color:var(--t3);text-align:center;margin-top:6px">Buscas no Google este mês: <b id="pr-uso">'+_prUsoMes(0)+'</b> · resultados ficam guardados '+PR_CACHE_DIAS+' dias</div>'
@@ -3981,6 +4022,37 @@ function renderProximosM(){
 }
 function prModo(m){ var ci=document.getElementById('pr-cidade'); if(ci) _PR.cidade=ci.value; _PR.modo=m; renderProximosM(); }
 function prRaio(r){ _prSalvarCfg({prospRaio:r}); renderProximosM(); }
+function prAbrirTipos(){
+  var ativos=prTiposAtivos(), P=prPerfilTipos();
+  var m=document.getElementById('pr-tipos-modal'); if(m) m.remove();
+  m=document.createElement('div'); m.id='pr-tipos-modal';
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:600;display:flex;align-items:flex-end';
+  m.onclick=function(e){ if(e.target===m) prFecharTipos(); };
+  var todos=ativos.length===PR_TIPOS.length;
+  m.innerHTML='<div style="background:var(--s1);border-radius:18px 18px 0 0;width:100%;max-height:80vh;display:flex;flex-direction:column">'
+    +'<div style="padding:14px 16px 8px"><div style="width:40px;height:4px;background:var(--bdr);border-radius:2px;margin:0 auto 12px"></div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-size:16px;font-weight:800;color:var(--t1)">Tipos de loja</div><button onclick="prFecharTipos()" style="background:none;border:none;font-size:22px;color:var(--t3)">✕</button></div>'
+    +'<div style="font-size:12px;color:var(--t3);margin-top:2px">O número mostra quantos clientes seus são desse tipo. Cada tipo = 1 busca no Google.</div></div>'
+    +'<div style="overflow-y:auto;padding:0 16px">'
+    +'<label style="display:flex;align-items:center;gap:12px;padding:13px 4px;border-bottom:2px solid var(--bdr)"><input type="checkbox" id="pr-t-todos" '+(todos?'checked':'')+' onchange="prTiposTodos(this.checked)" style="width:22px;height:22px;accent-color:var(--acc)"><span style="font-size:15px;font-weight:700;color:var(--t1)">Selecionar todos</span></label>'
+    +PR_TIPOS.map(function(t){ return '<label style="display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid var(--bdr)"><input type="checkbox" class="pr-t-item" value="'+t.id+'" '+(ativos.indexOf(t.id)>=0?'checked':'')+' onchange="prTiposContar()" style="width:22px;height:22px;accent-color:var(--acc)"><span style="flex:1;font-size:15px;color:var(--t1)">'+esc(t.nome)+'</span>'+(P.cont[t.id]?'<span style="font-size:12px;color:var(--t3);background:var(--s2);border-radius:10px;padding:2px 8px">'+P.cont[t.id]+'</span>':'')+'</label>'; }).join('')
+    +'</div><div style="padding:12px 16px calc(12px + env(safe-area-inset-bottom))"><button class="btn bp" id="pr-t-ok" onclick="prConfirmarTipos()" style="width:100%;padding:13px;font-size:15px;font-weight:700">Confirmar</button></div></div>';
+  document.body.appendChild(m); prTiposContar();
+}
+function prFecharTipos(){ var m=document.getElementById('pr-tipos-modal'); if(m) m.remove(); }
+function prTiposTodos(on){ document.querySelectorAll('.pr-t-item').forEach(function(c){ c.checked=on; }); prTiposContar(); }
+function prTiposContar(){
+  var its=[].slice.call(document.querySelectorAll('.pr-t-item')), n=its.filter(function(c){return c.checked;}).length;
+  var t=document.getElementById('pr-t-todos'); if(t) t.checked=n===its.length;
+  var ok=document.getElementById('pr-t-ok'); if(ok){ ok.disabled=!n; ok.textContent=n?'Confirmar ('+n+' tipo'+(n>1?'s':'')+')':'Marque pelo menos 1 tipo'; }
+}
+function prConfirmarTipos(){
+  var l=[].slice.call(document.querySelectorAll('.pr-t-item')).filter(function(c){return c.checked;}).map(function(c){return c.value;});
+  if(!l.length) return;
+  _prSalvarCfg({prospTipos:l}); prFecharTipos();
+  var ci=document.getElementById('pr-cidade'); if(ci) _PR.cidade=ci.value;
+  renderProximosM();
+}
 function prTipo(id){ var l=prTiposAtivos().slice(), i=l.indexOf(id); if(i>=0){ if(l.length>1) l.splice(i,1); } else l.push(id); _prSalvarCfg({prospTipos:l}); var ci=document.getElementById('pr-cidade'); if(ci) _PR.cidade=ci.value; renderProximosM(); }
 function _prStatus(h){ var el=document.getElementById('pr-status'); if(el) el.innerHTML=h; }
 
